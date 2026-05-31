@@ -1,0 +1,378 @@
+import {
+  assertSafeResolvedUrl,
+  crawlSameDomain,
+  crawlStaticSeed,
+  normalizeAuditUrl,
+  shouldSkipUrl
+} from "@a11yaudit/crawler";
+import {
+  DEFAULT_SCAN_LIMITS,
+  type AuditedPage,
+  type CompletedScanResult,
+  type EvidenceArtifact,
+  type ScanFinding,
+  type ScanRequest
+} from "@a11yaudit/core";
+import { buildAuditReportModel, renderPdfFromHtml, renderReportHtml } from "@a11yaudit/reporter";
+import { auditPage } from "@a11yaudit/rules";
+import { createArtifactKey, type StorageAdapter } from "@a11yaudit/storage";
+import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import { calculateScore } from "./score.js";
+
+export interface ScanProgressEvent {
+  status: "crawling" | "auditing" | "reporting";
+  pagesQueued: number;
+  pagesScanned: number;
+  findingsTotal: number;
+}
+
+export interface RunScanInput {
+  request: ScanRequest;
+  storage: StorageAdapter;
+  onProgress?: (event: ScanProgressEvent) => Promise<void> | void;
+}
+
+export async function runScan(input: RunScanInput): Promise<CompletedScanResult> {
+  const startedAt = new Date().toISOString();
+  const pages: AuditedPage[] = [];
+  const findings: ScanFinding[] = [];
+  let browser: Browser | null = null;
+
+  await emitProgress(input, "crawling", 0, 0, 0);
+  const urls = await crawlRequestedUrls(input);
+  if (urls.length === 0) {
+    throw new Error("No auditable URLs found");
+  }
+
+  const pagesQueued = urls.length * input.request.viewports.length;
+  await emitProgress(input, "auditing", pagesQueued, 0, 0);
+
+  try {
+    browser = await chromium.launch({ headless: true });
+
+    for (const url of urls) {
+      for (const viewport of input.request.viewports) {
+        const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
+        await installNavigationSafetyRoute(context, url);
+        const page = await context.newPage();
+
+        try {
+          const response = await page.goto(url, {
+            waitUntil: "networkidle",
+            timeout: DEFAULT_SCAN_LIMITS.navigationTimeoutMs
+          });
+          const finalUrl = page.url() || url;
+          await validateFinalNavigation(url, finalUrl);
+          const normalizedUrl = normalizeUrlSafely(finalUrl);
+          const auditResult = await auditPage({
+            page,
+            url,
+            normalizedUrl,
+            viewport
+          });
+
+          pages.push({
+            ...auditResult.page,
+            statusCode: response?.status() ?? auditResult.page.statusCode
+          });
+
+          const pageScreenshot = auditResult.findings.length > 0
+            ? await capturePageScreenshotEvidence({
+              runId: input.request.runId,
+              page,
+              normalizedUrl,
+              viewport: viewport.name,
+              storage: input.storage
+            })
+            : null;
+
+          for (const finding of auditResult.findings) {
+            const snippet = await captureSnippetEvidence(input.request.runId, finding, input.storage);
+            findings.push({
+              ...finding,
+              evidence: pageScreenshot ? [pageScreenshot, ...snippet] : snippet
+            });
+          }
+        } catch (error) {
+          pages.push(createFailedPage(url, viewport.name, error));
+        } finally {
+          await page.close().catch(() => undefined);
+          await context.close().catch(() => undefined);
+        }
+
+        await emitProgress(input, "auditing", pagesQueued, pages.length, findings.length);
+      }
+    }
+  } finally {
+    await browser?.close().catch(() => undefined);
+  }
+
+  if (!pages.some((page) => page.errorMessage === null)) {
+    throw new Error("No pages were audited successfully");
+  }
+
+  const score = calculateScore(findings);
+  await emitProgress(input, "reporting", pagesQueued, pages.length, findings.length);
+  const reports = await storeReports(input, {
+    score,
+    pages,
+    findings
+  });
+
+  return {
+    runId: input.request.runId,
+    projectId: input.request.projectId,
+    targetUrl: input.request.targetUrl,
+    mode: input.request.mode,
+    pages,
+    findings,
+    reports,
+    score,
+    startedAt,
+    finishedAt: new Date().toISOString()
+  };
+}
+
+async function crawlRequestedUrls(input: RunScanInput): Promise<string[]> {
+  const request = input.request;
+  const crawlInput = {
+    startUrl: request.targetUrl,
+    maxPages: request.maxPages,
+    maxDepth: request.maxDepth,
+    respectRobotsTxt: request.respectRobotsTxt,
+    pageTimeoutMs: DEFAULT_SCAN_LIMITS.pageTimeoutMs,
+    maxHtmlBytes: DEFAULT_SCAN_LIMITS.maxHtmlBytes
+  };
+
+  if (request.mode === "same_domain_crawl") {
+    const result = await crawlSameDomain(crawlInput);
+    return result.urls.slice(0, request.maxPages);
+  }
+
+  if (request.mode === "single_url") {
+    const result = await crawlStaticSeed(crawlInput);
+    return result.urls.slice(0, request.maxPages);
+  }
+
+  const urls = request.urls && request.urls.length > 0 ? request.urls : [request.targetUrl];
+  const normalizedUrls: string[] = [];
+
+  for (const url of urls) {
+    try {
+      const result = await crawlStaticSeed({
+        ...crawlInput,
+        startUrl: url,
+        maxPages: 1,
+        maxDepth: 0
+      });
+
+      for (const normalizedUrl of result.urls) {
+        if (!shouldSkipUrl(normalizedUrl) && !normalizedUrls.includes(normalizedUrl)) {
+          normalizedUrls.push(normalizedUrl);
+        }
+      }
+    } catch {
+      continue;
+    }
+
+    if (normalizedUrls.length >= request.maxPages) break;
+  }
+
+  return normalizedUrls;
+}
+
+async function installNavigationSafetyRoute(
+  context: BrowserContext,
+  requestedUrl: string
+): Promise<void> {
+  await context.route("**/*", async (route) => {
+    const request = route.request();
+    try {
+      await validateSafeAuditUrl(request.url());
+
+      if (request.resourceType() === "document") {
+        const response = await route.fetch({ maxRedirects: 0 });
+        const redirectUrl = getRedirectLocation(response.status(), response.headers(), request.url());
+        if (redirectUrl) {
+          await validateFinalNavigation(requestedUrl, redirectUrl);
+        }
+
+        await route.fulfill({ response });
+        return;
+      }
+
+      await route.continue();
+    } catch {
+      await route.abort("blockedbyclient");
+    }
+  });
+}
+
+function getRedirectLocation(status: number, headers: Record<string, string>, requestUrl: string): string | null {
+  if (status < 300 || status >= 400) {
+    return null;
+  }
+
+  const location = headers.location;
+  if (!location) {
+    return null;
+  }
+
+  return new URL(location, requestUrl).href;
+}
+
+async function capturePageScreenshotEvidence(input: {
+  runId: string;
+  page: Page;
+  normalizedUrl: string;
+  viewport: AuditedPage["viewport"];
+  storage: StorageAdapter;
+}): Promise<EvidenceArtifact> {
+  const pageScreenshot = await input.page.screenshot({ fullPage: true, type: "png" });
+  const pageKey = createArtifactKey({
+    runId: input.runId,
+    kind: "screenshot",
+    name: `${input.normalizedUrl}:${input.viewport}:page`,
+    extension: "png"
+  });
+  const storedPage = await input.storage.put(pageKey, Buffer.from(pageScreenshot), "image/png");
+
+  return {
+    kind: "page_screenshot",
+    artifactKey: storedPage.key,
+    mimeType: storedPage.mimeType,
+    sizeBytes: storedPage.sizeBytes
+  };
+}
+
+async function captureSnippetEvidence(
+  runId: string,
+  finding: ScanFinding,
+  storage: StorageAdapter
+): Promise<EvidenceArtifact[]> {
+  if (!finding.htmlSnippet) {
+    return [];
+  }
+
+  const snippetKey = createArtifactKey({
+    runId,
+    kind: "snippet",
+    name: `${finding.fingerprint}:html`,
+    extension: "txt"
+  });
+  const storedSnippet = await storage.put(snippetKey, Buffer.from(finding.htmlSnippet), "text/plain");
+
+  return [
+    {
+      kind: "html_snippet",
+      artifactKey: storedSnippet.key,
+      mimeType: storedSnippet.mimeType,
+      sizeBytes: storedSnippet.sizeBytes
+    }
+  ];
+}
+
+async function validateFinalNavigation(requestedUrl: string, finalUrl: string): Promise<void> {
+  await validateSafeAuditUrl(finalUrl);
+
+  const requested = new URL(requestedUrl);
+  const final = new URL(finalUrl);
+  if (requested.origin !== final.origin) {
+    throw new Error(`Unsafe redirect: final URL origin changed from ${requested.origin} to ${final.origin}`);
+  }
+}
+
+async function validateSafeAuditUrl(url: string): Promise<void> {
+  await assertSafeResolvedUrl(url);
+}
+
+async function storeReports(
+  input: RunScanInput,
+  reportInput: { score: number; pages: AuditedPage[]; findings: ScanFinding[] }
+): Promise<CompletedScanResult["reports"]> {
+  const generatedAt = new Date().toISOString();
+  const report = buildAuditReportModel({
+    request: input.request,
+    pages: reportInput.pages,
+    findings: reportInput.findings,
+    score: reportInput.score,
+    generatedAt
+  });
+  const html = renderReportHtml(report);
+  const pdf = await renderPdfFromHtml(html);
+  const htmlArtifact = await input.storage.put(
+    createArtifactKey({
+      runId: input.request.runId,
+      kind: "report",
+      name: "audit-report-html",
+      extension: "html"
+    }),
+    Buffer.from(html),
+    "text/html"
+  );
+  const pdfArtifact = await input.storage.put(
+    createArtifactKey({
+      runId: input.request.runId,
+      kind: "report",
+      name: "audit-report-pdf",
+      extension: "pdf"
+    }),
+    pdf,
+    "application/pdf"
+  );
+
+  return [
+    {
+      kind: "html",
+      artifactKey: htmlArtifact.key,
+      mimeType: htmlArtifact.mimeType,
+      sizeBytes: htmlArtifact.sizeBytes
+    },
+    {
+      kind: "pdf",
+      artifactKey: pdfArtifact.key,
+      mimeType: pdfArtifact.mimeType,
+      sizeBytes: pdfArtifact.sizeBytes
+    }
+  ];
+}
+
+async function emitProgress(
+  input: RunScanInput,
+  status: ScanProgressEvent["status"],
+  pagesQueued: number,
+  pagesScanned: number,
+  findingsTotal: number
+): Promise<void> {
+  await input.onProgress?.({ status, pagesQueued, pagesScanned, findingsTotal });
+}
+
+function createFailedPage(url: string, viewport: AuditedPage["viewport"], error: unknown): AuditedPage {
+  return {
+    url,
+    normalizedUrl: normalizeUrlSafely(url),
+    title: null,
+    viewport,
+    statusCode: null,
+    finalUrl: url,
+    durationMs: 0,
+    errorMessage: getAuditErrorMessage(error)
+  };
+}
+
+function getAuditErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : "Unable to audit page";
+  if (message.includes("ERR_BLOCKED_BY_CLIENT")) {
+    return "Unsafe document request blocked";
+  }
+
+  return message;
+}
+
+function normalizeUrlSafely(url: string): string {
+  try {
+    return normalizeAuditUrl(url);
+  } catch {
+    return url;
+  }
+}

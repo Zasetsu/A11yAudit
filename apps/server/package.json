@@ -1,0 +1,28 @@
+{
+  "name": "@a11yaudit/server",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/app.js",
+  "types": "dist/app.d.ts",
+  "scripts": {
+    "dev": "tsx src/app.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@a11yaudit/audit": "workspace:*",
+    "@a11yaudit/core": "workspace:*",
+    "@a11yaudit/crawler": "workspace:*",
+    "@a11yaudit/reporter": "workspace:*",
+    "@a11yaudit/storage": "workspace:*",
+    "better-sqlite3": "^12.10.0",
+    "drizzle-orm": "^0.30.10",
+    "fastify": "^4.27.0",
+    "nanoid": "^5.0.7",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "tsx": "^4.11.0"
+  }
+}

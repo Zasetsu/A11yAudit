@@ -1,0 +1,19 @@
+{
+  "name": "@a11yaudit/audit",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@a11yaudit/core": "workspace:*",
+    "@a11yaudit/crawler": "workspace:*",
+    "@a11yaudit/reporter": "workspace:*",
+    "@a11yaudit/rules": "workspace:*",
+    "@a11yaudit/storage": "workspace:*",
+    "playwright": "^1.44.0"
+  }
+}

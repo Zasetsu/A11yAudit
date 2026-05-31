@@ -1,0 +1,204 @@
+import { describe, expect, it } from "vitest";
+import { buildAuditReportModel, renderReportHtml } from "./index.js";
+
+describe("renderReportHtml", () => {
+  it("renders report sections and disclaimer", () => {
+    const html = renderReportHtml({
+      projectName: "Example Portal",
+      domain: "example.gov",
+      score: 74,
+      pagesAudited: 248,
+      findingsTotal: 613,
+      generatedAt: "2026-05-31T09:14:00.000Z",
+      findings: [],
+      pages: [],
+      targetUrl: "https://example.gov",
+      mode: "same_domain_crawl"
+    });
+
+    expect(html).toContain("Accessibility Audit Report");
+    expect(html).toContain("Example Portal");
+    expect(html).toContain("does not certify legal compliance");
+  });
+});
+
+describe("real report rendering", () => {
+  it("renders executive summary, technical findings, and honesty disclaimer", () => {
+    const report = buildAuditReportModel({
+      request: {
+        runId: "run-1",
+        projectId: "project-1",
+        targetUrl: "https://example.com",
+        mode: "single_url",
+        viewports: [{ name: "desktop", width: 1440, height: 900 }],
+        maxPages: 1,
+        maxDepth: 0,
+        respectRobotsTxt: true
+      },
+      pages: [{
+        url: "https://example.com",
+        normalizedUrl: "https://example.com/",
+        title: "Example Domain",
+        viewport: "desktop",
+        statusCode: 200,
+        finalUrl: "https://example.com/",
+        durationMs: 123,
+        errorMessage: null
+      }],
+      findings: [{
+        id: "finding-1",
+        title: "Images must have alternate text",
+        severity: "critical",
+        status: "new",
+        source: "axe",
+        certainty: "automatic_violation",
+        origin: "unknown",
+        wcagCriteria: ["1.1.1"],
+        ruleId: "image-alt",
+        description: "Ensures images have alternate text",
+        recommendation: "Add meaningful alternate text.",
+        pageUrl: "https://example.com",
+        viewport: "desktop",
+        selector: "img",
+        htmlSnippet: "<img>",
+        visibleText: null,
+        helpUrl: "https://dequeuniversity.com/rules/axe/4.10/image-alt",
+        fingerprint: "fingerprint",
+        evidence: [{
+          kind: "html_snippet",
+          artifactKey: "runs/run-1/snippets/finding-1.txt",
+          mimeType: "text/plain",
+          sizeBytes: 5
+        }],
+        instances: 1
+      }],
+      score: 75,
+      generatedAt: "2026-05-31T00:00:00.000Z"
+    });
+
+    const html = renderReportHtml(report);
+    expect(html).toContain("Executive Summary");
+    expect(html).toContain("Audit Scope");
+    expect(html).toContain("Severity Summary");
+    expect(html).toContain("Technical Findings");
+    expect(html).toContain("Evidence Appendix");
+    expect(html).toContain("Manual Review Notice");
+    expect(html).toContain("Images must have alternate text");
+    expect(html).toContain("runs/run-1/snippets/finding-1.txt");
+    expect(html).toContain("does not certify legal compliance");
+  });
+
+  it("escapes hostile finding and evidence fields", () => {
+    const report = buildAuditReportModel({
+      request: {
+        runId: "run-escape",
+        projectId: "project-escape",
+        targetUrl: "https://example.com",
+        mode: "single_url",
+        viewports: [{ name: "desktop", width: 1440, height: 900 }],
+        maxPages: 1,
+        maxDepth: 0,
+        respectRobotsTxt: true
+      },
+      pages: [],
+      findings: [{
+        id: "finding-<script>alert(1)</script>",
+        title: "Bad title <script>alert(1)</script>",
+        severity: "critical",
+        status: "new",
+        source: "axe",
+        certainty: "automatic_violation",
+        origin: "unknown",
+        wcagCriteria: ["1.1.1<script>alert(1)</script>"],
+        ruleId: "image-alt\"><img src=x onerror=\"alert(1)\">",
+        description: "Ensures images have alternate text",
+        recommendation: "Fix it <img src=x onerror=\"alert(1)\">",
+        pageUrl: "https://example.com/?q=<script>alert(1)</script>",
+        viewport: "desktop",
+        selector: "img[alt=\"\"><script>alert(1)</script>",
+        htmlSnippet: null,
+        visibleText: null,
+        helpUrl: null,
+        fingerprint: "fingerprint",
+        evidence: [{
+          kind: "html_snippet",
+          artifactKey: "runs/run-escape/<script>alert(1)</script>.txt",
+          mimeType: "text/html\"><img src=x onerror=\"alert(1)\">",
+          sizeBytes: 5
+        }],
+        instances: 1
+      }],
+      score: 75,
+      generatedAt: "2026-05-31T00:00:00.000Z"
+    });
+
+    const html = renderReportHtml(report);
+    expect(html).not.toContain("<script>");
+    expect(html).not.toContain("</script>");
+    expect(html).not.toContain("<img src=x");
+    expect(html).not.toContain("onerror=\"alert(1)\"");
+    expect(html).toContain("Bad title &lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(html).toContain("https://example.com/?q=&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(html).toContain("img[alt=&quot;&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(html).toContain("Fix it &lt;img src=x onerror=&quot;alert(1)&quot;&gt;");
+    expect(html).toContain("1.1.1&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(html).toContain("image-alt&quot;&gt;&lt;img src=x onerror=&quot;alert(1)&quot;&gt;");
+    expect(html).toContain("finding-&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(html).toContain("runs/run-escape/&lt;script&gt;alert(1)&lt;/script&gt;.txt");
+    expect(html).toContain("text/html&quot;&gt;&lt;img src=x onerror=&quot;alert(1)&quot;&gt;");
+  });
+
+  it("renders correct severity summary counts", () => {
+    const report = buildAuditReportModel({
+      request: {
+        runId: "run-severity",
+        projectId: "project-severity",
+        targetUrl: "https://example.com",
+        mode: "single_url",
+        viewports: [{ name: "desktop", width: 1440, height: 900 }],
+        maxPages: 1,
+        maxDepth: 0,
+        respectRobotsTxt: true
+      },
+      pages: [],
+      findings: [
+        "critical",
+        "serious",
+        "serious",
+        "moderate",
+        "moderate",
+        "moderate",
+        "minor",
+        "minor",
+        "minor",
+        "minor"
+      ].map((severity, index) => ({
+        id: `finding-${index}`,
+        title: `Finding ${index}`,
+        severity: severity as "critical" | "serious" | "moderate" | "minor",
+        status: "new",
+        source: "axe",
+        certainty: "automatic_violation",
+        origin: "unknown",
+        wcagCriteria: ["1.1.1"],
+        ruleId: `rule-${index}`,
+        description: "Description",
+        recommendation: "Recommendation",
+        pageUrl: "https://example.com",
+        viewport: "desktop",
+        selector: "main",
+        htmlSnippet: null,
+        visibleText: null,
+        helpUrl: null,
+        fingerprint: `fingerprint-${index}`,
+        evidence: [],
+        instances: 1
+      })),
+      score: 50,
+      generatedAt: "2026-05-31T00:00:00.000Z"
+    });
+
+    const html = renderReportHtml(report);
+    expect(html).toMatch(/<tr>\s*<td>1<\/td>\s*<td>2<\/td>\s*<td>3<\/td>\s*<td>4<\/td>\s*<\/tr>/);
+  });
+});

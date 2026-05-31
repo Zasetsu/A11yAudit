@@ -1,0 +1,14 @@
+node_modules
+dist
+.env*
+!.env.example
+.DS_Store
+.a11yaudit
+.a11yaudit-*
+coverage
+playwright-report
+.playwright-mcp
+test-results
+*.db
+*.db-shm
+*.db-wal

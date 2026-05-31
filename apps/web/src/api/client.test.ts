@@ -1,0 +1,209 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+function jsonResponse(data: unknown): Response {
+  return new Response(JSON.stringify({ data }), {
+    headers: { "content-type": "application/json" },
+    status: 200
+  });
+}
+
+async function importClient(apiBaseUrl?: string) {
+  vi.resetModules();
+  vi.unstubAllEnvs();
+  if (apiBaseUrl !== undefined) {
+    vi.stubEnv("VITE_A11YAUDIT_API_BASE_URL", apiBaseUrl);
+  }
+
+  return import("./client");
+}
+
+describe("api client", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it("uses demo reports only when no API base URL is configured", async () => {
+    const { getReports } = await importClient();
+
+    await expect(getReports()).resolves.not.toHaveLength(0);
+  });
+
+  it("does not return demo reports when configured API reports are unavailable", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 404 })));
+    const { getReports } = await importClient("https://api.example.test/");
+
+    await expect(getReports()).resolves.toEqual([]);
+  });
+
+  it("does not return demo dashboard data when configured API lists are unavailable", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 503 })));
+    const { getFindings, getProjects, getScans } = await importClient("https://api.example.test/");
+
+    await expect(getProjects()).resolves.toEqual([]);
+    await expect(getScans()).resolves.toEqual([]);
+    await expect(getFindings()).resolves.toEqual([]);
+  });
+
+  it("maps configured API reports when available", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse([
+          {
+            id: "report-1",
+            projectId: "project-1",
+            scanRunId: "run-1",
+            kind: "pdf",
+            artifactKey: "reports/report-1.pdf",
+            mimeType: "application/pdf"
+          }
+        ])
+      )
+    );
+    const { getReports } = await importClient("https://api.example.test/");
+
+    await expect(getReports()).resolves.toMatchObject([
+      {
+        id: "report-1",
+        artifactKey: "reports/report-1.pdf",
+        sizeBytes: 0,
+        status: "ready"
+      }
+    ]);
+  });
+
+  it("creates projects against the configured API", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          id: "project-1",
+          name: "Municipal Portal",
+          url: "https://municipal.example.gov/",
+          domain: "municipal.example.gov",
+          createdAt: "2026-05-31T00:00:00.000Z",
+          openFindings: 0,
+          lastScan: null
+        }),
+        { headers: { "content-type": "application/json" }, status: 201 }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { createProject } = await importClient("https://api.example.test/");
+
+    await expect(createProject({ name: "Municipal Portal", url: "https://municipal.example.gov/" })).resolves.toMatchObject({
+      id: "project-1",
+      name: "Municipal Portal",
+      domain: "municipal.example.gov"
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.test/api/projects",
+      expect.objectContaining({
+        body: JSON.stringify({ name: "Municipal Portal", url: "https://municipal.example.gov/" }),
+        method: "POST"
+      })
+    );
+  });
+
+  it("passes CLI-equivalent scan options to the configured API", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          id: "run-1",
+          projectId: "project-1",
+          url: "https://municipal.example.gov/",
+          status: "queued",
+          mode: "same_domain_crawl",
+          maxPages: 75,
+          maxDepth: 3,
+          viewports: "desktop",
+          pagesQueued: 0,
+          pagesScanned: 0,
+          findingsTotal: 0,
+          createdAt: "2026-05-31T00:00:00.000Z"
+        }),
+        { headers: { "content-type": "application/json" }, status: 201 }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { createScan } = await importClient("https://api.example.test/");
+
+    await expect(
+      createScan({
+        projectId: "project-1",
+        url: "https://municipal.example.gov/",
+        mode: "same_domain_crawl",
+        maxPages: 75,
+        maxDepth: 3,
+        viewports: ["desktop"]
+      })
+    ).resolves.toMatchObject({
+      id: "run-1",
+      mode: "same_domain_crawl",
+      maxPages: 75,
+      maxDepth: 3,
+      viewports: "Desktop"
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.test/api/scans",
+      expect.objectContaining({
+        body: JSON.stringify({
+          projectId: "project-1",
+          url: "https://municipal.example.gov/",
+          mode: "same_domain_crawl",
+          maxPages: 75,
+          maxDepth: 3,
+          viewports: ["desktop"]
+        }),
+        method: "POST"
+      })
+    );
+  });
+
+  it("maps finding evidence artifacts and exposes artifact download URLs", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse([
+          {
+            id: "finding-1",
+            projectId: "project-1",
+            scanRunId: "run-1",
+            pageUrl: "https://municipal.example.gov/",
+            ruleId: "button-name",
+            title: "Buttons must have discernible text",
+            severity: "critical",
+            status: "new",
+            wcagCriteria: "4.1.2",
+            evidence: JSON.stringify([
+              {
+                kind: "page_screenshot",
+                artifactKey: "runs/run-1/screenshot/page.png",
+                mimeType: "image/png",
+                sizeBytes: 2000
+              }
+            ])
+          }
+        ])
+      )
+    );
+    const { getArtifactDownloadUrl, getFindings } = await importClient("https://api.example.test/");
+
+    await expect(getFindings()).resolves.toMatchObject([
+      {
+        id: "finding-1",
+        evidenceArtifacts: [
+          {
+            kind: "page_screenshot",
+            artifactKey: "runs/run-1/screenshot/page.png",
+            mimeType: "image/png",
+            sizeBytes: 2000
+          }
+        ]
+      }
+    ]);
+    expect(getArtifactDownloadUrl("runs/run-1/screenshot/page.png")).toBe(
+      "https://api.example.test/api/artifacts/download?key=runs%2Frun-1%2Fscreenshot%2Fpage.png"
+    );
+  });
+});

@@ -1,0 +1,26 @@
+services:
+  server:
+    image: node:20-bookworm
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install && pnpm --filter @a11yaudit/server dev"
+    ports:
+      - "7842:7842"
+    volumes:
+      - .:/app
+      - a11yaudit_artifacts:/app/.a11yaudit
+
+  web:
+    image: node:20-bookworm
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install && pnpm --filter @a11yaudit/web dev"
+    environment:
+      VITE_A11YAUDIT_API_BASE_URL: http://localhost:7842
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+    depends_on:
+      - server
+
+volumes:
+  a11yaudit_artifacts:
