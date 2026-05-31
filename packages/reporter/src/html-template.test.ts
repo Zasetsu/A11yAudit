@@ -201,4 +201,63 @@ describe("real report rendering", () => {
     const html = renderReportHtml(report);
     expect(html).toMatch(/<tr>\s*<td>1<\/td>\s*<td>2<\/td>\s*<td>3<\/td>\s*<td>4<\/td>\s*<\/tr>/);
   });
+
+  it("limits detailed rows for print reports while preserving total counts", () => {
+    const report = buildAuditReportModel({
+      request: {
+        runId: "run-large",
+        projectId: "project-large",
+        targetUrl: "https://example.com",
+        mode: "same_domain_crawl",
+        viewports: [{ name: "desktop", width: 1440, height: 900 }],
+        maxPages: 250,
+        maxDepth: 5,
+        respectRobotsTxt: true
+      },
+      pages: [],
+      findings: Array.from({ length: 25 }, (_, index) => ({
+        id: `finding-${index}`,
+        title: `Finding ${index}`,
+        severity: "critical",
+        status: "new",
+        source: "axe",
+        certainty: "automatic_violation",
+        origin: "unknown",
+        wcagCriteria: ["4.1.2"],
+        ruleId: "button-name",
+        description: "Description",
+        recommendation: "Recommendation",
+        pageUrl: "https://example.com",
+        viewport: "desktop",
+        selector: `.node-${index}`,
+        htmlSnippet: null,
+        visibleText: null,
+        helpUrl: null,
+        fingerprint: `fingerprint-${index}`,
+        evidence: [{
+          kind: "html_snippet",
+          artifactKey: `runs/run-large/snippets/finding-${index}.txt`,
+          mimeType: "text/plain",
+          sizeBytes: 5
+        }],
+        instances: 1
+      })),
+      score: 0,
+      generatedAt: "2026-05-31T00:00:00.000Z"
+    });
+
+    const html = renderReportHtml(report, {
+      maxDetailedFindings: 10,
+      maxEvidenceRows: 5
+    });
+
+    expect(html).toContain("found 25 technical findings");
+    expect(html).toContain("Showing 10 of 25 findings");
+    expect(html).toContain("15 additional findings are summarized in the severity totals");
+    expect(html).toContain("Showing 5 of 25 evidence artifacts");
+    expect(html).toContain("Finding 9");
+    expect(html).not.toContain("Finding 10");
+    expect(html).toContain("runs/run-large/snippets/finding-4.txt");
+    expect(html).not.toContain("runs/run-large/snippets/finding-5.txt");
+  });
 });

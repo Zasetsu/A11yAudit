@@ -1,6 +1,11 @@
 import type { AuditReportModel, SeveritySummary } from "./report-model.js";
 
-export function renderReportHtml(report: AuditReportModel): string {
+export interface RenderReportHtmlOptions {
+  maxDetailedFindings?: number;
+  maxEvidenceRows?: number;
+}
+
+export function renderReportHtml(report: AuditReportModel, options: RenderReportHtmlOptions = {}): string {
   const severitySummary = report.severitySummary ?? summarizeSeverityFromFindings(report);
   const failedPages = report.pages.filter((page) => page.errorMessage !== null).length;
 
@@ -21,6 +26,7 @@ export function renderReportHtml(report: AuditReportModel): string {
     th, td { border: 1px solid #e6e2da; padding: 8px; text-align: left; vertical-align: top; }
     th { background: #f4f1ec; }
     code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
+    .limit-note { margin: 8px 0 12px; padding: 10px 12px; border-left: 4px solid #315fba; background: #eef3ff; color: #25324a; }
     .notice,
     .disclaimer { margin-top: 32px; padding: 12px; border: 1px solid #d4cfc5; background: #f4f1ec; }
   </style>
@@ -63,10 +69,10 @@ export function renderReportHtml(report: AuditReportModel): string {
   </table>
 
   <h2>Technical Findings</h2>
-  ${renderFindingsTable(report)}
+  ${renderFindingsTable(report, options.maxDetailedFindings)}
 
   <h2>Evidence Appendix</h2>
-  ${renderEvidenceAppendix(report)}
+  ${renderEvidenceAppendix(report, options.maxEvidenceRows)}
 
   <h2>Manual Review Notice</h2>
   <div class="notice">Automated scan results can identify many technical accessibility issues, but some WCAG 2.2 success criteria require manual review, assistive technology checks, and human judgment.</div>
@@ -76,12 +82,17 @@ export function renderReportHtml(report: AuditReportModel): string {
 </html>`;
 }
 
-function renderFindingsTable(report: AuditReportModel): string {
+function renderFindingsTable(report: AuditReportModel, maxDetailedFindings?: number): string {
   if (report.findings.length === 0) {
     return "<p>No technical findings were detected by the automated scan.</p>";
   }
 
-  const rows = report.findings.map((finding) => `<tr>
+  const visibleFindings = limitItems(report.findings, maxDetailedFindings);
+  const hiddenCount = report.findings.length - visibleFindings.length;
+  const limitNote = hiddenCount > 0
+    ? `<div class="limit-note">Showing ${visibleFindings.length} of ${report.findings.length} findings. ${hiddenCount} additional findings are summarized in the severity totals and remain available in the stored scan data.</div>`
+    : "";
+  const rows = visibleFindings.map((finding) => `<tr>
     <td>${escapeHtml(finding.severity)}</td>
     <td>${escapeHtml(finding.title)}</td>
     <td>${escapeHtml(finding.pageUrl)}</td>
@@ -93,7 +104,7 @@ function renderFindingsTable(report: AuditReportModel): string {
     <td>${escapeHtml(finding.recommendation)}</td>
   </tr>`).join("");
 
-  return `<table>
+  return `${limitNote}<table>
     <thead>
       <tr>
         <th>Severity</th>
@@ -111,21 +122,28 @@ function renderFindingsTable(report: AuditReportModel): string {
   </table>`;
 }
 
-function renderEvidenceAppendix(report: AuditReportModel): string {
-  const rows = report.findings.flatMap((finding) => finding.evidence.map((evidence) => `<tr>
+function renderEvidenceAppendix(report: AuditReportModel, maxEvidenceRows?: number): string {
+  const evidenceRows = report.findings.flatMap((finding) => finding.evidence.map((evidence) => ({ finding, evidence })));
+  const visibleEvidenceRows = limitItems(evidenceRows, maxEvidenceRows);
+  const hiddenCount = evidenceRows.length - visibleEvidenceRows.length;
+  const rows = visibleEvidenceRows.map(({ finding, evidence }) => `<tr>
     <td>${escapeHtml(finding.id)}</td>
     <td>${escapeHtml(finding.title)}</td>
     <td>${escapeHtml(evidence.kind)}</td>
     <td><code>${escapeHtml(evidence.artifactKey)}</code></td>
     <td>${escapeHtml(evidence.mimeType)}</td>
     <td>${evidence.sizeBytes}</td>
-  </tr>`));
+  </tr>`);
 
-  if (rows.length === 0) {
+  if (evidenceRows.length === 0) {
     return "<p>No evidence artifacts were attached to the scan findings.</p>";
   }
 
-  return `<table>
+  const limitNote = hiddenCount > 0
+    ? `<div class="limit-note">Showing ${visibleEvidenceRows.length} of ${evidenceRows.length} evidence artifacts. ${hiddenCount} additional evidence artifacts remain available in storage.</div>`
+    : "";
+
+  return `${limitNote}<table>
     <thead>
       <tr>
         <th>Finding ID</th>
@@ -150,6 +168,14 @@ function summarizeSeverityFromFindings(report: AuditReportModel): SeveritySummar
     moderate: 0,
     minor: 0
   });
+}
+
+function limitItems<T>(items: T[], maxItems?: number): T[] {
+  if (maxItems === undefined) {
+    return items;
+  }
+
+  return items.slice(0, Math.max(0, maxItems));
 }
 
 function escapeHtml(value: string): string {

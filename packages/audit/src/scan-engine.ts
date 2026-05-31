@@ -19,6 +19,9 @@ import { createArtifactKey, type StorageAdapter } from "@a11yaudit/storage";
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
 import { calculateScore } from "./score.js";
 
+const PDF_DETAILED_FINDING_LIMIT = 500;
+const PDF_EVIDENCE_ROW_LIMIT = 500;
+
 export interface ScanProgressEvent {
   status: "crawling" | "auditing" | "reporting";
   pagesQueued: number;
@@ -299,7 +302,11 @@ async function storeReports(
     generatedAt
   });
   const html = renderReportHtml(report);
-  const pdf = await renderPdfFromHtml(html);
+  const pdfHtml = renderReportHtml(report, {
+    maxDetailedFindings: PDF_DETAILED_FINDING_LIMIT,
+    maxEvidenceRows: PDF_EVIDENCE_ROW_LIMIT
+  });
+  const pdf = await renderPdfFromHtml(pdfHtml);
   const htmlArtifact = await input.storage.put(
     createArtifactKey({
       runId: input.request.runId,
