@@ -116,6 +116,62 @@ function mockCompletedScan(): void {
   });
 }
 
+function mockLargeCompletedScan(count: number): void {
+  runScanMock.mockImplementation(async ({ request, storage }: {
+    request: { runId: string; projectId: string | null; targetUrl: string };
+    storage: { put: (key: string, body: Buffer, mimeType: string) => Promise<{ key: string; mimeType: string; sizeBytes: number }> };
+  }) => {
+    const html = await storage.put(`runs/${request.runId}/report/audit-report.html`, Buffer.from("<html></html>"), "text/html");
+    const pdf = await storage.put(`runs/${request.runId}/report/audit-report.pdf`, Buffer.from("%PDF-1.4\n"), "application/pdf");
+
+    return {
+      runId: request.runId,
+      projectId: request.projectId,
+      targetUrl: request.targetUrl,
+      mode: "same_domain_crawl",
+      pages: Array.from({ length: 102 }, (_, index) => ({
+        url: `${request.targetUrl}/page-${index}`,
+        normalizedUrl: `${request.targetUrl}/page-${index}`,
+        title: `Fixture ${index}`,
+        viewport: index % 2 === 0 ? "desktop" : "mobile",
+        statusCode: 200,
+        finalUrl: `${request.targetUrl}/page-${index}`,
+        durationMs: 1,
+        errorMessage: null
+      })),
+      findings: Array.from({ length: count }, (_, index) => ({
+        id: `finding-${index}`,
+        pageUrl: request.targetUrl,
+        viewport: index % 2 === 0 ? "desktop" : "mobile",
+        selector: `.node-${index}`,
+        htmlSnippet: "<button></button>",
+        visibleText: null,
+        helpUrl: null,
+        fingerprint: `fingerprint-${index}`,
+        evidence: [],
+        instances: 1,
+        title: "Buttons must have discernible text",
+        severity: "critical",
+        status: "new",
+        source: "axe",
+        certainty: "automatic_violation",
+        origin: "component",
+        wcagCriteria: ["4.1.2"],
+        ruleId: "button-name",
+        description: "Buttons must have discernible text.",
+        recommendation: "Add an accessible name."
+      })),
+      reports: [
+        { kind: "html", artifactKey: html.key, mimeType: html.mimeType, sizeBytes: html.sizeBytes },
+        { kind: "pdf", artifactKey: pdf.key, mimeType: pdf.mimeType, sizeBytes: pdf.sizeBytes }
+      ],
+      score: 0,
+      startedAt: "2026-05-31T00:00:00.000Z",
+      finishedAt: "2026-05-31T00:00:01.000Z"
+    };
+  });
+}
+
 afterEach(() => {
   runScanMock.mockReset();
 });
@@ -522,6 +578,49 @@ describe("server", () => {
         });
         expect(screenshotDownload.statusCode).toBe(200);
         expect(screenshotDownload.headers["content-type"]).toContain("image/png");
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("persists large scan results in chunks instead of failing SQLite variable limits", async () => {
+    await withTempDb(async (dbPath) => {
+      mockLargeCompletedScan(4200);
+      const app = await buildServer({
+        dbPath,
+        storageRoot: join(dbPath, "..", "artifacts")
+      });
+      try {
+        const project = await app.inject({
+          method: "POST",
+          url: "/api/projects",
+          payload: {
+            name: "Large Fixture",
+            url: "https://large.example.com"
+          }
+        });
+        const scan = await app.inject({
+          method: "POST",
+          url: "/api/scans",
+          payload: {
+            projectId: project.json().id,
+            url: "https://large.example.com",
+            mode: "same_domain_crawl",
+            maxPages: 250,
+            viewports: ["desktop", "mobile"]
+          }
+        });
+
+        await waitForCompletedScan(app, scan.json().id);
+
+        const listed = await app.inject({ method: "GET", url: "/api/scans" });
+        const completed = listed.json().data.find((row: { id: string }) => row.id === scan.json().id);
+        expect(completed).toMatchObject({
+          status: "completed",
+          findingsTotal: 4200,
+          errorMessage: null
+        });
       } finally {
         await app.close();
       }

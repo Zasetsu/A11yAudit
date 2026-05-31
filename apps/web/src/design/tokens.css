@@ -861,6 +861,11 @@ textarea.input { height: auto; line-height: 1.5; min-height: 86px; padding: 8px 
   margin-top: 3px;
 }
 
+.error-text {
+  color: var(--critical);
+  font-weight: 600;
+}
+
 .project-grid {
   display: grid;
   gap: 14px;

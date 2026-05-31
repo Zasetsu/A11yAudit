@@ -21,6 +21,14 @@ export interface BuildServerOptions {
   executeScans?: boolean;
 }
 
+function chunkArray<T>(items: T[], chunkSize: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += chunkSize) {
+    chunks.push(items.slice(index, index + chunkSize));
+  }
+  return chunks;
+}
+
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: options.logger ?? false });
   const dbClient = options.dbClient ?? createDb(options.dbPath);
@@ -61,29 +69,30 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
           const completedAt = result.finishedAt;
           dbClient.db.transaction((tx) => {
             if (result.findings.length > 0) {
-              tx
-                .insert(findings)
-                .values(result.findings.map((finding) => ({
-                  id: `${result.runId}-${finding.id}`,
-                  projectId: result.projectId ?? job.payload.projectId,
-                  scanRunId: result.runId,
-                  pageUrl: finding.pageUrl,
-                  ruleId: finding.ruleId,
-                  title: finding.title,
-                  severity: finding.severity,
-                  status: finding.status,
-                  viewport: finding.viewport,
-                  certainty: finding.certainty,
-                  wcagCriteria: finding.wcagCriteria.join(","),
-                  selector: finding.selector,
-                  description: finding.description,
-                  helpUrl: finding.helpUrl,
-                  evidence: JSON.stringify(finding.evidence),
-                  fingerprint: finding.fingerprint,
-                  instances: finding.instances,
-                  createdAt: completedAt
-                })))
-                .run();
+              const findingRows = result.findings.map((finding) => ({
+                id: `${result.runId}-${finding.id}`,
+                projectId: result.projectId ?? job.payload.projectId,
+                scanRunId: result.runId,
+                pageUrl: finding.pageUrl,
+                ruleId: finding.ruleId,
+                title: finding.title,
+                severity: finding.severity,
+                status: finding.status,
+                viewport: finding.viewport,
+                certainty: finding.certainty,
+                wcagCriteria: finding.wcagCriteria.join(","),
+                selector: finding.selector,
+                description: finding.description,
+                helpUrl: finding.helpUrl,
+                evidence: JSON.stringify(finding.evidence),
+                fingerprint: finding.fingerprint,
+                instances: finding.instances,
+                createdAt: completedAt
+              }));
+
+              for (const chunk of chunkArray(findingRows, 200)) {
+                tx.insert(findings).values(chunk).run();
+              }
             }
 
             if (result.reports.length > 0) {
