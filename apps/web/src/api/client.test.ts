@@ -29,6 +29,12 @@ describe("api client", () => {
     await expect(getReports()).resolves.not.toHaveLength(0);
   });
 
+  it("uses demo issues only when no API base URL is configured", async () => {
+    const { fetchIssues } = await importClient();
+
+    await expect(fetchIssues()).resolves.not.toHaveLength(0);
+  });
+
   it("does not return demo reports when configured API reports are unavailable", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 404 })));
     const { getReports } = await importClient("https://api.example.test/");
@@ -117,6 +123,21 @@ describe("api client", () => {
         occurrences: 366,
         cmsHint: "Elementor widget button"
       }
+    ]);
+  });
+
+  it("does not fabricate required grouped issue fields for malformed API rows", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse([{}])));
+    const { fetchIssues } = await importClient("https://api.example.test/");
+
+    await expect(fetchIssues()).resolves.toEqual([
+      expect.objectContaining({
+        id: undefined,
+        title: undefined,
+        affectedPages: undefined,
+        occurrences: undefined,
+        createdAt: undefined
+      })
     ]);
   });
 

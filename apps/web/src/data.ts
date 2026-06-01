@@ -382,6 +382,36 @@ export const demoFindings: Finding[] = [
   }
 ];
 
+export const demoIssues: Issue[] = [
+  {
+    id: "issue-button-name-header-menu",
+    projectId: "proj-usagov",
+    scanRunId: "run-1042",
+    issueKey: "button-name|4.1.2|header menu|/*|header|Navigation menu button",
+    title: "Icon-only mobile menu button has no accessible name",
+    severity: "critical",
+    source: "axe",
+    certainty: "automatic_violation",
+    ruleId: "button-name",
+    wcagCriteria: "4.1.2",
+    description: "The control exposes a button role but does not provide an accessible name.",
+    recommendation: "Add visible text or an aria-label that describes the menu button.",
+    likelyScope: "Shared header component",
+    urlScopeGroup: "/*",
+    componentArea: "header",
+    cmsHint: "Navigation menu button",
+    confidence: "high",
+    affectedPages: 41,
+    occurrences: 41,
+    viewportSummary: "mobile",
+    representativeUrl: "https://example.gov/",
+    representativeSelector: "header > nav > button.menu-toggle",
+    representativeHtmlSnippet: null,
+    sampleUrls: ["https://example.gov/"],
+    createdAt: "2026-05-31T09:27:00.000Z"
+  }
+];
+
 export const demoReports: Report[] = [
   {
     id: "rep-0312",

@@ -1,5 +1,6 @@
 import {
   demoFindings,
+  demoIssues,
   demoProjects,
   demoReports,
   demoScanRuns,
@@ -77,10 +78,28 @@ type ServerReport = Partial<Report> & {
 };
 
 type ServerIssue = Partial<Omit<Issue, "severity" | "source" | "certainty" | "confidence" | "sampleUrls">> & {
-  severity?: string;
-  source?: string;
-  certainty?: string;
-  confidence?: string;
+  id: string;
+  projectId: string;
+  scanRunId: string;
+  issueKey: string;
+  title: string;
+  severity: string;
+  source: string;
+  certainty: string;
+  ruleId: string;
+  wcagCriteria: string;
+  description: string;
+  recommendation: string;
+  likelyScope: string;
+  urlScopeGroup: string;
+  componentArea: string;
+  cmsHint: string;
+  confidence: string;
+  affectedPages: number;
+  occurrences: number;
+  viewportSummary: string;
+  representativeUrl: string;
+  createdAt: string;
   sampleUrls?: unknown;
 };
 
@@ -168,55 +187,37 @@ function safeJsonParse(value: string): unknown {
   }
 }
 
-function issueSeverity(severity: string | undefined): Issue["severity"] {
-  return severity === "critical" || severity === "serious" || severity === "moderate" ? severity : "minor";
-}
-
-function issueSource(source: string | undefined): Issue["source"] {
-  return source === "custom" || source === "crawler" ? source : "axe";
-}
-
-function issueCertainty(certainty: string | undefined): Issue["certainty"] {
-  return certainty === "needs_manual_verification" || certainty === "not_automatically_testable"
-    ? certainty
-    : "automatic_violation";
-}
-
-function issueConfidence(confidence: string | undefined): Issue["confidence"] {
-  return confidence === "high" || confidence === "medium" ? confidence : "low";
-}
-
 function issueSampleUrls(sampleUrls: unknown): string[] {
   return Array.isArray(sampleUrls) ? sampleUrls.filter((url): url is string => typeof url === "string") : [];
 }
 
 function mapIssue(row: ServerIssue): Issue {
   return {
-    id: row.id ?? "",
-    projectId: row.projectId ?? "",
-    scanRunId: row.scanRunId ?? "",
-    issueKey: row.issueKey ?? "",
-    title: row.title ?? "Untitled issue",
-    severity: issueSeverity(row.severity),
-    source: issueSource(row.source),
-    certainty: issueCertainty(row.certainty),
-    ruleId: row.ruleId ?? "",
-    wcagCriteria: row.wcagCriteria ?? "",
-    description: row.description ?? "",
-    recommendation: row.recommendation ?? "",
-    likelyScope: row.likelyScope ?? "single page",
-    urlScopeGroup: row.urlScopeGroup ?? "",
-    componentArea: row.componentArea ?? "unknown",
-    cmsHint: row.cmsHint ?? "none",
-    confidence: issueConfidence(row.confidence),
-    affectedPages: row.affectedPages ?? 0,
-    occurrences: row.occurrences ?? 0,
-    viewportSummary: row.viewportSummary ?? "desktop",
-    representativeUrl: row.representativeUrl ?? "",
+    id: row.id,
+    projectId: row.projectId,
+    scanRunId: row.scanRunId,
+    issueKey: row.issueKey,
+    title: row.title,
+    severity: row.severity as Issue["severity"],
+    source: row.source as Issue["source"],
+    certainty: row.certainty as Issue["certainty"],
+    ruleId: row.ruleId,
+    wcagCriteria: row.wcagCriteria,
+    description: row.description,
+    recommendation: row.recommendation,
+    likelyScope: row.likelyScope,
+    urlScopeGroup: row.urlScopeGroup,
+    componentArea: row.componentArea,
+    cmsHint: row.cmsHint,
+    confidence: row.confidence as Issue["confidence"],
+    affectedPages: row.affectedPages,
+    occurrences: row.occurrences,
+    viewportSummary: row.viewportSummary,
+    representativeUrl: row.representativeUrl,
     representativeSelector: row.representativeSelector ?? null,
     representativeHtmlSnippet: row.representativeHtmlSnippet ?? null,
     sampleUrls: issueSampleUrls(row.sampleUrls),
-    createdAt: row.createdAt ?? new Date(0).toISOString()
+    createdAt: row.createdAt
   };
 }
 
@@ -308,7 +309,10 @@ export async function fetchIssues(params: { projectId?: string; scanRunId?: stri
 
   const query = search.toString();
   const result = await fetchList<ServerIssue>(`/api/issues${query === "" ? "" : `?${query}`}`);
-  if (result.status !== "ok") return [];
+  if (result.status === "not_configured") {
+    return demoIssues;
+  }
+  if (result.status === "unavailable") return [];
 
   return result.data.map(mapIssue);
 }
