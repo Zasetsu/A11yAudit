@@ -5,11 +5,10 @@ export type IssueConfidence = "high" | "medium" | "low";
 export type ComponentArea = "header" | "footer" | "nav" | "aside" | "form" | "main" | "unknown";
 export type CmsHint =
   | "Elementor widget button"
-  | "Elementor widget nav"
-  | "Elementor widget form"
+  | "Elementor nav menu"
+  | "Elementor form"
   | "WordPress single post"
-  | "WordPress archive"
-  | "WordPress category"
+  | "WordPress archive/category"
   | "WordPress post template"
   | "none";
 export type ViewportSummary = ViewportName | "desktop,mobile";
@@ -94,10 +93,10 @@ export function inferComponentArea(selector: string | null, htmlSnippet: string 
 
   if (matchesArea(haystack, "header")) return "header";
   if (matchesArea(haystack, "footer")) return "footer";
+  if (matchesArea(haystack, "nav") || /\bnavigation\b/.test(haystack)) return "nav";
   if (matchesArea(haystack, "aside") || /\bsidebar\b/.test(haystack)) return "aside";
   if (matchesArea(haystack, "form")) return "form";
   if (matchesArea(haystack, "main")) return "main";
-  if (matchesArea(haystack, "nav") || /\bnavigation\b/.test(haystack)) return "nav";
 
   return "unknown";
 }
@@ -106,15 +105,14 @@ export function inferCmsHint(selector: string | null, htmlSnippet: string | null
   const haystack = `${selector ?? ""} ${htmlSnippet ?? ""}`.toLowerCase();
 
   if (haystack.includes("elementor-widget-button")) return "Elementor widget button";
-  if (haystack.includes("elementor-widget-nav") || haystack.includes("elementor-nav-menu")) {
-    return "Elementor widget nav";
+  if (haystack.includes("elementor-widget-nav-menu") || haystack.includes("elementor-nav-menu")) {
+    return "Elementor nav menu";
   }
   if (haystack.includes("elementor-widget-form") || haystack.includes("elementor-form")) {
-    return "Elementor widget form";
+    return "Elementor form";
   }
   if (/\bsingle-post\b/.test(haystack)) return "WordPress single post";
-  if (/\bcategory\b|\bcategory-[\w-]+/.test(haystack)) return "WordPress category";
-  if (/\barchive\b/.test(haystack)) return "WordPress archive";
+  if (/\barchive\b|\bcategory\b|\bcategory-[\w-]+/.test(haystack)) return "WordPress archive/category";
   if (/\bpost-template\b|\bpost-template-[\w-]+/.test(haystack)) return "WordPress post template";
 
   return "none";
@@ -124,7 +122,7 @@ export function createIssueKey(input: IssueKeyInput): string {
   return [
     input.ruleId,
     [...input.wcagCriteria].sort().join(","),
-    input.elementSignature,
+    normalizeElementSignature(input.elementSignature),
     input.urlScopeGroup,
     input.componentArea,
     input.cmsHint
@@ -270,6 +268,10 @@ function normalizePath(path: string): string {
   const normalized = path.startsWith("/") ? path : `/${path}`;
   const withoutTrailingSlash = normalized.length > 1 ? normalized.replace(/\/+$/, "") : normalized;
   return withoutTrailingSlash || "/";
+}
+
+function normalizeElementSignature(elementSignature: string): string {
+  return elementSignature.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function matchesArea(haystack: string, area: Exclude<ComponentArea, "unknown">): boolean {

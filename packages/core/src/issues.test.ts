@@ -56,12 +56,26 @@ describe("issue inference", () => {
     expect(inferComponentArea(".cta a", "<a></a>")).toBe("unknown");
   });
 
+  it("prioritizes nav over aside, form, and main component areas", () => {
+    expect(inferComponentArea("nav aside form main a", "<main><form><aside><nav></nav></aside></form></main>")).toBe(
+      "nav"
+    );
+  });
+
   it("infers Elementor and WordPress hints without requiring them", () => {
     expect(inferCmsHint(".elementor-widget-button a", "<a></a>")).toBe("Elementor widget button");
     expect(inferCmsHint(".content", '<body class="single-post post-template-default"></body>')).toBe(
       "WordPress single post"
     );
     expect(inferCmsHint(".content", "<main></main>")).toBe("none");
+  });
+
+  it("uses spec CMS hint labels for nav menu, form, and archive category", () => {
+    expect(inferCmsHint(".elementor-widget-nav-menu a", "<nav></nav>")).toBe("Elementor nav menu");
+    expect(inferCmsHint(".elementor-widget-form input", "<form></form>")).toBe("Elementor form");
+    expect(inferCmsHint(".content", '<body class="archive category category-news"></body>')).toBe(
+      "WordPress archive/category"
+    );
   });
 
   it("creates issue keys without full URL or viewport", () => {
@@ -85,6 +99,27 @@ describe("issue inference", () => {
     expect(desktop).toBe(mobile);
     expect(desktop).not.toContain("https://example.com/haberler/a");
     expect(desktop).not.toContain("desktop");
+  });
+
+  it("normalizes element signatures in issue keys", () => {
+    const first = createIssueKey({
+      ruleId: "button-name",
+      wcagCriteria: ["4.1.2"],
+      elementSignature: "Aside   .Elementor-Widget-Button   A",
+      urlScopeGroup: "/haberler/*",
+      componentArea: "aside",
+      cmsHint: "Elementor widget button"
+    });
+    const second = createIssueKey({
+      ruleId: "button-name",
+      wcagCriteria: ["4.1.2"],
+      elementSignature: "aside .elementor-widget-button a",
+      urlScopeGroup: "/haberler/*",
+      componentArea: "aside",
+      cmsHint: "Elementor widget button"
+    });
+
+    expect(first).toBe(second);
   });
 });
 
