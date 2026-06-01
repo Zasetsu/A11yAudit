@@ -719,6 +719,55 @@ describe("server", () => {
     }
   });
 
+  it("returns grouped issues with parsed sample URLs", async () => {
+    await withTempDb(async (dbPath) => {
+      mockCompletedScan();
+      const app = await buildServer({
+        dbPath,
+        storageRoot: join(dbPath, "..", "artifacts")
+      });
+
+      try {
+        const project = await app.inject({
+          method: "POST",
+          url: "/api/projects",
+          payload: {
+            name: "Fixture",
+            url: "https://fixture.example.com"
+          }
+        });
+        const scan = await app.inject({
+          method: "POST",
+          url: "/api/scans",
+          payload: {
+            projectId: project.json().id,
+            url: "https://fixture.example.com",
+            mode: "single_url",
+            maxPages: 1,
+            viewports: ["desktop"]
+          }
+        });
+
+        await waitForCompletedScan(app, scan.json().id);
+
+        const response = await app.inject({
+          method: "GET",
+          url: `/api/issues?scanRunId=${scan.json().id}`
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.json().data[0]).toMatchObject({
+          scanRunId: scan.json().id,
+          affectedPages: 1,
+          occurrences: 1
+        });
+        expect(response.json().data[0].sampleUrls).toEqual(expect.any(Array));
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
   it("persists large scan results in chunks instead of failing SQLite variable limits", async () => {
     await withTempDb(async (dbPath) => {
       mockLargeCompletedScan(4200);

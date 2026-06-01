@@ -10,6 +10,7 @@ import { findings, issues, reports, scanRuns } from "./db/schema.js";
 import { LocalJobRunner } from "./jobs/local-job-runner.js";
 import { registerFindingRoutes } from "./routes/findings.js";
 import { registerArtifactRoutes } from "./routes/artifacts.js";
+import { registerIssueRoutes } from "./routes/issues.js";
 import { registerProjectRoutes } from "./routes/projects.js";
 import { registerReportRoutes } from "./routes/reports.js";
 import { registerScanRoutes, type ScanJobPayload } from "./routes/scans.js";
@@ -216,6 +217,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   await registerProjectRoutes(app, { db: dbClient.db });
   await registerScanRoutes(app, { db: dbClient.db, runner });
   await registerFindingRoutes(app, { db: dbClient.db });
+  await registerIssueRoutes(app, { db: dbClient.db });
   await registerReportRoutes(app, { db: dbClient.db, storage });
   await registerArtifactRoutes(app, { db: dbClient.db, storage });
 
