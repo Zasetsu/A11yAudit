@@ -134,10 +134,17 @@ describe("real report rendering", () => {
     const html = renderReportHtml(report);
 
     expect(html).toContain("Unique Issues");
+    expect(html).toContain("Affected Pages");
     expect(html).toContain("Total Occurrences");
+    expect(html).toContain("Issue");
+    expect(html).toContain("Severity");
+    expect(html).toContain("WCAG");
     expect(html).toContain("Likely Scope");
     expect(html).toContain("Component Area");
     expect(html).toContain("CMS Hint");
+    expect(html).toContain("Occurrences");
+    expect(html).toContain("Sample URLs");
+    expect(html).toContain("Recommendation");
     expect(html).toContain("Elementor widget button");
     expect(html.indexOf("Grouped Issues")).toBeGreaterThanOrEqual(0);
     expect(html.indexOf("Raw Occurrence Appendix")).toBeGreaterThanOrEqual(0);
