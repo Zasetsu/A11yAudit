@@ -275,6 +275,10 @@ Each technical finding can include:
 
 The web UI exposes evidence from finding detail pages. Reports are available from the Reports page.
 
+### Issue Grouping
+
+A11yAudit distinguishes grouped accessibility issues from raw occurrences. A repeated header, footer, sidebar, or CMS widget problem is shown as one unique issue with affected page and occurrence counts, instead of thousands of duplicate rows. Raw occurrences remain available for technical traceability.
+
 ## API Overview
 
 Main local endpoints:
