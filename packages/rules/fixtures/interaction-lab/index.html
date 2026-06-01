@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Interaction lab fixture</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        padding: 2rem;
+      }
+
+      .controls {
+        align-items: center;
+        display: flex;
+        gap: 1rem;
+      }
+
+      .fake-button,
+      button {
+        background: #174ea6;
+        border: 0;
+        color: #fff;
+        padding: 0.75rem 1rem;
+      }
+
+      .fake-button {
+        cursor: pointer;
+      }
+
+      .missing-focus:focus,
+      .missing-focus:focus-visible {
+        box-shadow: none;
+        outline: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Interaction lab fixture</h1>
+      <div class="controls">
+        <div class="fake-button" onclick="window.fakeClicked = true">Open menu</div>
+        <button class="missing-focus" type="button">Save changes</button>
+        <button type="button">Cancel</button>
+      </div>
+    </main>
+  </body>
+</html>
