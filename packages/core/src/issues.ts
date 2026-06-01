@@ -229,14 +229,16 @@ function createIssueId(issueKey: string): string {
 }
 
 function countUrlScopeGroups(findings: ScanFinding[]): Map<string, number> {
-  const counts = new Map<string, number>();
+  const groupedPages = new Map<string, Set<string>>();
 
   for (const finding of findings) {
     const groupKey = firstSegmentGroupKey(finding.pageUrl);
-    counts.set(groupKey, (counts.get(groupKey) ?? 0) + 1);
+    const pages = groupedPages.get(groupKey) ?? new Set<string>();
+    pages.add(normalizeUrlWithoutHash(finding.pageUrl));
+    groupedPages.set(groupKey, pages);
   }
 
-  return counts;
+  return new Map([...groupedPages].map(([groupKey, pages]) => [groupKey, pages.size]));
 }
 
 function firstSegmentGroupKey(url: string): string {

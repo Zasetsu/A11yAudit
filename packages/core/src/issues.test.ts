@@ -89,6 +89,23 @@ describe("issue inference", () => {
 });
 
 describe("aggregateScanIssues", () => {
+  it("keeps desktop and mobile findings on one page scoped to that page", () => {
+    const issues = aggregateScanIssues([
+      finding({ id: "occurrence-1", pageUrl: "https://example.com/haberler/a#desktop", viewport: "desktop" }),
+      finding({ id: "occurrence-2", pageUrl: "https://example.com/haberler/a#mobile", viewport: "mobile" })
+    ]);
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({
+      likelyScope: "single page",
+      urlScopeGroup: "/haberler/a",
+      affectedPages: 1,
+      occurrences: 2,
+      viewportSummary: "desktop,mobile",
+      confidence: "low"
+    });
+  });
+
   it("groups repeated template occurrences into one issue", () => {
     const issues = aggregateScanIssues([
       finding({ id: "occurrence-1", pageUrl: "https://example.com/haberler/a", viewport: "desktop" }),
@@ -106,7 +123,7 @@ describe("aggregateScanIssues", () => {
       affectedPages: 2,
       occurrences: 4,
       viewportSummary: "desktop,mobile",
-      confidence: "medium"
+      confidence: "low"
     });
     expect(issues[0]?.sampleUrls).toEqual([
       "https://example.com/haberler/a",
