@@ -27,6 +27,18 @@
         outline: none;
         box-shadow: none;
       }
+
+      .static-outline,
+      .static-outline:focus,
+      .static-outline:focus-visible {
+        outline: 2px solid #174ea6;
+      }
+
+      .static-shadow,
+      .static-shadow:focus,
+      .static-shadow:focus-visible {
+        box-shadow: 0 0 0 3px #174ea6;
+      }
     </style>
   </head>
   <body>
@@ -34,6 +46,8 @@
       <h1>Focus visible fail fixture</h1>
       <button type="button">Save changes</button>
       <button class="static-border" type="button">Cancel changes</button>
+      <button class="static-outline" type="button">Static outline</button>
+      <button class="static-shadow" type="button">Static shadow</button>
     </main>
   </body>
 </html>
