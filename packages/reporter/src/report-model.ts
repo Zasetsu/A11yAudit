@@ -1,4 +1,4 @@
-import type { AuditedPage, ScanFinding, ScanRequest, Severity } from "@a11yaudit/core";
+import { aggregateScanIssues, type AggregatedIssue, type AuditedPage, type ScanFinding, type ScanRequest, type Severity } from "@a11yaudit/core";
 
 export type SeveritySummary = Record<Severity, number>;
 
@@ -8,8 +8,11 @@ export interface AuditReportModel {
   score: number;
   pagesAudited: number;
   findingsTotal: number;
+  uniqueIssues: number;
+  totalOccurrences: number;
   generatedAt: string;
   findings: ScanFinding[];
+  issues: AggregatedIssue[];
   pages: AuditedPage[];
   targetUrl: string;
   mode: string;
@@ -24,6 +27,7 @@ export function buildAuditReportModel(input: {
   generatedAt: string;
 }): AuditReportModel {
   const url = new URL(input.request.targetUrl);
+  const issues = aggregateScanIssues(input.findings);
 
   return {
     projectName: url.hostname,
@@ -33,8 +37,11 @@ export function buildAuditReportModel(input: {
     score: input.score,
     pagesAudited: input.pages.length,
     findingsTotal: input.findings.length,
+    uniqueIssues: issues.length,
+    totalOccurrences: issues.reduce((total, issue) => total + issue.occurrences, 0),
     generatedAt: input.generatedAt,
     findings: input.findings,
+    issues,
     pages: input.pages,
     severitySummary: summarizeSeverity(input.findings)
   };

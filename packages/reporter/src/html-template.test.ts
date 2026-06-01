@@ -9,8 +9,11 @@ describe("renderReportHtml", () => {
       score: 74,
       pagesAudited: 248,
       findingsTotal: 613,
+      uniqueIssues: 0,
+      totalOccurrences: 0,
       generatedAt: "2026-05-31T09:14:00.000Z",
       findings: [],
+      issues: [],
       pages: [],
       targetUrl: "https://example.gov",
       mode: "same_domain_crawl"
@@ -23,7 +26,7 @@ describe("renderReportHtml", () => {
 });
 
 describe("real report rendering", () => {
-  it("renders executive summary, technical findings, and honesty disclaimer", () => {
+  it("renders executive summary, grouped issues, raw appendix, and honesty disclaimer", () => {
     const report = buildAuditReportModel({
       request: {
         runId: "run-1",
@@ -80,12 +83,65 @@ describe("real report rendering", () => {
     expect(html).toContain("Executive Summary");
     expect(html).toContain("Audit Scope");
     expect(html).toContain("Severity Summary");
-    expect(html).toContain("Technical Findings");
+    expect(html).toContain("Grouped Issues");
+    expect(html).toContain("Raw Occurrence Appendix");
     expect(html).toContain("Evidence Appendix");
     expect(html).toContain("Manual Review Notice");
     expect(html).toContain("Images must have alternate text");
     expect(html).toContain("runs/run-1/snippets/finding-1.txt");
     expect(html).toContain("does not certify legal compliance");
+  });
+
+  it("renders grouped issues before raw occurrence details", () => {
+    const report = buildAuditReportModel({
+      request: {
+        runId: "run-grouped",
+        projectId: "project-grouped",
+        targetUrl: "https://example.com/haberler/a",
+        mode: "single_url",
+        viewports: [{ name: "desktop", width: 1440, height: 900 }],
+        maxPages: 1,
+        maxDepth: 0,
+        respectRobotsTxt: true
+      },
+      pages: [],
+      findings: [{
+        id: "finding-grouped-1",
+        title: "Buttons must have discernible text",
+        severity: "critical",
+        status: "new",
+        source: "axe",
+        certainty: "automatic_violation",
+        origin: "unknown",
+        wcagCriteria: ["4.1.2"],
+        ruleId: "button-name",
+        description: "Ensures buttons have discernible text",
+        recommendation: "Add an accessible name.",
+        pageUrl: "https://example.com/haberler/a",
+        viewport: "desktop",
+        selector: "aside .elementor-widget-button a",
+        htmlSnippet: '<aside><div class="elementor-widget-button"><a></a></div></aside>',
+        visibleText: null,
+        helpUrl: "https://dequeuniversity.com/rules/axe/button-name",
+        fingerprint: "fingerprint-grouped-1",
+        evidence: [],
+        instances: 1
+      }],
+      score: 75,
+      generatedAt: "2026-05-31T00:00:00.000Z"
+    });
+
+    const html = renderReportHtml(report);
+
+    expect(html).toContain("Unique Issues");
+    expect(html).toContain("Total Occurrences");
+    expect(html).toContain("Likely Scope");
+    expect(html).toContain("Component Area");
+    expect(html).toContain("CMS Hint");
+    expect(html).toContain("Elementor widget button");
+    expect(html.indexOf("Grouped Issues")).toBeGreaterThanOrEqual(0);
+    expect(html.indexOf("Raw Occurrence Appendix")).toBeGreaterThanOrEqual(0);
+    expect(html.indexOf("Grouped Issues")).toBeLessThan(html.indexOf("Raw Occurrence Appendix"));
   });
 
   it("escapes hostile finding and evidence fields", () => {
@@ -251,9 +307,11 @@ describe("real report rendering", () => {
       maxEvidenceRows: 5
     });
 
-    expect(html).toContain("found 25 technical findings");
-    expect(html).toContain("Showing 10 of 25 findings");
-    expect(html).toContain("15 additional findings are summarized in the severity totals");
+    expect(html).toContain("found 25 unique issues across 25 occurrences");
+    expect(html).toContain("Showing 10 of 25 grouped issues");
+    expect(html).toContain("15 additional grouped issues are summarized in the issue totals");
+    expect(html).toContain("Showing 10 of 25 raw occurrences");
+    expect(html).toContain("15 additional raw occurrences are summarized in the issue and severity totals");
     expect(html).toContain("Showing 5 of 25 evidence artifacts");
     expect(html).toContain("Finding 9");
     expect(html).not.toContain("Finding 10");

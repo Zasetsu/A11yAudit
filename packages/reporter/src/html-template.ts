@@ -8,6 +8,10 @@ export interface RenderReportHtmlOptions {
 export function renderReportHtml(report: AuditReportModel, options: RenderReportHtmlOptions = {}): string {
   const severitySummary = report.severitySummary ?? summarizeSeverityFromFindings(report);
   const failedPages = report.pages.filter((page) => page.errorMessage !== null).length;
+  const issues = report.issues ?? [];
+  const uniqueIssues = report.uniqueIssues ?? issues.length;
+  const totalOccurrences = report.totalOccurrences ?? issues.reduce((total, issue) => total + issue.occurrences, 0);
+  const affectedPages = countAffectedPagesFromIssues(issues);
 
   return `<!doctype html>
 <html lang="en">
@@ -19,7 +23,7 @@ export function renderReportHtml(report: AuditReportModel, options: RenderReport
     h1, h2, h3 { margin: 0 0 12px; }
     h2 { margin-top: 32px; }
     .meta { color: #595550; margin-bottom: 24px; }
-    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 24px 0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 24px 0; }
     .card { border: 1px solid #e6e2da; border-radius: 8px; padding: 14px; }
     .value { font-size: 28px; font-weight: 700; }
     table { border-collapse: collapse; width: 100%; margin: 12px 0 24px; }
@@ -36,11 +40,13 @@ export function renderReportHtml(report: AuditReportModel, options: RenderReport
   <div class="meta">${escapeHtml(report.projectName)} · ${escapeHtml(report.domain)} · ${escapeHtml(report.generatedAt)}</div>
 
   <h2>Executive Summary</h2>
-  <p>A11yAudit scanned ${report.pagesAudited} page and viewport combination${report.pagesAudited === 1 ? "" : "s"} for ${escapeHtml(report.domain)} and found ${report.findingsTotal} technical finding${report.findingsTotal === 1 ? "" : "s"}.</p>
+  <p>A11yAudit scanned ${report.pagesAudited} page and viewport combination${report.pagesAudited === 1 ? "" : "s"} for ${escapeHtml(report.domain)} and found ${uniqueIssues} unique issue${uniqueIssues === 1 ? "" : "s"} across ${totalOccurrences} occurrence${totalOccurrences === 1 ? "" : "s"}.</p>
   <div class="grid">
     <div class="card"><div>Score</div><div class="value">${report.score}</div></div>
+    <div class="card"><div>Unique Issues</div><div class="value">${uniqueIssues}</div></div>
+    <div class="card"><div>Affected Pages</div><div class="value">${affectedPages}</div></div>
+    <div class="card"><div>Total Occurrences</div><div class="value">${totalOccurrences}</div></div>
     <div class="card"><div>Pages Audited</div><div class="value">${report.pagesAudited}</div></div>
-    <div class="card"><div>Findings</div><div class="value">${report.findingsTotal}</div></div>
   </div>
 
   <h2>Audit Scope</h2>
@@ -68,7 +74,10 @@ export function renderReportHtml(report: AuditReportModel, options: RenderReport
     </tbody>
   </table>
 
-  <h2>Technical Findings</h2>
+  <h2>Grouped Issues</h2>
+  ${renderGroupedIssuesTable(report, options.maxDetailedFindings)}
+
+  <h2>Raw Occurrence Appendix</h2>
   ${renderFindingsTable(report, options.maxDetailedFindings)}
 
   <h2>Evidence Appendix</h2>
@@ -82,15 +91,59 @@ export function renderReportHtml(report: AuditReportModel, options: RenderReport
 </html>`;
 }
 
+function renderGroupedIssuesTable(report: AuditReportModel, maxDetailedFindings?: number): string {
+  const issues = report.issues ?? [];
+
+  if (issues.length === 0) {
+    return "<p>No grouped issues were detected by the automated scan.</p>";
+  }
+
+  const visibleIssues = limitItems(issues, maxDetailedFindings);
+  const hiddenCount = issues.length - visibleIssues.length;
+  const limitNote = hiddenCount > 0
+    ? `<div class="limit-note">Showing ${visibleIssues.length} of ${issues.length} grouped issues. ${hiddenCount} additional grouped issues are summarized in the issue totals and remain available in the stored scan data.</div>`
+    : "";
+  const rows = visibleIssues.map((issue) => `<tr>
+    <td>${escapeHtml(issue.title)}</td>
+    <td>${escapeHtml(issue.severity)}</td>
+    <td>${escapeHtml(issue.wcagCriteria.join(", "))}</td>
+    <td>${escapeHtml(issue.likelyScope)}</td>
+    <td>${escapeHtml(issue.componentArea)}</td>
+    <td>${escapeHtml(issue.cmsHint)}</td>
+    <td>${issue.affectedPages}</td>
+    <td>${issue.occurrences}</td>
+    <td>${escapeHtml(formatSampleUrls(issue.sampleUrls))}</td>
+    <td>${escapeHtml(issue.recommendation)}</td>
+  </tr>`).join("");
+
+  return `${limitNote}<table>
+    <thead>
+      <tr>
+        <th>Issue</th>
+        <th>Severity</th>
+        <th>WCAG</th>
+        <th>Likely Scope</th>
+        <th>Component Area</th>
+        <th>CMS Hint</th>
+        <th>Affected Pages</th>
+        <th>Occurrences</th>
+        <th>Sample URLs</th>
+        <th>Recommendation</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
 function renderFindingsTable(report: AuditReportModel, maxDetailedFindings?: number): string {
   if (report.findings.length === 0) {
-    return "<p>No technical findings were detected by the automated scan.</p>";
+    return "<p>No raw occurrences were detected by the automated scan.</p>";
   }
 
   const visibleFindings = limitItems(report.findings, maxDetailedFindings);
   const hiddenCount = report.findings.length - visibleFindings.length;
   const limitNote = hiddenCount > 0
-    ? `<div class="limit-note">Showing ${visibleFindings.length} of ${report.findings.length} findings. ${hiddenCount} additional findings are summarized in the severity totals and remain available in the stored scan data.</div>`
+    ? `<div class="limit-note">Showing ${visibleFindings.length} of ${report.findings.length} raw occurrences. ${hiddenCount} additional raw occurrences are summarized in the issue and severity totals and remain available in the stored scan data.</div>`
     : "";
   const rows = visibleFindings.map((finding) => `<tr>
     <td>${escapeHtml(finding.severity)}</td>
@@ -108,7 +161,7 @@ function renderFindingsTable(report: AuditReportModel, maxDetailedFindings?: num
     <thead>
       <tr>
         <th>Severity</th>
-        <th>Finding</th>
+        <th>Occurrence</th>
         <th>Page</th>
         <th>Viewport</th>
         <th>WCAG</th>
@@ -168,6 +221,14 @@ function summarizeSeverityFromFindings(report: AuditReportModel): SeveritySummar
     moderate: 0,
     minor: 0
   });
+}
+
+function countAffectedPagesFromIssues(issues: AuditReportModel["issues"]): number {
+  return new Set(issues.flatMap((issue) => issue.sampleUrls)).size;
+}
+
+function formatSampleUrls(sampleUrls: string[]): string {
+  return sampleUrls.length === 0 ? "N/A" : sampleUrls.join(", ");
 }
 
 function limitItems<T>(items: T[], maxItems?: number): T[] {
