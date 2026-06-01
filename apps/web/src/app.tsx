@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchIssues, getFindings, getProjects, getReports, getScans } from "./api/client";
 import { Sidebar, TopBar } from "./design/shell";
@@ -30,6 +30,15 @@ const activeScanStatuses = new Set<ScanRun["status"]>(["queued", "crawling", "au
 
 function hasActiveScans(scans: ScanRun[] | undefined): boolean {
   return scans?.some((scan) => activeScanStatuses.has(scan.status)) ?? false;
+}
+
+function latestScanForProject(scans: ScanRun[] | undefined, projectId: string): ScanRun | undefined {
+  return scans?.reduce<ScanRun | undefined>((latest, scan) => {
+    if (scan.projectId !== projectId) return latest;
+    if (latest === undefined) return scan;
+
+    return scan.createdAt > latest.createdAt ? scan : latest;
+  }, undefined);
 }
 
 function DocsPage() {
@@ -70,9 +79,20 @@ export function App() {
     refetchInterval: (query) => (hasActiveScans(query.state.data) ? 2_000 : false)
   });
   const findingsQuery = useQuery({ queryKey: ["findings"], queryFn: getFindings });
+  const projects = projectsQuery.data ?? [activeProject()];
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(activeProject().id);
+  const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? projects[0] ?? emptyProject();
+  const selectedScan = useMemo(
+    () => latestScanForProject(scansQuery.data, selectedProject.id),
+    [scansQuery.data, selectedProject.id]
+  );
   const issuesQuery = useQuery({
-    queryKey: ["issues"],
-    queryFn: () => fetchIssues(),
+    queryKey: ["issues", selectedProject.id, selectedScan?.id ?? null],
+    queryFn: () => fetchIssues(
+      selectedScan === undefined
+        ? { projectId: selectedProject.id }
+        : { projectId: selectedProject.id, scanRunId: selectedScan.id }
+    ),
     refetchInterval: hasActiveScans(scansQuery.data) ? 3_000 : false
   });
   const reportsQuery = useQuery({
@@ -80,10 +100,6 @@ export function App() {
     queryFn: getReports,
     refetchInterval: hasActiveScans(scansQuery.data) ? 2_000 : false
   });
-
-  const projects = projectsQuery.data ?? [activeProject()];
-  const [selectedProjectId, setSelectedProjectId] = useState<string>(activeProject().id);
-  const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? projects[0] ?? emptyProject();
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;

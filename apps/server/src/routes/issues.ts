@@ -45,6 +45,10 @@ export async function registerIssueRoutes(app: FastifyInstance, options: IssueRo
       return reply.code(400).send({ error: "Invalid issue query", issues: parsed.error.issues });
     }
 
+    if (parsed.data.projectId === undefined && parsed.data.scanRunId === undefined) {
+      return reply.code(400).send({ error: "Issue query requires a projectId or scanRunId filter" });
+    }
+
     if (parsed.data.projectId !== undefined && parsed.data.scanRunId !== undefined) {
       return {
         data: db
@@ -81,14 +85,6 @@ export async function registerIssueRoutes(app: FastifyInstance, options: IssueRo
       };
     }
 
-    return {
-      data: db
-        .select()
-        .from(issues)
-        .orderBy(desc(issues.createdAt))
-        .all()
-        .map(mapIssueRow)
-    };
   });
 
   app.get("/api/issues/:id", async (request, reply) => {

@@ -27,7 +27,7 @@ export function buildAuditReportModel(input: {
   generatedAt: string;
 }): AuditReportModel {
   const url = new URL(input.request.targetUrl);
-  const issues = aggregateScanIssues(input.findings);
+  const issues = aggregateScanIssues(input.findings, { auditedPages: input.pages });
 
   return {
     projectName: url.hostname,

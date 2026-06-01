@@ -3,13 +3,18 @@ import { formatBytes, formatDate } from "../data";
 import { Button, Icon, PageHeader, Panel, RunStatusBadge } from "../design/ui";
 import type { PageProps } from "./page-props";
 
-function reportActionLabel(report: PageProps["reports"][number]): string {
+export function reportActionLabel(report: PageProps["reports"][number]): string {
   const kind = report.kind.trim();
   return kind === "" ? "Report" : kind.toUpperCase();
 }
 
-function isPdfReport(report: PageProps["reports"][number]): boolean {
-  return report.kind.toLowerCase() === "pdf" || report.mimeType === "application/pdf";
+export function reportDownloadUrl(report: PageProps["reports"][number]): string | null {
+  return report.status === "ready" ? getReportDownloadUrl(report.id) : null;
+}
+
+export function reportDownloadTitle(report: PageProps["reports"][number]): string {
+  const actionLabel = reportActionLabel(report);
+  return report.status === "ready" ? `Download ${actionLabel} report` : `${actionLabel} report is still generating`;
 }
 
 export function ReportsPage({ reports, scans, navigate }: PageProps) {
@@ -36,12 +41,11 @@ export function ReportsPage({ reports, scans, navigate }: PageProps) {
               </tr>
             </thead>
             <tbody>
-              {reports.map((report) => {
-                const scan = scans.find((candidate) => candidate.id === report.scanRunId);
-                const actionLabel = reportActionLabel(report);
-                const isDownloadablePdf = report.status === "ready" && isPdfReport(report);
-                const downloadUrl = isDownloadablePdf ? getReportDownloadUrl(report.id) : null;
-                return (
+	              {reports.map((report) => {
+	                const scan = scans.find((candidate) => candidate.id === report.scanRunId);
+	                const actionLabel = reportActionLabel(report);
+	                const downloadUrl = reportDownloadUrl(report);
+	                return (
                   <tr key={report.id}>
                     <td>
                       <strong>{report.kind.toUpperCase()} accessibility report</strong>
@@ -52,11 +56,11 @@ export function ReportsPage({ reports, scans, navigate }: PageProps) {
                     <td>{report.status === "ready" && scan !== undefined ? <RunStatusBadge status="completed" /> : <span className="badge run queued"><Icon name="loader" size={11} className="spin" />Generating</span>}</td>
                     <td className="num">{formatBytes(report.sizeBytes)}</td>
                     <td>{formatDate(report.createdAt)}</td>
-                    <td className="num">
-                      {downloadUrl === null ? (
-                        <Button disabled icon="download" size="sm" title={isDownloadablePdf ? "PDF download requires a configured API server" : report.status === "ready" ? `${actionLabel} download is not available in the web UI` : `${actionLabel} report is still generating`}>{actionLabel}</Button>
-                      ) : (
-                        <a className="btn default sm" download href={downloadUrl} title="Download PDF report">
+	                    <td className="num">
+	                      {downloadUrl === null ? (
+	                        <Button disabled icon="download" size="sm" title={reportDownloadTitle(report)}>{actionLabel}</Button>
+	                      ) : (
+	                        <a className="btn default sm" download href={downloadUrl} title={reportDownloadTitle(report)}>
                           <Icon name="download" size={13} />
                           {actionLabel}
                         </a>

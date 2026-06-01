@@ -4,7 +4,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { assertSafeUrl } from "@a11yaudit/crawler";
 import type { SqliteDatabase } from "../db/client.js";
-import { findings, projects, reports, scanRuns } from "../db/schema.js";
+import { issues, projects, reports, scanRuns } from "../db/schema.js";
 
 const projectPayloadSchema = z
   .object({
@@ -60,7 +60,18 @@ export async function registerProjectRoutes(app: FastifyInstance, options: Proje
           order by ${scanRuns.createdAt} desc
           limit 1
         )`,
-        openFindings: sql<number>`count(distinct case when ${findings.status} != 'resolved' then ${findings.id} end)`,
+        openFindings: sql<number>`(
+          select count(*)
+          from ${issues}
+          where ${issues.projectId} = ${projects.id}
+            and ${issues.scanRunId} = (
+              select ${scanRuns.id}
+              from ${scanRuns}
+              where ${scanRuns.projectId} = ${projects.id} and ${scanRuns.status} = 'completed'
+              order by ${scanRuns.createdAt} desc
+              limit 1
+            )
+        )`,
         reports: sql<number>`count(distinct ${reports.id})`,
         lastScan: sql<string | null>`max(${scanRuns.createdAt})`,
         crawlLimit: sql<number | null>`(
@@ -80,7 +91,6 @@ export async function registerProjectRoutes(app: FastifyInstance, options: Proje
       })
       .from(projects)
       .leftJoin(scanRuns, eq(scanRuns.projectId, projects.id))
-      .leftJoin(findings, eq(findings.projectId, projects.id))
       .leftJoin(reports, eq(reports.projectId, projects.id))
       .groupBy(projects.id)
       .orderBy(desc(projects.createdAt))

@@ -6,7 +6,7 @@ import {
   inferComponentArea,
   inferUrlScope
 } from "./issues.js";
-import type { ScanFinding } from "./models.js";
+import type { AuditedPage, ScanFinding } from "./models.js";
 
 function finding(overrides: Partial<ScanFinding>): ScanFinding {
   return {
@@ -30,6 +30,22 @@ function finding(overrides: Partial<ScanFinding>): ScanFinding {
     fingerprint: "raw-fingerprint",
     evidence: [],
     instances: 1,
+    ...overrides
+  };
+}
+
+function auditedPage(url: string, overrides: Partial<AuditedPage> = {}): AuditedPage {
+  const normalized = url.split("#", 1)[0] ?? url;
+
+  return {
+    url,
+    normalizedUrl: normalized,
+    title: null,
+    viewport: "desktop",
+    statusCode: 200,
+    finalUrl: normalized,
+    durationMs: 123,
+    errorMessage: null,
     ...overrides
   };
 }
@@ -301,5 +317,131 @@ describe("aggregateScanIssues", () => {
       "https://other.example/haberler/a"
     ]);
     expect(issues.map((issue) => issue.urlScopeGroup)).toEqual(["/haberler/a", "/haberler/a"]);
+  });
+
+  it("uses audited group coverage for medium confidence", () => {
+    const issues = aggregateScanIssues([
+      finding({ id: "occurrence-1", pageUrl: "https://example.com/haberler/a", fingerprint: "fingerprint-1" }),
+      finding({ id: "occurrence-2", pageUrl: "https://example.com/haberler/b", fingerprint: "fingerprint-2" })
+    ], {
+      auditedPages: [
+        auditedPage("https://example.com/haberler/a"),
+        auditedPage("https://example.com/haberler/b"),
+        auditedPage("https://example.com/haberler/c")
+      ]
+    });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({
+      likelyScope: "URL group /haberler/*",
+      affectedPages: 2,
+      confidence: "medium"
+    });
+  });
+
+  it("uses audited group coverage for high confidence", () => {
+    const issues = aggregateScanIssues([
+      finding({ id: "occurrence-1", pageUrl: "https://example.com/haberler/a", fingerprint: "fingerprint-1" }),
+      finding({ id: "occurrence-2", pageUrl: "https://example.com/haberler/b", fingerprint: "fingerprint-2" }),
+      finding({ id: "occurrence-3", pageUrl: "https://example.com/haberler/c", fingerprint: "fingerprint-3" }),
+      finding({ id: "occurrence-4", pageUrl: "https://example.com/haberler/d", fingerprint: "fingerprint-4" })
+    ], {
+      auditedPages: [
+        auditedPage("https://example.com/haberler/a"),
+        auditedPage("https://example.com/haberler/b"),
+        auditedPage("https://example.com/haberler/c"),
+        auditedPage("https://example.com/haberler/d"),
+        auditedPage("https://example.com/haberler/e")
+      ]
+    });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({
+      likelyScope: "URL group /haberler/*",
+      affectedPages: 4,
+      confidence: "high"
+    });
+  });
+
+  it("requires enough audited group pages before raising confidence", () => {
+    const issues = aggregateScanIssues([
+      finding({ id: "occurrence-1", pageUrl: "https://example.com/haberler/a", fingerprint: "fingerprint-1" }),
+      finding({ id: "occurrence-2", pageUrl: "https://example.com/haberler/b", fingerprint: "fingerprint-2" })
+    ], {
+      auditedPages: [
+        auditedPage("https://example.com/haberler/a"),
+        auditedPage("https://example.com/haberler/b")
+      ]
+    });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({
+      likelyScope: "URL group /haberler/*",
+      affectedPages: 2,
+      confidence: "low"
+    });
+  });
+
+  it("does not let unrelated findings inflate likely scope", () => {
+    const issues = aggregateScanIssues([
+      finding({
+        id: "occurrence-1",
+        pageUrl: "https://example.com/haberler/a",
+        fingerprint: "fingerprint-1"
+      }),
+      finding({
+        id: "occurrence-control-1",
+        ruleId: "image-alt",
+        title: "Images must have alternate text",
+        wcagCriteria: ["1.1.1"],
+        pageUrl: "https://example.com/haberler/b",
+        selector: "main img",
+        htmlSnippet: "<main><img></main>",
+        fingerprint: "fingerprint-control-1"
+      }),
+      finding({
+        id: "occurrence-control-2",
+        ruleId: "image-alt",
+        title: "Images must have alternate text",
+        wcagCriteria: ["1.1.1"],
+        pageUrl: "https://example.com/haberler/c",
+        selector: "main img",
+        htmlSnippet: "<main><img></main>",
+        fingerprint: "fingerprint-control-2"
+      })
+    ]);
+
+    const buttonIssue = issues.find((issue) => issue.ruleId === "button-name");
+
+    expect(buttonIssue).toMatchObject({
+      likelyScope: "single page",
+      urlScopeGroup: "/haberler/a",
+      affectedPages: 1,
+      confidence: "low"
+    });
+  });
+
+  it("does not share audited group denominators across origins", () => {
+    const issues = aggregateScanIssues([
+      finding({ id: "occurrence-1", pageUrl: "https://example.com/haberler/a", fingerprint: "fingerprint-1" }),
+      finding({ id: "occurrence-2", pageUrl: "https://example.com/haberler/b", fingerprint: "fingerprint-2" })
+    ], {
+      auditedPages: [
+        auditedPage("https://example.com/haberler/a"),
+        auditedPage("https://example.com/haberler/b"),
+        auditedPage("https://example.com/haberler/c"),
+        auditedPage("https://other.example/haberler/a"),
+        auditedPage("https://other.example/haberler/b"),
+        auditedPage("https://other.example/haberler/c"),
+        auditedPage("https://other.example/haberler/d"),
+        auditedPage("https://other.example/haberler/e")
+      ]
+    });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({
+      affectedPages: 2,
+      confidence: "medium"
+    });
   });
 });

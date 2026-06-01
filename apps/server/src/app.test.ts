@@ -544,7 +544,7 @@ describe("server", () => {
     });
   });
 
-  it("excludes resolved findings from project open finding counts", async () => {
+  it("counts grouped issues from the latest completed scan in project summaries", async () => {
     const dbClient = createDb(":memory:");
     const app = await buildServer({ dbClient, executeScans: false });
 
@@ -568,54 +568,27 @@ describe("server", () => {
       });
 
       const now = new Date().toISOString();
-      dbClient.db
-        .insert(findings)
-        .values([
-          {
-            id: "finding-new",
-            projectId: project.json().id,
-            scanRunId: scan.json().id,
-            pageUrl: "https://portal.example.gov/start",
-            ruleId: "image-alt",
-            title: "Image missing alternative text",
-            severity: "serious",
-            status: "new",
-            viewport: "desktop",
-            certainty: "automatic_violation",
-            wcagCriteria: "1.1.1",
-            selector: "img",
-            description: "Image elements must have alternate text.",
-            helpUrl: null,
-            evidence: "[]",
-            fingerprint: "fingerprint-new",
-            instances: 1,
-            createdAt: now
-          },
-          {
-            id: "finding-resolved",
-            projectId: project.json().id,
-            scanRunId: scan.json().id,
-            pageUrl: "https://portal.example.gov/start",
-            ruleId: "color-contrast",
-            title: "Insufficient color contrast",
-            severity: "serious",
-            status: "resolved",
-            viewport: "desktop",
-            certainty: "automatic_violation",
-            wcagCriteria: "1.4.3",
-            selector: ".button",
-            description: "Text must meet minimum contrast requirements.",
-            helpUrl: null,
-            evidence: "[]",
-            fingerprint: "fingerprint-resolved",
-            instances: 1,
-            createdAt: now
-          }
-        ])
-        .run();
+      dbClient.sqlite.prepare("UPDATE scan_runs SET status = ?, created_at = ? WHERE id = ?").run("completed", now, scan.json().id);
+      dbClient.db.insert(issues).values([
+        issueFixture({
+          id: "issue-new",
+          projectId: project.json().id,
+          scanRunId: scan.json().id,
+          createdAt: now
+        }),
+        issueFixture({
+          id: "issue-second",
+          projectId: project.json().id,
+          scanRunId: scan.json().id,
+          issueKey: "axe:button-name:button",
+          title: "Buttons must have discernible text",
+          ruleId: "button-name",
+          createdAt: now
+        })
+      ]).run();
 
       const listed = await app.inject({ method: "GET", url: "/api/projects" });
-      expect(listed.json().data[0].openFindings).toBe(1);
+      expect(listed.json().data[0].openFindings).toBe(2);
     } finally {
       await app.close();
       dbClient.close();
@@ -891,6 +864,96 @@ describe("server", () => {
         await app.close();
       }
     });
+  });
+
+  it("rejects unfiltered grouped issue requests", async () => {
+    const dbClient = createDb(":memory:");
+    const app = await buildServer({ dbClient, executeScans: false });
+
+    try {
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/issues"
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({ error: "Issue query requires a projectId or scanRunId filter" });
+    } finally {
+      await app.close();
+      dbClient.close();
+    }
+  });
+
+  it("applies project filters for grouped issues", async () => {
+    const dbClient = createDb(":memory:");
+    const app = await buildServer({ dbClient, executeScans: false });
+
+    try {
+      const projectA = await app.inject({
+        method: "POST",
+        url: "/api/projects",
+        payload: {
+          name: "Project A",
+          url: "https://project-a.example.com"
+        }
+      });
+      const projectB = await app.inject({
+        method: "POST",
+        url: "/api/projects",
+        payload: {
+          name: "Project B",
+          url: "https://project-b.example.com"
+        }
+      });
+      const scanA = await app.inject({
+        method: "POST",
+        url: "/api/scans",
+        payload: {
+          projectId: projectA.json().id,
+          url: "https://project-a.example.com"
+        }
+      });
+      const scanB = await app.inject({
+        method: "POST",
+        url: "/api/scans",
+        payload: {
+          projectId: projectB.json().id,
+          url: "https://project-b.example.com"
+        }
+      });
+
+      dbClient.db.insert(issues).values([
+        issueFixture({
+          id: "issue-project-a",
+          projectId: projectA.json().id,
+          scanRunId: scanA.json().id,
+          representativeUrl: "https://project-a.example.com",
+          sampleUrls: JSON.stringify(["https://project-a.example.com"])
+        }),
+        issueFixture({
+          id: "issue-project-b",
+          projectId: projectB.json().id,
+          scanRunId: scanB.json().id,
+          representativeUrl: "https://project-b.example.com",
+          sampleUrls: JSON.stringify(["https://project-b.example.com"])
+        })
+      ]).run();
+
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/issues?projectId=${projectA.json().id}`
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().data).toHaveLength(1);
+      expect(response.json().data[0]).toMatchObject({
+        id: "issue-project-a",
+        projectId: projectA.json().id
+      });
+    } finally {
+      await app.close();
+      dbClient.close();
+    }
   });
 
   it("applies project and scan filters together for grouped issues", async () => {
