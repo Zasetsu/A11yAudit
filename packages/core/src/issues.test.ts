@@ -162,6 +162,54 @@ describe("aggregateScanIssues", () => {
     });
   });
 
+  it("infers single-page scope from each issue group instead of unrelated pages in the same path segment", () => {
+    const issues = aggregateScanIssues([
+      finding({
+        id: "occurrence-1",
+        ruleId: "image-alt",
+        title: "Images must have alternate text",
+        wcagCriteria: ["1.1.1"],
+        pageUrl: "https://example.com/blog/a",
+        selector: "main img.hero",
+        htmlSnippet: '<main><img class="hero"></main>',
+        fingerprint: "fingerprint-1"
+      }),
+      finding({
+        id: "occurrence-2",
+        ruleId: "button-name",
+        title: "Buttons must have discernible text",
+        wcagCriteria: ["4.1.2"],
+        pageUrl: "https://example.com/blog/b",
+        selector: "footer button.icon",
+        htmlSnippet: '<footer><button class="icon"></button></footer>',
+        fingerprint: "fingerprint-2"
+      })
+    ]);
+
+    expect(issues).toHaveLength(2);
+    expect(
+      issues.map((issue) => ({
+        ruleId: issue.ruleId,
+        affectedPages: issue.affectedPages,
+        likelyScope: issue.likelyScope,
+        urlScopeGroup: issue.urlScopeGroup
+      }))
+    ).toEqual([
+      {
+        ruleId: "image-alt",
+        affectedPages: 1,
+        likelyScope: "single page",
+        urlScopeGroup: "/blog/a"
+      },
+      {
+        ruleId: "button-name",
+        affectedPages: 1,
+        likelyScope: "single page",
+        urlScopeGroup: "/blog/b"
+      }
+    ]);
+  });
+
   it("groups repeated template occurrences into one issue", () => {
     const issues = aggregateScanIssues([
       finding({

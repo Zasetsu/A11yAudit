@@ -61,12 +61,9 @@ export interface AggregatedIssue {
 
 interface IssueAccumulator {
   first: ScanFinding;
-  issueKey: string;
-  urlScope: UrlScopeInference;
   componentArea: ComponentArea;
   cmsHint: CmsHint;
   elementSignature: string;
-  groupSize: number;
   pages: Map<string, string>;
   viewports: Set<ViewportName>;
   occurrences: number;
@@ -137,26 +134,23 @@ export function createIssueKey(input: IssueKeyInput): string {
 }
 
 export function aggregateScanIssues(findings: ScanFinding[]): AggregatedIssue[] {
-  const groupSizes = countUrlScopeGroups(findings);
   const accumulators = new Map<string, IssueAccumulator>();
 
   for (const finding of findings) {
     const elementSignature = getElementSignature(finding);
-    const groupSize = groupSizes.get(firstSegmentGroupKey(finding.pageUrl)) ?? 1;
-    const urlScope = inferUrlScope(finding.pageUrl, groupSize);
     const componentArea = inferComponentArea(finding.selector, finding.htmlSnippet);
     const cmsHint = inferCmsHint(finding.selector, finding.htmlSnippet);
-    const issueKey = createIssueKey({
+    const candidateKey = createIssueKey({
       ruleId: finding.ruleId,
       wcagCriteria: finding.wcagCriteria,
       elementSignature,
-      urlScopeGroup: urlScope.groupKey,
+      urlScopeGroup: firstSegmentScopeGroup(finding.pageUrl),
       scopeOrigin: getUrlOrigin(finding.pageUrl),
       componentArea,
       cmsHint
     });
     const normalizedUrl = normalizeUrlWithoutHash(finding.pageUrl);
-    const existing = accumulators.get(issueKey);
+    const existing = accumulators.get(candidateKey);
 
     if (existing) {
       existing.pages.set(normalizedUrl, normalizedUrl);
@@ -167,14 +161,11 @@ export function aggregateScanIssues(findings: ScanFinding[]): AggregatedIssue[] 
       continue;
     }
 
-    accumulators.set(issueKey, {
+    accumulators.set(candidateKey, {
       first: finding,
-      issueKey,
-      urlScope,
       componentArea,
       cmsHint,
       elementSignature,
-      groupSize,
       pages: new Map([[normalizedUrl, normalizedUrl]]),
       viewports: new Set([finding.viewport]),
       occurrences: finding.instances,
@@ -189,10 +180,20 @@ export function aggregateScanIssues(findings: ScanFinding[]): AggregatedIssue[] 
 function toAggregatedIssue(accumulator: IssueAccumulator): AggregatedIssue {
   const sampleUrls = [...accumulator.pages.values()];
   const affectedPages = sampleUrls.length;
+  const urlScope = inferUrlScope(accumulator.first.pageUrl, affectedPages);
+  const issueKey = createIssueKey({
+    ruleId: accumulator.first.ruleId,
+    wcagCriteria: accumulator.first.wcagCriteria,
+    elementSignature: accumulator.elementSignature,
+    urlScopeGroup: urlScope.groupKey,
+    scopeOrigin: getUrlOrigin(accumulator.first.pageUrl),
+    componentArea: accumulator.componentArea,
+    cmsHint: accumulator.cmsHint
+  });
 
   return {
-    id: createIssueId(accumulator.issueKey),
-    issueKey: accumulator.issueKey,
+    id: createIssueId(issueKey),
+    issueKey,
     title: accumulator.first.title,
     severity: accumulator.first.severity,
     status: accumulator.first.status,
@@ -204,15 +205,15 @@ function toAggregatedIssue(accumulator: IssueAccumulator): AggregatedIssue {
     description: accumulator.first.description,
     recommendation: accumulator.first.recommendation,
     helpUrl: accumulator.first.helpUrl,
-    likelyScope: accumulator.urlScope.scope,
-    urlScopeGroup: accumulator.urlScope.groupKey,
+    likelyScope: urlScope.scope,
+    urlScopeGroup: urlScope.groupKey,
     componentArea: accumulator.componentArea,
     cmsHint: accumulator.cmsHint,
     elementSignature: accumulator.elementSignature,
     affectedPages,
     occurrences: accumulator.occurrences,
     viewportSummary: summarizeViewports(accumulator.viewports),
-    confidence: inferConfidence(accumulator.groupSize, affectedPages),
+    confidence: inferConfidence(affectedPages),
     representativeUrl: accumulator.first.pageUrl,
     representativeSelector: accumulator.first.selector,
     representativeHtmlSnippet: accumulator.first.htmlSnippet,
@@ -222,11 +223,9 @@ function toAggregatedIssue(accumulator: IssueAccumulator): AggregatedIssue {
   };
 }
 
-function inferConfidence(groupSize: number, affectedPages: number): IssueConfidence {
-  const ratio = groupSize === 0 ? 0 : affectedPages / groupSize;
-
-  if (groupSize >= 5 && ratio >= 0.8) return "high";
-  if (groupSize >= 3 && ratio >= 0.4) return "medium";
+function inferConfidence(affectedPages: number): IssueConfidence {
+  if (affectedPages >= 5) return "high";
+  if (affectedPages >= 3) return "medium";
   return "low";
 }
 
@@ -240,23 +239,10 @@ function createIssueId(issueKey: string): string {
   return `issue-${createHash("sha256").update(issueKey).digest("base64url").slice(0, 24)}`;
 }
 
-function countUrlScopeGroups(findings: ScanFinding[]): Map<string, number> {
-  const groupedPages = new Map<string, Set<string>>();
-
-  for (const finding of findings) {
-    const groupKey = firstSegmentGroupKey(finding.pageUrl);
-    const pages = groupedPages.get(groupKey) ?? new Set<string>();
-    pages.add(normalizeUrlWithoutHash(finding.pageUrl));
-    groupedPages.set(groupKey, pages);
-  }
-
-  return new Map([...groupedPages].map(([groupKey, pages]) => [groupKey, pages.size]));
-}
-
-function firstSegmentGroupKey(url: string): string {
+function firstSegmentScopeGroup(url: string): string {
   const path = normalizeUrlPath(url);
   const firstSegment = path.split("/").filter(Boolean)[0];
-  return JSON.stringify([getUrlOrigin(url), firstSegment ? `/${firstSegment}/*` : "/"]);
+  return firstSegment ? `/${firstSegment}/*` : "/";
 }
 
 function getElementSignature(finding: ScanFinding): string {
