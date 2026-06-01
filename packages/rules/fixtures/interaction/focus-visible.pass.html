@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Focus visible pass fixture</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        padding: 2rem;
+      }
+
+      button {
+        background: #174ea6;
+        border: 2px solid #174ea6;
+        color: #fff;
+        padding: 0.75rem 1rem;
+      }
+
+      button:focus,
+      button:focus-visible {
+        outline: 3px solid #fbbc04;
+        outline-offset: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Focus visible pass fixture</h1>
+      <button type="button">Save changes</button>
+    </main>
+  </body>
+</html>
