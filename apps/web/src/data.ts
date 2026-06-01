@@ -1,4 +1,6 @@
 export type Severity = "critical" | "serious" | "moderate" | "minor";
+export type FindingSource = "axe" | "custom" | "crawler";
+export type FindingCertainty = "automatic_violation" | "needs_manual_verification" | "not_automatically_testable";
 export type FindingStatus = "new" | "ongoing" | "resolved";
 export type ScanStatus = "queued" | "crawling" | "auditing" | "reporting" | "completed" | "failed";
 export type Viewport = "desktop" | "mobile" | "both";
@@ -58,6 +60,34 @@ export interface Finding {
   origin: "component" | "template" | "content" | "third-party";
   testability: "automatic" | "manual";
   evidenceArtifacts: EvidenceArtifact[];
+}
+
+export interface Issue {
+  id: string;
+  projectId: string;
+  scanRunId: string;
+  issueKey: string;
+  title: string;
+  severity: Severity;
+  source: FindingSource;
+  certainty: FindingCertainty;
+  ruleId: string;
+  wcagCriteria: string;
+  description: string;
+  recommendation: string;
+  likelyScope: string;
+  urlScopeGroup: string;
+  componentArea: string;
+  cmsHint: string;
+  confidence: "high" | "medium" | "low";
+  affectedPages: number;
+  occurrences: number;
+  viewportSummary: string;
+  representativeUrl: string;
+  representativeSelector: string | null;
+  representativeHtmlSnippet: string | null;
+  sampleUrls: string[];
+  createdAt: string;
 }
 
 export interface EvidenceArtifact {

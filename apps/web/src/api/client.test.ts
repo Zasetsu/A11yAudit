@@ -73,6 +73,53 @@ describe("api client", () => {
     ]);
   });
 
+  it("maps grouped issues from configured API", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse([
+          {
+            id: "issue-1",
+            projectId: "project-1",
+            scanRunId: "run-1",
+            issueKey: "button-name|4.1.2|aside button|/haberler/*|aside|Elementor widget button",
+            title: "Buttons must have discernible text",
+            severity: "critical",
+            source: "axe",
+            certainty: "automatic_violation",
+            ruleId: "button-name",
+            wcagCriteria: "4.1.2",
+            description: "Description",
+            recommendation: "Add an accessible name.",
+            likelyScope: "URL group /haberler/*",
+            urlScopeGroup: "/haberler/*",
+            componentArea: "aside",
+            cmsHint: "Elementor widget button",
+            confidence: "medium",
+            affectedPages: 183,
+            occurrences: 366,
+            viewportSummary: "desktop,mobile",
+            representativeUrl: "https://example.com/haberler/a",
+            representativeSelector: "aside .elementor-widget-button a",
+            representativeHtmlSnippet: "<a></a>",
+            sampleUrls: ["https://example.com/haberler/a"],
+            createdAt: "2026-06-01T00:00:00.000Z"
+          }
+        ])
+      )
+    );
+    const { fetchIssues } = await importClient("https://api.example.test/");
+
+    await expect(fetchIssues()).resolves.toMatchObject([
+      {
+        id: "issue-1",
+        affectedPages: 183,
+        occurrences: 366,
+        cmsHint: "Elementor widget button"
+      }
+    ]);
+  });
+
   it("creates projects against the configured API", async () => {
     const fetchMock = vi.fn(async () =>
       new Response(

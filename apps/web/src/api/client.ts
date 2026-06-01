@@ -5,6 +5,7 @@ import {
   demoScanRuns,
   type EvidenceArtifact,
   type Finding,
+  type Issue,
   type Project,
   type Report,
   type ScanRun,
@@ -73,6 +74,14 @@ type ServerReport = Partial<Report> & {
   mimeType: string;
   sizeBytes?: number;
   createdAt?: string;
+};
+
+type ServerIssue = Partial<Omit<Issue, "severity" | "source" | "certainty" | "confidence" | "sampleUrls">> & {
+  severity?: string;
+  source?: string;
+  certainty?: string;
+  confidence?: string;
+  sampleUrls?: unknown;
 };
 
 function apiUrl(path: string): string | null {
@@ -159,6 +168,58 @@ function safeJsonParse(value: string): unknown {
   }
 }
 
+function issueSeverity(severity: string | undefined): Issue["severity"] {
+  return severity === "critical" || severity === "serious" || severity === "moderate" ? severity : "minor";
+}
+
+function issueSource(source: string | undefined): Issue["source"] {
+  return source === "custom" || source === "crawler" ? source : "axe";
+}
+
+function issueCertainty(certainty: string | undefined): Issue["certainty"] {
+  return certainty === "needs_manual_verification" || certainty === "not_automatically_testable"
+    ? certainty
+    : "automatic_violation";
+}
+
+function issueConfidence(confidence: string | undefined): Issue["confidence"] {
+  return confidence === "high" || confidence === "medium" ? confidence : "low";
+}
+
+function issueSampleUrls(sampleUrls: unknown): string[] {
+  return Array.isArray(sampleUrls) ? sampleUrls.filter((url): url is string => typeof url === "string") : [];
+}
+
+function mapIssue(row: ServerIssue): Issue {
+  return {
+    id: row.id ?? "",
+    projectId: row.projectId ?? "",
+    scanRunId: row.scanRunId ?? "",
+    issueKey: row.issueKey ?? "",
+    title: row.title ?? "Untitled issue",
+    severity: issueSeverity(row.severity),
+    source: issueSource(row.source),
+    certainty: issueCertainty(row.certainty),
+    ruleId: row.ruleId ?? "",
+    wcagCriteria: row.wcagCriteria ?? "",
+    description: row.description ?? "",
+    recommendation: row.recommendation ?? "",
+    likelyScope: row.likelyScope ?? "single page",
+    urlScopeGroup: row.urlScopeGroup ?? "",
+    componentArea: row.componentArea ?? "unknown",
+    cmsHint: row.cmsHint ?? "none",
+    confidence: issueConfidence(row.confidence),
+    affectedPages: row.affectedPages ?? 0,
+    occurrences: row.occurrences ?? 0,
+    viewportSummary: row.viewportSummary ?? "desktop",
+    representativeUrl: row.representativeUrl ?? "",
+    representativeSelector: row.representativeSelector ?? null,
+    representativeHtmlSnippet: row.representativeHtmlSnippet ?? null,
+    sampleUrls: issueSampleUrls(row.sampleUrls),
+    createdAt: row.createdAt ?? new Date(0).toISOString()
+  };
+}
+
 export async function getProjects(): Promise<Project[]> {
   const result = await fetchList<ServerProject>("/api/projects");
   if (result.status === "not_configured") {
@@ -238,6 +299,18 @@ export async function getFindings(): Promise<Finding[]> {
     testability: row.testability ?? "automatic",
     evidenceArtifacts: parseEvidenceArtifacts(row.evidence)
   }));
+}
+
+export async function fetchIssues(params: { projectId?: string; scanRunId?: string } = {}): Promise<Issue[]> {
+  const search = new URLSearchParams();
+  if (params.projectId !== undefined) search.set("projectId", params.projectId);
+  if (params.scanRunId !== undefined) search.set("scanRunId", params.scanRunId);
+
+  const query = search.toString();
+  const result = await fetchList<ServerIssue>(`/api/issues${query === "" ? "" : `?${query}`}`);
+  if (result.status !== "ok") return [];
+
+  return result.data.map(mapIssue);
 }
 
 export async function getReports(): Promise<Report[]> {
