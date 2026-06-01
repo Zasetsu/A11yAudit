@@ -121,6 +121,27 @@ describe("issue inference", () => {
 
     expect(first).toBe(second);
   });
+
+  it("uses structured issue keys so delimiters in fields cannot collide", () => {
+    const first = createIssueKey({
+      ruleId: "rule|one",
+      wcagCriteria: ["two"],
+      elementSignature: "button",
+      urlScopeGroup: "/haberler/*",
+      componentArea: "unknown",
+      cmsHint: "none"
+    });
+    const second = createIssueKey({
+      ruleId: "rule",
+      wcagCriteria: ["one|two"],
+      elementSignature: "button",
+      urlScopeGroup: "/haberler/*",
+      componentArea: "unknown",
+      cmsHint: "none"
+    });
+
+    expect(first).not.toBe(second);
+  });
 });
 
 describe("aggregateScanIssues", () => {
@@ -190,5 +211,47 @@ describe("aggregateScanIssues", () => {
       "https://example.com/haberler/a",
       "https://example.com/haberler/b"
     ]);
+  });
+
+  it("does not merge null-selector findings with different snippets", () => {
+    const issues = aggregateScanIssues([
+      finding({
+        id: "occurrence-1",
+        selector: null,
+        htmlSnippet: '<button class="primary"></button>',
+        fingerprint: "fingerprint-1"
+      }),
+      finding({
+        id: "occurrence-2",
+        selector: null,
+        htmlSnippet: '<a class="primary"></a>',
+        fingerprint: "fingerprint-2"
+      })
+    ]);
+
+    expect(issues).toHaveLength(2);
+    expect(issues.map((issue) => issue.occurrenceFingerprints)).toEqual([["fingerprint-1"], ["fingerprint-2"]]);
+  });
+
+  it("does not merge matching path groups across origins", () => {
+    const issues = aggregateScanIssues([
+      finding({
+        id: "occurrence-1",
+        pageUrl: "https://example.com/haberler/a",
+        fingerprint: "fingerprint-1"
+      }),
+      finding({
+        id: "occurrence-2",
+        pageUrl: "https://other.example/haberler/a",
+        fingerprint: "fingerprint-2"
+      })
+    ]);
+
+    expect(issues).toHaveLength(2);
+    expect(issues.map((issue) => issue.representativeUrl)).toEqual([
+      "https://example.com/haberler/a",
+      "https://other.example/haberler/a"
+    ]);
+    expect(issues.map((issue) => issue.urlScopeGroup)).toEqual(["/haberler/a", "/haberler/a"]);
   });
 });

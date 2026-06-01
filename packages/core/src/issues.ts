@@ -23,6 +23,7 @@ export interface IssueKeyInput {
   wcagCriteria: string[];
   elementSignature: string;
   urlScopeGroup: string;
+  scopeOrigin?: string;
   componentArea: ComponentArea;
   cmsHint: CmsHint;
 }
@@ -124,14 +125,15 @@ export function inferCmsHint(selector: string | null, htmlSnippet: string | null
 }
 
 export function createIssueKey(input: IssueKeyInput): string {
-  return [
+  return JSON.stringify([
     input.ruleId,
-    [...input.wcagCriteria].sort().join(","),
+    [...input.wcagCriteria].sort(),
     normalizeElementSignature(input.elementSignature),
     input.urlScopeGroup,
+    input.scopeOrigin ?? "",
     input.componentArea,
     input.cmsHint
-  ].join("|");
+  ]);
 }
 
 export function aggregateScanIssues(findings: ScanFinding[]): AggregatedIssue[] {
@@ -139,7 +141,7 @@ export function aggregateScanIssues(findings: ScanFinding[]): AggregatedIssue[] 
   const accumulators = new Map<string, IssueAccumulator>();
 
   for (const finding of findings) {
-    const elementSignature = finding.selector ?? "unknown";
+    const elementSignature = getElementSignature(finding);
     const groupSize = groupSizes.get(firstSegmentGroupKey(finding.pageUrl)) ?? 1;
     const urlScope = inferUrlScope(finding.pageUrl, groupSize);
     const componentArea = inferComponentArea(finding.selector, finding.htmlSnippet);
@@ -149,6 +151,7 @@ export function aggregateScanIssues(findings: ScanFinding[]): AggregatedIssue[] 
       wcagCriteria: finding.wcagCriteria,
       elementSignature,
       urlScopeGroup: urlScope.groupKey,
+      scopeOrigin: getUrlOrigin(finding.pageUrl),
       componentArea,
       cmsHint
     });
@@ -253,7 +256,19 @@ function countUrlScopeGroups(findings: ScanFinding[]): Map<string, number> {
 function firstSegmentGroupKey(url: string): string {
   const path = normalizeUrlPath(url);
   const firstSegment = path.split("/").filter(Boolean)[0];
-  return firstSegment ? `/${firstSegment}/*` : "/";
+  return JSON.stringify([getUrlOrigin(url), firstSegment ? `/${firstSegment}/*` : "/"]);
+}
+
+function getElementSignature(finding: ScanFinding): string {
+  return finding.selector ?? finding.htmlSnippet ?? finding.title;
+}
+
+function getUrlOrigin(url: string): string {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return "";
+  }
 }
 
 function normalizeUrlWithoutHash(url: string): string {
