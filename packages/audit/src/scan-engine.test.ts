@@ -4,12 +4,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_VIEWPORTS, type ScanRequest } from "@a11yaudit/core";
 import { LocalStorageAdapter } from "@a11yaudit/storage";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runScan } from "./scan-engine.js";
 
 const crawlerSafety = vi.hoisted(() => ({
   assertSafeResolvedUrl: vi.fn(),
   unsafeResolvedHosts: new Set<string>()
+}));
+
+const reporterMocks = vi.hoisted(() => ({
+  renderReportHtml: vi.fn(),
+  renderPdfFromHtml: vi.fn()
 }));
 
 vi.mock("@a11yaudit/crawler", async (importOriginal) => {
@@ -42,6 +47,16 @@ vi.mock("@a11yaudit/crawler", async (importOriginal) => {
     assertSafeResolvedUrl: crawlerSafety.assertSafeResolvedUrl,
     crawlStaticSeed,
     crawlSameDomain: vi.fn(async (input: Parameters<typeof actual.crawlSameDomain>[0]) => crawlStaticSeed(input))
+  };
+});
+
+vi.mock("@a11yaudit/reporter", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@a11yaudit/reporter")>();
+
+  return {
+    ...actual,
+    renderReportHtml: reporterMocks.renderReportHtml,
+    renderPdfFromHtml: reporterMocks.renderPdfFromHtml
   };
 });
 
@@ -82,9 +97,16 @@ describe("runScan", () => {
   let server: Server | null = null;
   let tempDir: string | null = null;
 
+  beforeEach(() => {
+    reporterMocks.renderReportHtml.mockReturnValue("<!doctype html><html><body>Report</body></html>");
+    reporterMocks.renderPdfFromHtml.mockResolvedValue(Buffer.from("%PDF-1.4\n"));
+  });
+
   afterEach(async () => {
     crawlerSafety.assertSafeResolvedUrl.mockClear();
     crawlerSafety.unsafeResolvedHosts.clear();
+    reporterMocks.renderReportHtml.mockReset();
+    reporterMocks.renderPdfFromHtml.mockReset();
 
     await closeServer(server);
     server = null;
@@ -133,6 +155,44 @@ describe("runScan", () => {
     expect(result.findings.length).toBeGreaterThan(0);
     expect(result.reports.map((report) => report.kind).sort()).toEqual(["html", "pdf"]);
     expect(result.score).toBeLessThan(100);
+  }, 60_000);
+
+  it("returns completed audit data and HTML report when PDF rendering fails", async () => {
+    reporterMocks.renderPdfFromHtml.mockRejectedValueOnce(
+      new Error("page.pdf: Protocol error (Page.printToPDF): Printing failed")
+    );
+    server = createServer((_request, response) => {
+      response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      response.end(`<!doctype html>
+        <html lang="en">
+          <head><title>Audit Fixture</title></head>
+          <body><main><h1>Audit Fixture</h1><img src="/missing.png"></main></body>
+        </html>`);
+    });
+    const url = await listen(server);
+    tempDir = await mkdtemp(join(tmpdir(), "a11yaudit-scan-"));
+    const storage = new LocalStorageAdapter({ rootDir: tempDir });
+    const request: ScanRequest = {
+      runId: "run-pdf-failure",
+      projectId: "project-1",
+      targetUrl: url,
+      mode: "single_url",
+      viewports: [DEFAULT_VIEWPORTS[0]!],
+      maxPages: 1,
+      maxDepth: 0,
+      respectRobotsTxt: false
+    };
+
+    const result = await runScan({
+      request,
+      storage
+    });
+
+    expect(result.findings.length).toBeGreaterThan(0);
+    expect(result.reports.map((report) => report.kind)).toEqual(["html"]);
+    expect(result.reportWarnings).toContain(
+      "PDF report failed: page.pdf: Protocol error (Page.printToPDF): Printing failed"
+    );
   }, 60_000);
 
   it("does not audit a redirect from an allowed local URL to a private address", async () => {

@@ -107,6 +107,7 @@ export interface CompletedScanResult {
   pages: AuditedPage[];
   findings: ScanFinding[];
   reports: ScanReportArtifact[];
+  reportWarnings?: string[];
   score: number;
   startedAt: string;
   finishedAt: string;

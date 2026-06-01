@@ -116,7 +116,7 @@ export async function runScan(input: RunScanInput): Promise<CompletedScanResult>
 
   const score = calculateScore(findings);
   await emitProgress(input, "reporting", pagesQueued, pages.length, findings.length);
-  const reports = await storeReports(input, {
+  const { reports, reportWarnings } = await storeReports(input, {
     score,
     pages,
     findings
@@ -130,6 +130,7 @@ export async function runScan(input: RunScanInput): Promise<CompletedScanResult>
     pages,
     findings,
     reports,
+    reportWarnings,
     score,
     startedAt,
     finishedAt: new Date().toISOString()
@@ -292,7 +293,7 @@ async function validateSafeAuditUrl(url: string): Promise<void> {
 async function storeReports(
   input: RunScanInput,
   reportInput: { score: number; pages: AuditedPage[]; findings: ScanFinding[] }
-): Promise<CompletedScanResult["reports"]> {
+): Promise<{ reports: CompletedScanResult["reports"]; reportWarnings: string[] }> {
   const generatedAt = new Date().toISOString();
   const report = buildAuditReportModel({
     request: input.request,
@@ -302,11 +303,6 @@ async function storeReports(
     generatedAt
   });
   const html = renderReportHtml(report);
-  const pdfHtml = renderReportHtml(report, {
-    maxDetailedFindings: PDF_DETAILED_FINDING_LIMIT,
-    maxEvidenceRows: PDF_EVIDENCE_ROW_LIMIT
-  });
-  const pdf = await renderPdfFromHtml(pdfHtml);
   const htmlArtifact = await input.storage.put(
     createArtifactKey({
       runId: input.request.runId,
@@ -317,31 +313,44 @@ async function storeReports(
     Buffer.from(html),
     "text/html"
   );
-  const pdfArtifact = await input.storage.put(
-    createArtifactKey({
-      runId: input.request.runId,
-      kind: "report",
-      name: "audit-report-pdf",
-      extension: "pdf"
-    }),
-    pdf,
-    "application/pdf"
-  );
-
-  return [
+  const reports: CompletedScanResult["reports"] = [
     {
       kind: "html",
       artifactKey: htmlArtifact.key,
       mimeType: htmlArtifact.mimeType,
       sizeBytes: htmlArtifact.sizeBytes
-    },
-    {
+    }
+  ];
+  const reportWarnings: string[] = [];
+
+  try {
+    const pdfHtml = renderReportHtml(report, {
+      maxDetailedFindings: PDF_DETAILED_FINDING_LIMIT,
+      maxEvidenceRows: PDF_EVIDENCE_ROW_LIMIT
+    });
+    const pdf = await renderPdfFromHtml(pdfHtml);
+    const pdfArtifact = await input.storage.put(
+      createArtifactKey({
+        runId: input.request.runId,
+        kind: "report",
+        name: "audit-report-pdf",
+        extension: "pdf"
+      }),
+      pdf,
+      "application/pdf"
+    );
+    reports.push({
       kind: "pdf",
       artifactKey: pdfArtifact.key,
       mimeType: pdfArtifact.mimeType,
       sizeBytes: pdfArtifact.sizeBytes
-    }
-  ];
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    reportWarnings.push(`PDF report failed: ${message}`);
+  }
+
+  return { reports, reportWarnings };
 }
 
 async function emitProgress(

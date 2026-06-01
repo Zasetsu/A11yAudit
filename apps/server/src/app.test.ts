@@ -116,6 +116,54 @@ function mockCompletedScan(): void {
   });
 }
 
+function mockCompletedScanWithReportWarning(): void {
+  runScanMock.mockImplementation(async ({ request, storage }: {
+    request: { runId: string; projectId: string | null; targetUrl: string };
+    storage: { put: (key: string, body: Buffer, mimeType: string) => Promise<{ key: string; mimeType: string; sizeBytes: number }> };
+  }) => {
+    const html = await storage.put(`runs/${request.runId}/report/audit-report.html`, Buffer.from("<html></html>"), "text/html");
+
+    return {
+      runId: request.runId,
+      projectId: request.projectId,
+      targetUrl: request.targetUrl,
+      mode: "single_url",
+      pages: [{ url: request.targetUrl, normalizedUrl: request.targetUrl, title: "Fixture", viewport: "desktop", statusCode: 200, finalUrl: request.targetUrl, durationMs: 1, errorMessage: null }],
+      findings: [{
+        id: "finding-image-alt",
+        pageUrl: request.targetUrl,
+        viewport: "desktop",
+        selector: "img",
+        htmlSnippet: "<img>",
+        visibleText: null,
+        helpUrl: null,
+        fingerprint: "fingerprint-image-alt",
+        evidence: [],
+        instances: 1,
+        title: "Image missing alternative text",
+        severity: "serious",
+        status: "new",
+        source: "axe",
+        certainty: "automatic_violation",
+        origin: "content",
+        wcagCriteria: ["1.1.1"],
+        ruleId: "image-alt",
+        description: "Image elements must have alternate text.",
+        recommendation: "Add alt text."
+      }],
+      reports: [
+        { kind: "html", artifactKey: html.key, mimeType: html.mimeType, sizeBytes: html.sizeBytes }
+      ],
+      reportWarnings: [
+        "PDF report failed: page.pdf: Protocol error (Page.printToPDF): Printing failed"
+      ],
+      score: 75,
+      startedAt: "2026-05-31T00:00:00.000Z",
+      finishedAt: "2026-05-31T00:00:01.000Z"
+    };
+  });
+}
+
 function mockLargeCompletedScan(count: number): void {
   runScanMock.mockImplementation(async ({ request, storage }: {
     request: { runId: string; projectId: string | null; targetUrl: string };
@@ -692,6 +740,52 @@ describe("server", () => {
         });
         expect(screenshotDownload.statusCode).toBe(200);
         expect(screenshotDownload.headers["content-type"]).toContain("image/png");
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("completes scans with report warnings and persists only generated reports", async () => {
+    await withTempDb(async (dbPath) => {
+      mockCompletedScanWithReportWarning();
+      const app = await buildServer({
+        dbPath,
+        storageRoot: join(dbPath, "..", "artifacts")
+      });
+      try {
+        const project = await app.inject({
+          method: "POST",
+          url: "/api/projects",
+          payload: {
+            name: "Fixture",
+            url: "https://fixture.example.com"
+          }
+        });
+        const scan = await app.inject({
+          method: "POST",
+          url: "/api/scans",
+          payload: {
+            projectId: project.json().id,
+            url: "https://fixture.example.com",
+            mode: "single_url",
+            maxPages: 1,
+            viewports: ["desktop"]
+          }
+        });
+
+        const completedScan = await waitForScan(app, scan.json().id, "completed");
+
+        expect(completedScan.errorMessage).toContain(
+          "PDF report failed: page.pdf: Protocol error (Page.printToPDF): Printing failed"
+        );
+
+        const reportsResponse = await app.inject({
+          method: "GET",
+          url: `/api/reports?scanRunId=${scan.json().id}`
+        });
+        expect(reportsResponse.statusCode).toBe(200);
+        expect(reportsResponse.json().data.map((report: { kind: string }) => report.kind)).toEqual(["html"]);
       } finally {
         await app.close();
       }

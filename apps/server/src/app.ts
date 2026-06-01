@@ -171,7 +171,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
                 score: result.score,
                 startedAt: result.startedAt,
                 finishedAt: completedAt,
-                errorMessage: null
+                errorMessage: result.reportWarnings?.length ? result.reportWarnings.join("\n") : null
               })
               .where(eq(scanRuns.id, job.id))
               .run();
