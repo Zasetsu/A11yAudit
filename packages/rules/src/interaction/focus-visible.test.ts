@@ -31,7 +31,7 @@ describe("runFocusVisibleRule", () => {
         viewport
       });
 
-      expect(findings).toHaveLength(2);
+      expect(findings).toHaveLength(4);
       expect(findings[0]).toMatchObject({
         ruleId: "focus-visible-missing",
         title: "Focused element has no detectable focus indicator",
@@ -47,6 +47,14 @@ describe("runFocusVisibleRule", () => {
           expect.objectContaining({
             ruleId: "focus-visible-missing",
             visibleText: "Cancel changes"
+          }),
+          expect.objectContaining({
+            ruleId: "focus-visible-missing",
+            visibleText: "Static outline"
+          }),
+          expect.objectContaining({
+            ruleId: "focus-visible-missing",
+            visibleText: "Static shadow"
           })
         ])
       );

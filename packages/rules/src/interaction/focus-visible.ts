@@ -85,15 +85,39 @@ async function inspectFocusedElement(page: Parameters<InteractionRule>[0]["page"
     }
 
     function hasVisibleFocusIndicator(focusedStyle: FocusStyle, unfocusedStyle: FocusStyle): boolean {
-      return hasVisibleOutline(focusedStyle) || hasVisibleBoxShadow(focusedStyle) || hasNoticeableBorder(focusedStyle, unfocusedStyle);
+      return (
+        hasNoticeableOutline(focusedStyle, unfocusedStyle) ||
+        hasNoticeableBoxShadow(focusedStyle, unfocusedStyle) ||
+        hasNoticeableBorder(focusedStyle, unfocusedStyle)
+      );
     }
 
-    function hasVisibleOutline(style: FocusStyle): boolean {
-      return isPositiveLength(style.outlineWidth) && isVisibleLineStyle(style.outlineStyle) && isVisibleColor(style.outlineColor);
+    function hasNoticeableOutline(focusedStyle: FocusStyle, unfocusedStyle: FocusStyle): boolean {
+      return outlineChanged(focusedStyle, unfocusedStyle) && hasVisibleOutline(focusedStyle);
     }
 
-    function hasVisibleBoxShadow(style: FocusStyle): boolean {
-      return style.boxShadow !== "" && style.boxShadow !== "none" && isVisibleColor(style.boxShadow);
+    function outlineChanged(focusedStyle: FocusStyle, unfocusedStyle: FocusStyle): boolean {
+      return (
+        focusedStyle.outlineWidth !== unfocusedStyle.outlineWidth ||
+        focusedStyle.outlineStyle !== unfocusedStyle.outlineStyle ||
+        focusedStyle.outlineColor !== unfocusedStyle.outlineColor
+      );
+    }
+
+    function hasVisibleOutline(focusedStyle: FocusStyle): boolean {
+      return (
+        isPositiveLength(focusedStyle.outlineWidth) &&
+        isVisibleLineStyle(focusedStyle.outlineStyle) &&
+        isVisibleColor(focusedStyle.outlineColor)
+      );
+    }
+
+    function hasNoticeableBoxShadow(focusedStyle: FocusStyle, unfocusedStyle: FocusStyle): boolean {
+      return focusedStyle.boxShadow !== unfocusedStyle.boxShadow && hasVisibleBoxShadow(focusedStyle);
+    }
+
+    function hasVisibleBoxShadow(focusedStyle: FocusStyle): boolean {
+      return focusedStyle.boxShadow !== "" && focusedStyle.boxShadow !== "none" && isVisibleColor(focusedStyle.boxShadow);
     }
 
     function hasNoticeableBorder(focusedStyle: FocusStyle, unfocusedStyle: FocusStyle): boolean {
