@@ -6,9 +6,9 @@ export interface RenderReportHtmlOptions {
 }
 
 export function renderReportHtml(report: AuditReportModel, options: RenderReportHtmlOptions = {}): string {
-  const severitySummary = report.severitySummary ?? summarizeSeverityFromFindings(report);
-  const failedPages = report.pages.filter((page) => page.errorMessage !== null).length;
   const issues = report.issues ?? [];
+  const severitySummary = report.severitySummary ?? summarizeSeverity(report);
+  const failedPages = report.pages.filter((page) => page.errorMessage !== null).length;
   const uniqueIssues = report.uniqueIssues ?? issues.length;
   const totalOccurrences = report.totalOccurrences ?? issues.reduce((total, issue) => total + issue.occurrences, 0);
   const affectedPages = countAffectedPagesFromIssues(issues);
@@ -107,7 +107,7 @@ function renderGroupedIssuesTable(report: AuditReportModel, maxDetailedFindings?
     <td>${escapeHtml(issue.title)}</td>
     <td>${escapeHtml(issue.severity)}</td>
     <td>${escapeHtml(issue.wcagCriteria.join(", "))}</td>
-    <td>${escapeHtml(issue.likelyScope)}</td>
+    <td>${escapeHtml(formatLikelyScope(issue))}</td>
     <td>${escapeHtml(issue.componentArea)}</td>
     <td>${escapeHtml(issue.cmsHint)}</td>
     <td>${issue.affectedPages}</td>
@@ -211,9 +211,13 @@ function renderEvidenceAppendix(report: AuditReportModel, maxEvidenceRows?: numb
   </table>`;
 }
 
-function summarizeSeverityFromFindings(report: AuditReportModel): SeveritySummary {
-  return report.findings.reduce<SeveritySummary>((summary, finding) => {
-    summary[finding.severity] += 1;
+function summarizeSeverity(report: AuditReportModel): SeveritySummary {
+  const severities = report.issues.length > 0
+    ? report.issues.map((issue) => issue.severity)
+    : report.findings.map((finding) => finding.severity);
+
+  return severities.reduce<SeveritySummary>((summary, severity) => {
+    summary[severity] += 1;
     return summary;
   }, {
     critical: 0,
@@ -221,6 +225,10 @@ function summarizeSeverityFromFindings(report: AuditReportModel): SeveritySummar
     moderate: 0,
     minor: 0
   });
+}
+
+function formatLikelyScope(issue: AuditReportModel["issues"][number]): string {
+  return `${issue.likelyScope} (${issue.confidence})`;
 }
 
 function countAffectedPagesFromIssues(issues: AuditReportModel["issues"]): number {

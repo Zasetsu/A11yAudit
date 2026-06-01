@@ -265,6 +265,163 @@ describe("real report rendering", () => {
     expect(html).toMatch(/<tr>\s*<td>1<\/td>\s*<td>2<\/td>\s*<td>3<\/td>\s*<td>4<\/td>\s*<\/tr>/);
   });
 
+  it("summarizes severity by unique grouped issues instead of raw occurrences", () => {
+    const report = buildAuditReportModel({
+      request: {
+        runId: "run-unique-severity",
+        projectId: "project-unique-severity",
+        targetUrl: "https://example.com/haberler/a",
+        mode: "same_domain_crawl",
+        viewports: [{ name: "desktop", width: 1440, height: 900 }],
+        maxPages: 3,
+        maxDepth: 1,
+        respectRobotsTxt: true
+      },
+      pages: [],
+      findings: [
+        {
+          id: "finding-critical-1",
+          title: "Buttons must have discernible text",
+          severity: "critical",
+          status: "new",
+          source: "axe",
+          certainty: "automatic_violation",
+          origin: "unknown",
+          wcagCriteria: ["4.1.2"],
+          ruleId: "button-name",
+          description: "Ensures buttons have discernible text",
+          recommendation: "Add an accessible name.",
+          pageUrl: "https://example.com/haberler/a",
+          viewport: "desktop",
+          selector: "aside .elementor-widget-button a",
+          htmlSnippet: '<aside><div class="elementor-widget-button"><a></a></div></aside>',
+          visibleText: null,
+          helpUrl: null,
+          fingerprint: "fingerprint-critical-1",
+          evidence: [],
+          instances: 1
+        },
+        {
+          id: "finding-critical-2",
+          title: "Buttons must have discernible text",
+          severity: "critical",
+          status: "new",
+          source: "axe",
+          certainty: "automatic_violation",
+          origin: "unknown",
+          wcagCriteria: ["4.1.2"],
+          ruleId: "button-name",
+          description: "Ensures buttons have discernible text",
+          recommendation: "Add an accessible name.",
+          pageUrl: "https://example.com/haberler/a#mobile",
+          viewport: "mobile",
+          selector: "aside .elementor-widget-button a",
+          htmlSnippet: '<aside><div class="elementor-widget-button"><a></a></div></aside>',
+          visibleText: null,
+          helpUrl: null,
+          fingerprint: "fingerprint-critical-2",
+          evidence: [],
+          instances: 1
+        }
+      ],
+      score: 75,
+      generatedAt: "2026-05-31T00:00:00.000Z"
+    });
+
+    const html = renderReportHtml(report);
+    expect(html).toContain("found 1 unique issue across 2 occurrences");
+    expect(html).toMatch(/<tr>\s*<td>1<\/td>\s*<td>0<\/td>\s*<td>0<\/td>\s*<td>0<\/td>\s*<\/tr>/);
+  });
+
+  it("renders grouped issue likely scope with confidence", () => {
+    const report = buildAuditReportModel({
+      request: {
+        runId: "run-confidence",
+        projectId: "project-confidence",
+        targetUrl: "https://example.com/haberler/a",
+        mode: "same_domain_crawl",
+        viewports: [{ name: "desktop", width: 1440, height: 900 }],
+        maxPages: 3,
+        maxDepth: 1,
+        respectRobotsTxt: true
+      },
+      pages: [],
+      findings: [
+        {
+          id: "finding-confidence-1",
+          title: "Buttons must have discernible text",
+          severity: "critical",
+          status: "new",
+          source: "axe",
+          certainty: "automatic_violation",
+          origin: "unknown",
+          wcagCriteria: ["4.1.2"],
+          ruleId: "button-name",
+          description: "Ensures buttons have discernible text",
+          recommendation: "Add an accessible name.",
+          pageUrl: "https://example.com/haberler/a",
+          viewport: "desktop",
+          selector: "aside .elementor-widget-button a",
+          htmlSnippet: '<aside><div class="elementor-widget-button"><a></a></div></aside>',
+          visibleText: null,
+          helpUrl: null,
+          fingerprint: "fingerprint-confidence-1",
+          evidence: [],
+          instances: 1
+        },
+        {
+          id: "finding-confidence-2",
+          title: "Buttons must have discernible text",
+          severity: "critical",
+          status: "new",
+          source: "axe",
+          certainty: "automatic_violation",
+          origin: "unknown",
+          wcagCriteria: ["4.1.2"],
+          ruleId: "button-name",
+          description: "Ensures buttons have discernible text",
+          recommendation: "Add an accessible name.",
+          pageUrl: "https://example.com/haberler/b",
+          viewport: "desktop",
+          selector: "aside .elementor-widget-button a",
+          htmlSnippet: '<aside><div class="elementor-widget-button"><a></a></div></aside>',
+          visibleText: null,
+          helpUrl: null,
+          fingerprint: "fingerprint-confidence-2",
+          evidence: [],
+          instances: 1
+        },
+        {
+          id: "finding-confidence-control",
+          title: "Images must have alternate text",
+          severity: "minor",
+          status: "new",
+          source: "axe",
+          certainty: "automatic_violation",
+          origin: "unknown",
+          wcagCriteria: ["1.1.1"],
+          ruleId: "image-alt",
+          description: "Ensures images have alternate text",
+          recommendation: "Add meaningful alternate text.",
+          pageUrl: "https://example.com/haberler/c",
+          viewport: "desktop",
+          selector: "main img",
+          htmlSnippet: "<main><img></main>",
+          visibleText: null,
+          helpUrl: null,
+          fingerprint: "fingerprint-confidence-control",
+          evidence: [],
+          instances: 1
+        }
+      ],
+      score: 75,
+      generatedAt: "2026-05-31T00:00:00.000Z"
+    });
+
+    const html = renderReportHtml(report);
+    expect(html).toContain("URL group /haberler/* (medium)");
+  });
+
   it("limits detailed rows for print reports while preserving total counts", () => {
     const report = buildAuditReportModel({
       request: {

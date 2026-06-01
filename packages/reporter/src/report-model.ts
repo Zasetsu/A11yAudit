@@ -43,13 +43,13 @@ export function buildAuditReportModel(input: {
     findings: input.findings,
     issues,
     pages: input.pages,
-    severitySummary: summarizeSeverity(input.findings)
+    severitySummary: summarizeSeverity(issues)
   };
 }
 
-function summarizeSeverity(findings: ScanFinding[]): SeveritySummary {
-  return findings.reduce<SeveritySummary>((summary, finding) => {
-    summary[finding.severity] += 1;
+function summarizeSeverity(issues: AggregatedIssue[]): SeveritySummary {
+  return issues.reduce<SeveritySummary>((summary, issue) => {
+    summary[issue.severity] += 1;
     return summary;
   }, {
     critical: 0,
