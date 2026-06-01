@@ -1,15 +1,28 @@
-import { formatDate, severityMeta, type Severity } from "../data";
+import { formatDate, severityMeta, type Issue, type Severity } from "../data";
 import { Button, Icon, PageHeader, Panel, Progress, RunStatusBadge, ScoreRing, SeverityBadge } from "../design/ui";
 import type { PageProps } from "./page-props";
 
-function countBySeverity(findings: PageProps["findings"]): Record<Severity, number> {
-  return findings.reduce<Record<Severity, number>>(
-    (counts, finding) => {
-      counts[finding.severity] += finding.instances;
-      return counts;
-    },
-    { critical: 0, serious: 0, moderate: 0, minor: 0 }
-  );
+export function issueOverviewMetrics(issues: Issue[]) {
+  const sampledUrls = new Set<string>();
+  let totalOccurrences = 0;
+  let criticalIssues = 0;
+
+  for (const issue of issues) {
+    totalOccurrences += issue.occurrences;
+    if (issue.severity === "critical") {
+      criticalIssues += 1;
+    }
+    for (const url of issue.sampleUrls) {
+      sampledUrls.add(url);
+    }
+  }
+
+  return {
+    affectedPages: sampledUrls.size,
+    criticalIssues,
+    totalOccurrences,
+    uniqueIssues: issues.length
+  };
 }
 
 function Stat({ icon, label, value, sub }: { icon: Parameters<typeof Icon>[0]["name"]; label: string; value: string | number; sub: string }) {
@@ -22,16 +35,23 @@ function Stat({ icon, label, value, sub }: { icon: Parameters<typeof Icon>[0]["n
   );
 }
 
-export function OverviewPage({ project, scans, findings, navigate }: PageProps) {
+export function OverviewPage({ project, scans, issues, navigate }: PageProps) {
   const projectScans = scans.filter((scan) => scan.projectId === project.id);
-  const projectFindings = findings.filter((finding) => finding.projectId === project.id && finding.status !== "resolved");
-  const severityCounts = countBySeverity(projectFindings);
+  const projectIssues = issues.filter((issue) => issue.projectId === project.id);
+  const issueMetrics = issueOverviewMetrics(projectIssues);
+  const severityCounts = projectIssues.reduce<Record<Severity, number>>(
+    (counts, issue) => {
+      counts[issue.severity] += 1;
+      return counts;
+    },
+    { critical: 0, serious: 0, moderate: 0, minor: 0 }
+  );
   const total = Object.values(severityCounts).reduce((sum, value) => sum + value, 0) || 1;
   const activeRun = projectScans.find(
     (scan) => scan.status === "auditing" || scan.status === "crawling" || scan.status === "queued" || scan.status === "reporting"
   );
-  const topIssues = [...projectFindings]
-    .sort((a, b) => severityMeta[a.severity].rank - severityMeta[b.severity].rank || b.instances - a.instances)
+  const topIssues = [...projectIssues]
+    .sort((a, b) => severityMeta[a.severity].rank - severityMeta[b.severity].rank || b.occurrences - a.occurrences)
     .slice(0, 5);
 
   return (
@@ -60,15 +80,15 @@ export function OverviewPage({ project, scans, findings, navigate }: PageProps) 
           </div>
         </Panel>
         <div className="stat-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
-          <Stat icon="list" label="Open findings" sub="current project" value={projectFindings.length} />
-          <Stat icon="file-text" label="Pages scanned" sub="latest scan" value={activeRun?.pagesScanned ?? projectScans[0]?.pagesScanned ?? 0} />
-          <Stat icon="circle-dot" label="New" sub="needs triage" value={projectFindings.filter((finding) => finding.status === "new").length} />
-          <Stat icon="check-circle" label="Resolved" sub="current project" value={findings.filter((finding) => finding.projectId === project.id && finding.status === "resolved").length} />
+          <Stat icon="list" label="Unique issues" sub="grouped problems" value={issueMetrics.uniqueIssues} />
+          <Stat icon="file-text" label="Affected pages" sub="sampled from issues" value={issueMetrics.affectedPages} />
+          <Stat icon="circle-dot" label="Occurrences" sub="raw detections" value={issueMetrics.totalOccurrences} />
+          <Stat icon="alert-octagon" label="Critical issues" sub="highest severity" value={issueMetrics.criticalIssues} />
         </div>
       </div>
 
       <div className="split-grid three" style={{ marginBottom: 16 }}>
-        <Panel action={<Button iconRight="arrow-right" onClick={() => navigate({ page: "findings" })} size="sm" variant="ghost">Triage</Button>} title="Findings by severity">
+        <Panel action={<Button iconRight="arrow-right" onClick={() => navigate({ page: "findings" })} size="sm" variant="ghost">Triage</Button>} title="Issues by severity">
           <div className="severity-meter" aria-label="Severity distribution">
             {(["critical", "serious", "moderate", "minor"] as const).map((level) => (
               <i className={level} key={level} style={{ width: `${(severityCounts[level] / total) * 100}%` }} />
@@ -107,12 +127,12 @@ export function OverviewPage({ project, scans, findings, navigate }: PageProps) 
       <div className="split-grid two">
         <Panel title="Top recurring issues">
           <div className="stack-list">
-            {topIssues.map((finding) => (
-              <button className="list-row" key={finding.id} onClick={() => navigate({ page: "finding-detail", findingId: finding.id })} type="button">
-                <SeverityBadge level={finding.severity} />
-                <span className="truncate">{finding.title}</span>
-                <span className="wcag">{finding.wcagCriteria}</span>
-                <strong className="tnum">{finding.instances}</strong>
+            {topIssues.map((issue) => (
+              <button className="list-row" key={issue.id} onClick={() => navigate({ page: "finding-detail", findingId: issue.id })} type="button">
+                <SeverityBadge level={issue.severity} />
+                <span className="truncate">{issue.title}</span>
+                <span className="wcag">{issue.wcagCriteria}</span>
+                <strong className="tnum">{issue.occurrences}</strong>
               </button>
             ))}
           </div>

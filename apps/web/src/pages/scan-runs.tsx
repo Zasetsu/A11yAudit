@@ -36,7 +36,7 @@ export function ScanRunsPage({ scans, navigate }: PageProps) {
                 <th>Profile</th>
                 <th>Target</th>
                 <th>Progress</th>
-                <th className="num">Findings</th>
+                <th className="num">Occurrences</th>
                 <th>Started</th>
               </tr>
             </thead>

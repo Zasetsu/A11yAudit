@@ -1,5 +1,5 @@
 import { getArtifactDownloadUrl } from "../api/client";
-import { formatBytes } from "../data";
+import { formatBytes, type Issue } from "../data";
 import { Button, Icon, PageHeader, Panel, SeverityBadge, StatusBadge, ViewportBadge } from "../design/ui";
 import type { PageProps } from "./page-props";
 
@@ -9,8 +9,68 @@ function evidenceLabel(kind: string): string {
   return kind.replaceAll("_", " ");
 }
 
-export function FindingDetailPage({ findings, findingId, navigate }: PageProps & { findingId: string }) {
+function confidenceLabel(confidence: Issue["confidence"]): string {
+  return `${confidence[0].toUpperCase()}${confidence.slice(1)} confidence`;
+}
+
+export function FindingDetailPage({ findings, issues, findingId, navigate }: PageProps & { findingId: string }) {
+  const issue = issues.find((candidate) => candidate.id === findingId);
   const finding = findings.find((candidate) => candidate.id === findingId) ?? findings[0];
+
+  if (issue !== undefined) {
+    return (
+      <div className="content-inner fadein">
+        <PageHeader
+          actions={<Button icon="arrow-right" onClick={() => navigate({ page: "findings" })}>Back to Findings</Button>}
+          breadcrumb={<><Icon name="list" size={13} /> <span>{issue.id}</span></>}
+          subtitle={issue.description}
+          title={issue.title}
+        />
+        <div className="split-grid score">
+          <Panel title="Issue summary">
+            <div className="detail-stack">
+              <div className="detail-title-row">
+                <SeverityBadge level={issue.severity} />
+                <span className="wcag">{issue.wcagCriteria}</span>
+                <span className="inline-meta">{issue.viewportSummary}</span>
+              </div>
+              <div className="kv"><span>Rule ID</span><strong className="mono">{issue.ruleId}</strong></div>
+              <div className="kv"><span>Affected pages</span><strong className="tnum">{issue.affectedPages}</strong></div>
+              <div className="kv"><span>Occurrences</span><strong className="tnum">{issue.occurrences}</strong></div>
+              <div className="kv"><span>Likely scope</span><strong>{issue.likelyScope}</strong></div>
+              <div className="kv"><span>Component area</span><strong>{issue.componentArea}</strong></div>
+              <div className="kv"><span>CMS hint</span><strong>{issue.cmsHint}</strong></div>
+              <div className="kv"><span>Confidence</span><strong>{confidenceLabel(issue.confidence)}</strong></div>
+              <div className="kv"><span>Representative URL</span><strong className="mono break-text">{issue.representativeUrl}</strong></div>
+              <div className="kv"><span>Representative selector</span><strong className="mono break-text">{issue.representativeSelector ?? "Not captured"}</strong></div>
+            </div>
+          </Panel>
+          <Panel title="Sample URLs" subtitle="Sampled pages from the grouped issue.">
+            {issue.sampleUrls.length === 0 ? (
+              <div className="note"><Icon name="info" size={14} /> No sample URLs were captured for this grouped issue.</div>
+            ) : (
+              <div className="stack-list static">
+                {issue.sampleUrls.map((url) => (
+                  <div className="list-row" key={url}>
+                    <Icon name="file-text" size={15} />
+                    <span className="mono break-text">{url}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+          <Panel title="Recommendation">
+            <div className="detail-stack">
+              <p className="panel-copy">{issue.recommendation}</p>
+              {issue.representativeHtmlSnippet ? (
+                <div className="kv"><span>HTML snippet</span><strong className="mono break-text">{issue.representativeHtmlSnippet}</strong></div>
+              ) : null}
+            </div>
+          </Panel>
+        </div>
+      </div>
+    );
+  }
 
   if (finding === undefined) {
     return (

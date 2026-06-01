@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getFindings, getProjects, getReports, getScans } from "./api/client";
+import { fetchIssues, getFindings, getProjects, getReports, getScans } from "./api/client";
 import { Sidebar, TopBar } from "./design/shell";
 import { activeProject, emptyProject, type Project, type ScanRun } from "./data";
 import { OverviewPage } from "./pages/overview";
@@ -70,6 +70,11 @@ export function App() {
     refetchInterval: (query) => (hasActiveScans(query.state.data) ? 2_000 : false)
   });
   const findingsQuery = useQuery({ queryKey: ["findings"], queryFn: getFindings });
+  const issuesQuery = useQuery({
+    queryKey: ["issues"],
+    queryFn: () => fetchIssues(),
+    refetchInterval: hasActiveScans(scansQuery.data) ? 3_000 : false
+  });
   const reportsQuery = useQuery({
     queryKey: ["reports"],
     queryFn: getReports,
@@ -103,6 +108,7 @@ export function App() {
     projects,
     scans: scansQuery.data ?? [],
     findings: findingsQuery.data ?? [],
+    issues: issuesQuery.data ?? [],
     reports: reportsQuery.data ?? [],
     navigate
   };
@@ -151,7 +157,7 @@ export function App() {
           toggleTheme={() => setTheme((value) => (value === "light" ? "dark" : "light"))}
         />
         <main aria-label="Main content" className="content" ref={contentRef}>
-          {projectsQuery.isError || scansQuery.isError || findingsQuery.isError || reportsQuery.isError ? (
+          {projectsQuery.isError || scansQuery.isError || findingsQuery.isError || issuesQuery.isError || reportsQuery.isError ? (
             <div className="content-inner" style={{ paddingBottom: 0 }}>
               <div className="note"><Icon name="info" size={14} /> API data is unavailable, so the interface is showing local demo data.</div>
             </div>
