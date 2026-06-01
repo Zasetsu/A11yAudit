@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Focus obscured fail fixture</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 0;
+      }
+
+      .fixed-banner {
+        align-items: center;
+        background: #1f2937;
+        color: #fff;
+        display: flex;
+        height: 96px;
+        inset: 0 0 auto;
+        padding: 0 2rem;
+        position: fixed;
+        z-index: 10;
+      }
+
+      main {
+        padding: 2rem;
+      }
+
+      button,
+      a {
+        display: inline-block;
+        padding: 0.75rem 1rem;
+      }
+
+      a {
+        margin-top: 7rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="fixed-banner" aria-hidden="true">Persistent page toolbar</header>
+    <main>
+      <button type="button">Hidden primary action</button><br>
+      <a href="#details">Visible details link</a>
+      <section id="details" tabindex="-1">
+        <h1>Focus obscured fail fixture</h1>
+      </section>
+    </main>
+  </body>
+</html>

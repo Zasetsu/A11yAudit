@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Focus obscured pass fixture</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 0;
+      }
+
+      .fixed-banner {
+        align-items: center;
+        background: #1f2937;
+        color: #fff;
+        display: flex;
+        height: 96px;
+        inset: 0 0 auto;
+        padding: 0 2rem;
+        position: fixed;
+        z-index: 10;
+      }
+
+      main {
+        padding: 8rem 2rem 2rem;
+      }
+
+      button,
+      a {
+        display: inline-block;
+        margin-right: 1rem;
+        padding: 0.75rem 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="fixed-banner" aria-hidden="true">Persistent page toolbar</header>
+    <main>
+      <button type="button">Visible primary action</button>
+      <a href="#details">Visible details link</a>
+      <section id="details" tabindex="-1">
+        <h1>Focus obscured pass fixture</h1>
+      </section>
+    </main>
+  </body>
+</html>
