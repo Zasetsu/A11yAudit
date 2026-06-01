@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Keyboard trap fail fixture</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        padding: 2rem;
+      }
+
+      button,
+      a {
+        display: inline-block;
+        margin-right: 1rem;
+        padding: 0.75rem 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Keyboard trap fail fixture</h1>
+      <button id="trap-start" type="button">Trap start</button>
+      <button id="trap-end" type="button">Trap end</button>
+      <a href="#after-trap">After trap link</a>
+    </main>
+    <script>
+      const trapStart = document.querySelector("#trap-start");
+      const trapEnd = document.querySelector("#trap-end");
+
+      trapStart.addEventListener("keydown", (event) => {
+        if (event.key === "Tab") {
+          event.preventDefault();
+          trapEnd.focus();
+        }
+      });
+
+      trapEnd.addEventListener("keydown", (event) => {
+        if (event.key === "Tab") {
+          event.preventDefault();
+          trapStart.focus();
+        }
+      });
+    </script>
+  </body>
+</html>

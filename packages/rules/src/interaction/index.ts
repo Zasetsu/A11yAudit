@@ -3,3 +3,4 @@ export * from "./dom-utils.js";
 export * from "./keyboard-unreachable-clickable.js";
 export * from "./focus-obscured.js";
 export * from "./focus-visible.js";
+export * from "./keyboard-trap.js";
