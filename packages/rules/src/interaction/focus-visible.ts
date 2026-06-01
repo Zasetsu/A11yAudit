@@ -52,7 +52,10 @@ async function inspectFocusedElement(page: Parameters<InteractionRule>[0]["page"
     if (!(element instanceof HTMLElement) || element === document.body) return null;
 
     const rect = element.getBoundingClientRect();
-    const style = window.getComputedStyle(element);
+    const focusedStyle = snapshotStyle(window.getComputedStyle(element));
+    element.blur();
+    const unfocusedStyle = snapshotStyle(window.getComputedStyle(element));
+    element.focus({ preventScroll: true });
 
     return {
       selector: buildSelector(element),
@@ -62,31 +65,54 @@ async function inspectFocusedElement(page: Parameters<InteractionRule>[0]["page"
       y: rect.y,
       width: rect.width,
       height: rect.height,
-      hasFocusIndicator: hasVisibleFocusIndicator(style)
+      hasFocusIndicator: hasVisibleFocusIndicator(focusedStyle, unfocusedStyle)
     };
 
-    function hasVisibleFocusIndicator(style: CSSStyleDeclaration): boolean {
-      return hasVisibleOutline(style) || hasVisibleBoxShadow(style) || hasNoticeableBorder(style);
+    function snapshotStyle(style: CSSStyleDeclaration): FocusStyle {
+      const sides = ["top", "right", "bottom", "left"] as const;
+
+      return {
+        outlineWidth: style.outlineWidth,
+        outlineStyle: style.outlineStyle,
+        outlineColor: style.outlineColor,
+        boxShadow: style.boxShadow,
+        borders: sides.map((side) => ({
+          width: style.getPropertyValue(`border-${side}-width`),
+          lineStyle: style.getPropertyValue(`border-${side}-style`),
+          color: style.getPropertyValue(`border-${side}-color`)
+        }))
+      };
     }
 
-    function hasVisibleOutline(style: CSSStyleDeclaration): boolean {
+    function hasVisibleFocusIndicator(focusedStyle: FocusStyle, unfocusedStyle: FocusStyle): boolean {
+      return hasVisibleOutline(focusedStyle) || hasVisibleBoxShadow(focusedStyle) || hasNoticeableBorder(focusedStyle, unfocusedStyle);
+    }
+
+    function hasVisibleOutline(style: FocusStyle): boolean {
       return isPositiveLength(style.outlineWidth) && isVisibleLineStyle(style.outlineStyle) && isVisibleColor(style.outlineColor);
     }
 
-    function hasVisibleBoxShadow(style: CSSStyleDeclaration): boolean {
+    function hasVisibleBoxShadow(style: FocusStyle): boolean {
       return style.boxShadow !== "" && style.boxShadow !== "none" && isVisibleColor(style.boxShadow);
     }
 
-    function hasNoticeableBorder(style: CSSStyleDeclaration): boolean {
-      const sides = ["Top", "Right", "Bottom", "Left"] as const;
-
-      return sides.some((side) => {
-        const width = style.getPropertyValue(`border-${side.toLowerCase()}-width`);
-        const lineStyle = style.getPropertyValue(`border-${side.toLowerCase()}-style`);
-        const color = style.getPropertyValue(`border-${side.toLowerCase()}-color`);
-
-        return parseCssPixels(width) >= 2 && isVisibleLineStyle(lineStyle) && isVisibleColor(color);
+    function hasNoticeableBorder(focusedStyle: FocusStyle, unfocusedStyle: FocusStyle): boolean {
+      return focusedStyle.borders.some((border, index) => {
+        return (
+          borderChanged(border, unfocusedStyle.borders[index]) &&
+          parseCssPixels(border.width) >= 2 &&
+          isVisibleLineStyle(border.lineStyle) &&
+          isVisibleColor(border.color)
+        );
       });
+    }
+
+    function borderChanged(focusedBorder: BorderStyle, unfocusedBorder: BorderStyle): boolean {
+      return (
+        focusedBorder.width !== unfocusedBorder.width ||
+        focusedBorder.lineStyle !== unfocusedBorder.lineStyle ||
+        focusedBorder.color !== unfocusedBorder.color
+      );
     }
 
     function isVisibleLineStyle(lineStyle: string): boolean {
@@ -133,6 +159,20 @@ async function inspectFocusedElement(page: Parameters<InteractionRule>[0]["page"
       }
 
       return parts.join(" > ");
+    }
+
+    interface BorderStyle {
+      width: string;
+      lineStyle: string;
+      color: string;
+    }
+
+    interface FocusStyle {
+      outlineWidth: string;
+      outlineStyle: string;
+      outlineColor: string;
+      boxShadow: string;
+      borders: BorderStyle[];
     }
   });
 }

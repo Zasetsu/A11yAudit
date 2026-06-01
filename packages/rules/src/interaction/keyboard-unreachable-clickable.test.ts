@@ -31,7 +31,7 @@ describe("keyboardUnreachableClickableRule", () => {
         viewport
       });
 
-      expect(findings).toHaveLength(1);
+      expect(findings).toHaveLength(2);
       expect(findings[0]).toMatchObject({
         ruleId: "keyboard-unreachable-clickable",
         title: "Clickable control is not reachable by keyboard",
@@ -43,6 +43,11 @@ describe("keyboardUnreachableClickableRule", () => {
       });
       expect(findings[0]?.htmlSnippet).toContain('class="fake-button"');
       expect(findings[0]?.recommendation).toContain("native interactive element");
+      expect(findings[1]).toMatchObject({
+        ruleId: "keyboard-unreachable-clickable",
+        selector: "main > section > div.fake-button:nth-of-type(2)",
+        visibleText: "Unreachable duplicate"
+      });
     } finally {
       await page.close();
     }

@@ -98,12 +98,42 @@ async function collectClickableCandidates(page: Page): Promise<ElementSnapshot[]
           .slice(0, 2)
           .map((className) => `.${CSS.escape(className)}`)
           .join("");
+        const position = hasMatchingFallbackSibling(current, tag, classes) ? `:nth-of-type(${getNthOfType(current)})` : "";
 
-        parts.unshift(`${tag}${classes}`);
+        parts.unshift(`${tag}${classes}${position}`);
         current = current.parentElement;
       }
 
       return parts.join(" > ");
+    }
+
+    function hasMatchingFallbackSibling(element: HTMLElement, tag: string, classes: string): boolean {
+      const parent = element.parentElement;
+      if (!parent) return false;
+
+      return [...parent.children]
+        .filter((sibling): sibling is HTMLElement => sibling instanceof HTMLElement && sibling !== element)
+        .some((sibling) => {
+          const siblingTag = sibling.tagName.toLowerCase();
+          const siblingClasses = [...sibling.classList]
+            .slice(0, 2)
+            .map((className) => `.${CSS.escape(className)}`)
+            .join("");
+
+          return siblingTag === tag && siblingClasses === classes;
+        });
+    }
+
+    function getNthOfType(element: HTMLElement): number {
+      let position = 1;
+      let sibling = element.previousElementSibling;
+
+      while (sibling) {
+        if (sibling.tagName === element.tagName) position += 1;
+        sibling = sibling.previousElementSibling;
+      }
+
+      return position;
     }
   });
 }
@@ -160,12 +190,42 @@ async function getFocusedElementSnapshot(page: Page): Promise<ElementSnapshot | 
           .slice(0, 2)
           .map((className) => `.${CSS.escape(className)}`)
           .join("");
+        const position = hasMatchingFallbackSibling(current, tag, classes) ? `:nth-of-type(${getNthOfType(current)})` : "";
 
-        parts.unshift(`${tag}${classes}`);
+        parts.unshift(`${tag}${classes}${position}`);
         current = current.parentElement;
       }
 
       return parts.join(" > ");
+    }
+
+    function hasMatchingFallbackSibling(element: HTMLElement, tag: string, classes: string): boolean {
+      const parent = element.parentElement;
+      if (!parent) return false;
+
+      return [...parent.children]
+        .filter((sibling): sibling is HTMLElement => sibling instanceof HTMLElement && sibling !== element)
+        .some((sibling) => {
+          const siblingTag = sibling.tagName.toLowerCase();
+          const siblingClasses = [...sibling.classList]
+            .slice(0, 2)
+            .map((className) => `.${CSS.escape(className)}`)
+            .join("");
+
+          return siblingTag === tag && siblingClasses === classes;
+        });
+    }
+
+    function getNthOfType(element: HTMLElement): number {
+      let position = 1;
+      let sibling = element.previousElementSibling;
+
+      while (sibling) {
+        if (sibling.tagName === element.tagName) position += 1;
+        sibling = sibling.previousElementSibling;
+      }
+
+      return position;
     }
   });
 }

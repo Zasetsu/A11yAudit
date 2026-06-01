@@ -23,6 +23,10 @@
     <main>
       <h1>Keyboard unreachable clickable fail fixture</h1>
       <div class="fake-button" onclick="window.clicked = true">Save changes</div>
+      <section aria-label="Duplicate custom controls">
+        <div class="fake-button" tabindex="0" onclick="window.reachableDuplicate = true">Reachable duplicate</div>
+        <div class="fake-button" onclick="window.unreachableDuplicate = true">Unreachable duplicate</div>
+      </section>
       <button type="button">Reachable native button</button>
     </main>
   </body>
