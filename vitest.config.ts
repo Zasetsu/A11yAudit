@@ -4,6 +4,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
+    minWorkers: 1,
+    maxWorkers: 2,
     include: [
       "packages/**/*.{test,spec}.{ts,tsx}",
       "apps/**/*.{test,spec}.{ts,tsx}"
