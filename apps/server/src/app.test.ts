@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildServer } from "./app.js";
 import { createDb, initializeDb } from "./db/client.js";
-import { findings, projects, reports, scanRuns } from "./db/schema.js";
+import { findings, issues, projects, reports, scanRuns } from "./db/schema.js";
 
 const { runScanMock } = vi.hoisted(() => ({
   runScanMock: vi.fn()
@@ -253,6 +253,37 @@ function mockGroupedIssueCompletedScan(): void {
     startedAt: "2026-05-31T00:00:00.000Z",
     finishedAt: "2026-05-31T00:00:01.000Z"
   }));
+}
+
+function issueFixture(overrides: Partial<typeof issues.$inferInsert> = {}): typeof issues.$inferInsert {
+  return {
+    id: "issue-fixture",
+    projectId: "project-fixture",
+    scanRunId: "run-fixture",
+    issueKey: "axe:image-alt:img",
+    title: "Image missing alternative text",
+    severity: "serious",
+    source: "axe",
+    certainty: "automatic_violation",
+    ruleId: "image-alt",
+    wcagCriteria: "1.1.1",
+    description: "Image elements must have alternate text.",
+    recommendation: "Add alt text.",
+    likelyScope: "single page",
+    urlScopeGroup: "single page",
+    componentArea: "content",
+    cmsHint: "Unknown",
+    confidence: "high",
+    affectedPages: 1,
+    occurrences: 1,
+    viewportSummary: "desktop",
+    representativeUrl: "https://fixture.example.com",
+    representativeSelector: "img",
+    representativeHtmlSnippet: "<img>",
+    sampleUrls: JSON.stringify(["https://fixture.example.com"]),
+    createdAt: "2026-05-31T00:00:01.000Z",
+    ...overrides
+  };
 }
 
 afterEach(() => {
@@ -766,6 +797,105 @@ describe("server", () => {
         await app.close();
       }
     });
+  });
+
+  it("applies project and scan filters together for grouped issues", async () => {
+    const dbClient = createDb(":memory:");
+    const app = await buildServer({ dbClient, executeScans: false });
+
+    try {
+      const projectA = await app.inject({
+        method: "POST",
+        url: "/api/projects",
+        payload: {
+          name: "Project A",
+          url: "https://project-a.example.com"
+        }
+      });
+      const projectB = await app.inject({
+        method: "POST",
+        url: "/api/projects",
+        payload: {
+          name: "Project B",
+          url: "https://project-b.example.com"
+        }
+      });
+      const scanB = await app.inject({
+        method: "POST",
+        url: "/api/scans",
+        payload: {
+          projectId: projectB.json().id,
+          url: "https://project-b.example.com"
+        }
+      });
+
+      dbClient.db.insert(issues).values(issueFixture({
+        id: "issue-project-b",
+        projectId: projectB.json().id,
+        scanRunId: scanB.json().id,
+        representativeUrl: "https://project-b.example.com",
+        sampleUrls: JSON.stringify(["https://project-b.example.com"])
+      })).run();
+
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/issues?projectId=${projectA.json().id}&scanRunId=${scanB.json().id}`
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().data).toEqual([]);
+    } finally {
+      await app.close();
+      dbClient.close();
+    }
+  });
+
+  it("defaults malformed stored issue sample URLs to an empty array", async () => {
+    const dbClient = createDb(":memory:");
+    const app = await buildServer({ dbClient, executeScans: false });
+
+    try {
+      const project = await app.inject({
+        method: "POST",
+        url: "/api/projects",
+        payload: {
+          name: "Malformed Fixture",
+          url: "https://malformed.example.com"
+        }
+      });
+      const scan = await app.inject({
+        method: "POST",
+        url: "/api/scans",
+        payload: {
+          projectId: project.json().id,
+          url: "https://malformed.example.com"
+        }
+      });
+
+      dbClient.db.insert(issues).values(issueFixture({
+        id: "issue-malformed-sample-urls",
+        projectId: project.json().id,
+        scanRunId: scan.json().id,
+        sampleUrls: "not-json"
+      })).run();
+
+      const listed = await app.inject({
+        method: "GET",
+        url: `/api/issues?scanRunId=${scan.json().id}`
+      });
+      const detail = await app.inject({
+        method: "GET",
+        url: "/api/issues/issue-malformed-sample-urls"
+      });
+
+      expect(listed.statusCode).toBe(200);
+      expect(listed.json().data[0].sampleUrls).toEqual([]);
+      expect(detail.statusCode).toBe(200);
+      expect(detail.json().sampleUrls).toEqual([]);
+    } finally {
+      await app.close();
+      dbClient.close();
+    }
   });
 
   it("persists large scan results in chunks instead of failing SQLite variable limits", async () => {

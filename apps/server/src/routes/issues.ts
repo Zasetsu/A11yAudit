@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { SqliteDatabase } from "../db/client.js";
@@ -18,11 +18,15 @@ export interface IssueRouteOptions {
 
 function parseSampleUrls(value: string | string[]): string[] {
   if (Array.isArray(value)) {
-    return value;
+    return value.filter((url): url is string => typeof url === "string");
   }
 
-  const parsed = JSON.parse(value);
-  return Array.isArray(parsed) ? parsed.filter((url): url is string => typeof url === "string") : [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((url): url is string => typeof url === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
 function mapIssueRow(row: IssueRow): IssueResponse {
@@ -39,6 +43,18 @@ export async function registerIssueRoutes(app: FastifyInstance, options: IssueRo
     const parsed = issueQuerySchema.safeParse(request.query);
     if (!parsed.success) {
       return reply.code(400).send({ error: "Invalid issue query", issues: parsed.error.issues });
+    }
+
+    if (parsed.data.projectId !== undefined && parsed.data.scanRunId !== undefined) {
+      return {
+        data: db
+          .select()
+          .from(issues)
+          .where(and(eq(issues.projectId, parsed.data.projectId), eq(issues.scanRunId, parsed.data.scanRunId)))
+          .orderBy(desc(issues.occurrences))
+          .all()
+          .map(mapIssueRow)
+      };
     }
 
     if (parsed.data.scanRunId !== undefined) {
