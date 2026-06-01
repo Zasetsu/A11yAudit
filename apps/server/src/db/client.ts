@@ -66,10 +66,39 @@ export function initializeDb(sqlite: Database.Database): void {
       error_message TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS issues (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      scan_run_id TEXT NOT NULL REFERENCES scan_runs(id) ON DELETE CASCADE,
+      issue_key TEXT NOT NULL,
+      title TEXT NOT NULL,
+      severity TEXT NOT NULL,
+      source TEXT NOT NULL,
+      certainty TEXT NOT NULL,
+      rule_id TEXT NOT NULL,
+      wcag_criteria TEXT NOT NULL,
+      description TEXT NOT NULL,
+      recommendation TEXT NOT NULL,
+      likely_scope TEXT NOT NULL,
+      url_scope_group TEXT NOT NULL,
+      component_area TEXT NOT NULL,
+      cms_hint TEXT NOT NULL,
+      confidence TEXT NOT NULL,
+      affected_pages INTEGER NOT NULL,
+      occurrences INTEGER NOT NULL,
+      viewport_summary TEXT NOT NULL,
+      representative_url TEXT NOT NULL,
+      representative_selector TEXT,
+      representative_html_snippet TEXT,
+      sample_urls TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS findings (
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       scan_run_id TEXT NOT NULL REFERENCES scan_runs(id) ON DELETE CASCADE,
+      issue_id TEXT REFERENCES issues(id) ON DELETE SET NULL,
       page_url TEXT NOT NULL,
       rule_id TEXT NOT NULL,
       title TEXT NOT NULL,
@@ -100,6 +129,8 @@ export function initializeDb(sqlite: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_projects_domain ON projects(domain);
     CREATE INDEX IF NOT EXISTS idx_scan_runs_project_created ON scan_runs(project_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_issues_scan_severity ON issues(scan_run_id, severity);
+    CREATE INDEX IF NOT EXISTS idx_issues_project_created ON issues(project_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_findings_scan_status ON findings(scan_run_id, status);
     CREATE INDEX IF NOT EXISTS idx_reports_scan_created ON reports(scan_run_id, created_at);
   `);
@@ -112,6 +143,7 @@ export function initializeDb(sqlite: Database.Database): void {
   addColumnIfMissing(sqlite, "findings", "certainty", "TEXT NOT NULL DEFAULT 'automatic_violation'");
   addColumnIfMissing(sqlite, "findings", "evidence", "TEXT NOT NULL DEFAULT '[]'");
   addColumnIfMissing(sqlite, "findings", "fingerprint", "TEXT NOT NULL DEFAULT ''");
+  addColumnIfMissing(sqlite, "findings", "issue_id", "TEXT REFERENCES issues(id) ON DELETE SET NULL");
 }
 
 function addColumnIfMissing(sqlite: Database.Database, table: string, column: string, definition: string): void {

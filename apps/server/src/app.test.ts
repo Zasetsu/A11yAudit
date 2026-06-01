@@ -172,6 +172,89 @@ function mockLargeCompletedScan(count: number): void {
   });
 }
 
+function mockGroupedIssueCompletedScan(): void {
+  runScanMock.mockImplementation(async ({ request }: {
+    request: { runId: string; projectId: string | null; targetUrl: string };
+  }) => ({
+    runId: request.runId,
+    projectId: request.projectId,
+    targetUrl: request.targetUrl,
+    mode: "single_url",
+    pages: [
+      {
+        url: request.targetUrl,
+        normalizedUrl: request.targetUrl,
+        title: "Fixture",
+        viewport: "desktop",
+        statusCode: 200,
+        finalUrl: request.targetUrl,
+        durationMs: 1,
+        errorMessage: null
+      },
+      {
+        url: request.targetUrl,
+        normalizedUrl: request.targetUrl,
+        title: "Fixture",
+        viewport: "mobile",
+        statusCode: 200,
+        finalUrl: request.targetUrl,
+        durationMs: 1,
+        errorMessage: null
+      }
+    ],
+    findings: [
+      {
+        id: "occurrence-desktop",
+        pageUrl: request.targetUrl,
+        viewport: "desktop",
+        selector: "aside .elementor-widget-button a",
+        htmlSnippet: '<aside><div class="elementor-widget-button"><a></a></div></aside>',
+        visibleText: null,
+        helpUrl: null,
+        fingerprint: "raw-1",
+        evidence: [],
+        instances: 1,
+        title: "Buttons must have discernible text",
+        severity: "critical",
+        status: "new",
+        source: "axe",
+        certainty: "automatic_violation",
+        origin: "component",
+        wcagCriteria: ["4.1.2"],
+        ruleId: "button-name",
+        description: "Buttons must have discernible text.",
+        recommendation: "Add an accessible name."
+      },
+      {
+        id: "occurrence-mobile",
+        pageUrl: request.targetUrl,
+        viewport: "mobile",
+        selector: "aside .elementor-widget-button a",
+        htmlSnippet: '<aside><div class="elementor-widget-button"><a></a></div></aside>',
+        visibleText: null,
+        helpUrl: null,
+        fingerprint: "raw-2",
+        evidence: [],
+        instances: 1,
+        title: "Buttons must have discernible text",
+        severity: "critical",
+        status: "new",
+        source: "axe",
+        certainty: "automatic_violation",
+        origin: "component",
+        wcagCriteria: ["4.1.2"],
+        ruleId: "button-name",
+        description: "Buttons must have discernible text.",
+        recommendation: "Add an accessible name."
+      }
+    ],
+    reports: [],
+    score: 50,
+    startedAt: "2026-05-31T00:00:00.000Z",
+    finishedAt: "2026-05-31T00:00:01.000Z"
+  }));
+}
+
 afterEach(() => {
   runScanMock.mockReset();
 });
@@ -582,6 +665,58 @@ describe("server", () => {
         await app.close();
       }
     });
+  });
+
+  it("persists grouped issues separately from raw finding occurrences", async () => {
+    const dbClient = createDb(":memory:");
+    mockGroupedIssueCompletedScan();
+    const app = await buildServer({ dbClient });
+
+    try {
+      const project = await app.inject({
+        method: "POST",
+        url: "/api/projects",
+        payload: {
+          name: "Grouped Fixture",
+          url: "https://grouped.example.com"
+        }
+      });
+      const scan = await app.inject({
+        method: "POST",
+        url: "/api/scans",
+        payload: {
+          projectId: project.json().id,
+          url: "https://grouped.example.com/page",
+          mode: "single_url",
+          maxPages: 1,
+          viewports: ["desktop", "mobile"]
+        }
+      });
+
+      await waitForCompletedScan(app, scan.json().id);
+
+      const issueRows = dbClient.sqlite
+        .prepare("SELECT * FROM issues WHERE scan_run_id = ?")
+        .all(scan.json().id) as Array<Record<string, unknown>>;
+      const findingRows = dbClient.sqlite
+        .prepare("SELECT * FROM findings WHERE scan_run_id = ? ORDER BY fingerprint")
+        .all(scan.json().id) as Array<Record<string, unknown>>;
+
+      expect(issueRows).toHaveLength(1);
+      expect(findingRows).toHaveLength(2);
+      expect(issueRows[0]).toMatchObject({
+        likely_scope: "single page",
+        component_area: "aside",
+        cms_hint: "Elementor widget button",
+        affected_pages: 1,
+        occurrences: 2,
+        viewport_summary: "desktop,mobile"
+      });
+      expect(findingRows.map((finding) => finding.issue_id)).toEqual([issueRows[0]?.id, issueRows[0]?.id]);
+    } finally {
+      await app.close();
+      dbClient.close();
+    }
   });
 
   it("persists large scan results in chunks instead of failing SQLite variable limits", async () => {

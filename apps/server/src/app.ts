@@ -1,11 +1,12 @@
 import { pathToFileURL } from "node:url";
 import { runScan } from "@a11yaudit/audit";
+import { aggregateScanIssues } from "@a11yaudit/core";
 import { LocalStorageAdapter } from "@a11yaudit/storage";
 import { eq, inArray } from "drizzle-orm";
 import Fastify, { type FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
 import { createDb, initializeDb, type DbClient } from "./db/client.js";
-import { findings, reports, scanRuns } from "./db/schema.js";
+import { findings, issues, reports, scanRuns } from "./db/schema.js";
 import { LocalJobRunner } from "./jobs/local-job-runner.js";
 import { registerFindingRoutes } from "./routes/findings.js";
 import { registerArtifactRoutes } from "./routes/artifacts.js";
@@ -68,11 +69,59 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
 
           const completedAt = result.finishedAt;
           dbClient.db.transaction((tx) => {
+            const projectId = result.projectId ?? job.payload.projectId;
+            const issueIdByFingerprint = new Map<string, string>();
+
+            if (result.findings.length > 0) {
+              const issueRows = aggregateScanIssues(result.findings).map((issue) => {
+                const issueId = `${result.runId}-${issue.id}`;
+
+                for (const fingerprint of issue.occurrenceFingerprints) {
+                  if (fingerprint) {
+                    issueIdByFingerprint.set(fingerprint, issueId);
+                  }
+                }
+
+                return {
+                  id: issueId,
+                  projectId,
+                  scanRunId: result.runId,
+                  issueKey: issue.issueKey,
+                  title: issue.title,
+                  severity: issue.severity,
+                  source: issue.source,
+                  certainty: issue.certainty,
+                  ruleId: issue.ruleId,
+                  wcagCriteria: issue.wcagCriteria.join(","),
+                  description: issue.description,
+                  recommendation: issue.recommendation,
+                  likelyScope: issue.likelyScope,
+                  urlScopeGroup: issue.urlScopeGroup,
+                  componentArea: issue.componentArea,
+                  cmsHint: issue.cmsHint,
+                  confidence: issue.confidence,
+                  affectedPages: issue.affectedPages,
+                  occurrences: issue.occurrences,
+                  viewportSummary: issue.viewportSummary,
+                  representativeUrl: issue.representativeUrl,
+                  representativeSelector: issue.representativeSelector,
+                  representativeHtmlSnippet: issue.representativeHtmlSnippet,
+                  sampleUrls: JSON.stringify(issue.sampleUrls),
+                  createdAt: completedAt
+                };
+              });
+
+              for (const chunk of chunkArray(issueRows, 200)) {
+                tx.insert(issues).values(chunk).run();
+              }
+            }
+
             if (result.findings.length > 0) {
               const findingRows = result.findings.map((finding) => ({
                 id: `${result.runId}-${finding.id}`,
-                projectId: result.projectId ?? job.payload.projectId,
+                projectId,
                 scanRunId: result.runId,
+                issueId: issueIdByFingerprint.get(finding.fingerprint) ?? null,
                 pageUrl: finding.pageUrl,
                 ruleId: finding.ruleId,
                 title: finding.title,
@@ -100,7 +149,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
                 .insert(reports)
                 .values(result.reports.map((report) => ({
                   id: `report-${nanoid(10)}`,
-                  projectId: result.projectId ?? job.payload.projectId,
+                  projectId,
                   scanRunId: result.runId,
                   kind: report.kind,
                   artifactKey: report.artifactKey,

@@ -29,6 +29,38 @@ export const scanRuns = sqliteTable("scan_runs", {
   errorMessage: text("error_message")
 });
 
+export const issues = sqliteTable("issues", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  scanRunId: text("scan_run_id")
+    .notNull()
+    .references(() => scanRuns.id, { onDelete: "cascade" }),
+  issueKey: text("issue_key").notNull(),
+  title: text("title").notNull(),
+  severity: text("severity").notNull(),
+  source: text("source").notNull(),
+  certainty: text("certainty").notNull(),
+  ruleId: text("rule_id").notNull(),
+  wcagCriteria: text("wcag_criteria").notNull(),
+  description: text("description").notNull(),
+  recommendation: text("recommendation").notNull(),
+  likelyScope: text("likely_scope").notNull(),
+  urlScopeGroup: text("url_scope_group").notNull(),
+  componentArea: text("component_area").notNull(),
+  cmsHint: text("cms_hint").notNull(),
+  confidence: text("confidence").notNull(),
+  affectedPages: integer("affected_pages").notNull(),
+  occurrences: integer("occurrences").notNull(),
+  viewportSummary: text("viewport_summary").notNull(),
+  representativeUrl: text("representative_url").notNull(),
+  representativeSelector: text("representative_selector"),
+  representativeHtmlSnippet: text("representative_html_snippet"),
+  sampleUrls: text("sample_urls").notNull(),
+  createdAt: text("created_at").notNull()
+});
+
 export const findings = sqliteTable("findings", {
   id: text("id").primaryKey(),
   projectId: text("project_id")
@@ -37,6 +69,7 @@ export const findings = sqliteTable("findings", {
   scanRunId: text("scan_run_id")
     .notNull()
     .references(() => scanRuns.id, { onDelete: "cascade" }),
+  issueId: text("issue_id").references(() => issues.id, { onDelete: "set null" }),
   pageUrl: text("page_url").notNull(),
   ruleId: text("rule_id").notNull(),
   title: text("title").notNull(),
