@@ -50,7 +50,11 @@ export interface AggregatedIssue {
   occurrences: number;
   viewportSummary: ViewportSummary;
   confidence: IssueConfidence;
+  representativeUrl: string;
+  representativeSelector: string | null;
+  representativeHtmlSnippet: string | null;
   sampleUrls: string[];
+  occurrenceFingerprints: string[];
   occurrenceIds: string[];
 }
 
@@ -65,6 +69,7 @@ interface IssueAccumulator {
   pages: Map<string, string>;
   viewports: Set<ViewportName>;
   occurrences: number;
+  occurrenceFingerprints: string[];
   occurrenceIds: string[];
 }
 
@@ -154,6 +159,7 @@ export function aggregateScanIssues(findings: ScanFinding[]): AggregatedIssue[] 
       existing.pages.set(normalizedUrl, normalizedUrl);
       existing.viewports.add(finding.viewport);
       existing.occurrences += finding.instances;
+      existing.occurrenceFingerprints.push(finding.fingerprint);
       existing.occurrenceIds.push(finding.id);
       continue;
     }
@@ -169,6 +175,7 @@ export function aggregateScanIssues(findings: ScanFinding[]): AggregatedIssue[] 
       pages: new Map([[normalizedUrl, normalizedUrl]]),
       viewports: new Set([finding.viewport]),
       occurrences: finding.instances,
+      occurrenceFingerprints: [finding.fingerprint],
       occurrenceIds: [finding.id]
     });
   }
@@ -203,7 +210,11 @@ function toAggregatedIssue(accumulator: IssueAccumulator): AggregatedIssue {
     occurrences: accumulator.occurrences,
     viewportSummary: summarizeViewports(accumulator.viewports),
     confidence: inferConfidence(accumulator.groupSize, affectedPages),
+    representativeUrl: accumulator.first.pageUrl,
+    representativeSelector: accumulator.first.selector,
+    representativeHtmlSnippet: accumulator.first.htmlSnippet,
     sampleUrls,
+    occurrenceFingerprints: [...accumulator.occurrenceFingerprints],
     occurrenceIds: [...accumulator.occurrenceIds]
   };
 }

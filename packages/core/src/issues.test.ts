@@ -143,10 +143,30 @@ describe("aggregateScanIssues", () => {
 
   it("groups repeated template occurrences into one issue", () => {
     const issues = aggregateScanIssues([
-      finding({ id: "occurrence-1", pageUrl: "https://example.com/haberler/a", viewport: "desktop" }),
-      finding({ id: "occurrence-2", pageUrl: "https://example.com/haberler/a", viewport: "mobile" }),
-      finding({ id: "occurrence-3", pageUrl: "https://example.com/haberler/b", viewport: "desktop" }),
-      finding({ id: "occurrence-4", pageUrl: "https://example.com/haberler/b", viewport: "mobile" })
+      finding({
+        id: "occurrence-1",
+        pageUrl: "https://example.com/haberler/a",
+        viewport: "desktop",
+        fingerprint: "fingerprint-1"
+      }),
+      finding({
+        id: "occurrence-2",
+        pageUrl: "https://example.com/haberler/a",
+        viewport: "mobile",
+        fingerprint: "fingerprint-2"
+      }),
+      finding({
+        id: "occurrence-3",
+        pageUrl: "https://example.com/haberler/b",
+        viewport: "desktop",
+        fingerprint: "fingerprint-3"
+      }),
+      finding({
+        id: "occurrence-4",
+        pageUrl: "https://example.com/haberler/b",
+        viewport: "mobile",
+        fingerprint: "fingerprint-4"
+      })
     ]);
 
     expect(issues).toHaveLength(1);
@@ -159,6 +179,12 @@ describe("aggregateScanIssues", () => {
       occurrences: 4,
       viewportSummary: "desktop,mobile",
       confidence: "low"
+    });
+    expect(issues[0]).toMatchObject({
+      representativeUrl: "https://example.com/haberler/a",
+      representativeSelector: "aside .elementor-widget-button a",
+      representativeHtmlSnippet: '<aside><div class="elementor-widget-button"><a></a></div></aside>',
+      occurrenceFingerprints: ["fingerprint-1", "fingerprint-2", "fingerprint-3", "fingerprint-4"]
     });
     expect(issues[0]?.sampleUrls).toEqual([
       "https://example.com/haberler/a",
