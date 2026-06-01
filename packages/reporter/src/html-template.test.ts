@@ -146,6 +146,7 @@ describe("real report rendering", () => {
     expect(html).toContain("Sample URLs");
     expect(html).toContain("Recommendation");
     expect(html).toContain("Elementor widget button");
+    expect(html).toContain("single page (low)");
     expect(html.indexOf("Grouped Issues")).toBeGreaterThanOrEqual(0);
     expect(html.indexOf("Raw Occurrence Appendix")).toBeGreaterThanOrEqual(0);
     expect(html.indexOf("Grouped Issues")).toBeLessThan(html.indexOf("Raw Occurrence Appendix"));
