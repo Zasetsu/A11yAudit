@@ -140,7 +140,7 @@ export function OverviewPage({ project, scans, issues, navigate }: PageProps) {
         <Panel action={<Button iconRight="arrow-right" onClick={() => navigate({ page: "scan-runs" })} size="sm" variant="ghost">All runs</Button>} title="Recent scan runs">
           <div className="table-wrap">
             <table className="table">
-              <thead><tr><th>Run</th><th>Status</th><th>Started</th><th className="num">Findings</th></tr></thead>
+              <thead><tr><th>Run</th><th>Status</th><th>Started</th><th className="num">Occurrences</th></tr></thead>
               <tbody>
                 {projectScans.slice(0, 4).map((scan) => (
                   <tr key={scan.id}>
