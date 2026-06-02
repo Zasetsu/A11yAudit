@@ -23,6 +23,7 @@ Current server behavior:
 A11YAUDIT_PUBLIC_SIGNUPS=false
 A11YAUDIT_MAX_CONCURRENT_SCANS=1
 A11YAUDIT_DB_PATH=.a11yaudit/a11yaudit.db
+A11YAUDIT_WEB_ORIGIN=https://your-web-origin.example
 PORT=7842
 NODE_ENV=production
 ```
@@ -32,6 +33,7 @@ Notes:
 - `A11YAUDIT_PUBLIC_SIGNUPS` only enables open signup when set exactly to `true`. With the default unset or false behavior, the first user can bootstrap the first workspace, then later direct signup is disabled.
 - `A11YAUDIT_MAX_CONCURRENT_SCANS` defaults to `1`. Invalid, missing, zero, or negative values fall back to `1`.
 - `A11YAUDIT_DB_PATH` is the current SQLite database path variable used by the server and Drizzle config. The default is `.a11yaudit/a11yaudit.db`.
+- `A11YAUDIT_WEB_ORIGIN` controls the trusted browser origin used for CORS and CSRF origin checks. Set it to the deployed web app origin. The default is `http://localhost:5173`.
 - `DATABASE_URL` is not the current server database setting.
 - `PORT` defaults to `7842`.
 - `NODE_ENV=production` makes auth cookies secure, so deploy behind HTTPS.
