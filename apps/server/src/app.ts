@@ -9,6 +9,7 @@ import { getTrustedBrowserOrigin, readAuthFromRequest, validateCsrf } from "./au
 import { createDb, initializeDb, type DbClient } from "./db/client.js";
 import { findings, issues, reports, scanRuns } from "./db/schema.js";
 import { LocalJobRunner } from "./jobs/local-job-runner.js";
+import { registerAuthRoutes } from "./routes/auth.js";
 import { registerFindingRoutes } from "./routes/findings.js";
 import { registerArtifactRoutes } from "./routes/artifacts.js";
 import { registerIssueRoutes } from "./routes/issues.js";
@@ -236,6 +237,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
     version: "0.1.0"
   }));
 
+  await registerAuthRoutes(app, { db: dbClient.db });
   await registerProjectRoutes(app, { db: dbClient.db });
   await registerScanRoutes(app, { db: dbClient.db, runner });
   await registerFindingRoutes(app, { db: dbClient.db });

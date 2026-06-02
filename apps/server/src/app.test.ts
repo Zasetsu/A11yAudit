@@ -6,7 +6,7 @@ import { buildServer } from "./app.js";
 import { csrfCookieName, sessionCookieName } from "./auth/cookies.js";
 import { createSession } from "./auth/session.js";
 import { createDb, initializeDb } from "./db/client.js";
-import { findings, issues, projects, reports, scanRuns, users } from "./db/schema.js";
+import { findings, issues, projects, reports, scanRuns, sessions, users } from "./db/schema.js";
 
 const { runScanMock } = vi.hoisted(() => ({
   runScanMock: vi.fn()
@@ -305,6 +305,40 @@ function mockGroupedIssueCompletedScan(): void {
   }));
 }
 
+function setCookieHeaders(response: { headers: Record<string, string | string[] | undefined> }): string[] {
+  const setCookie = response.headers["set-cookie"];
+  return Array.isArray(setCookie) ? setCookie : setCookie === undefined ? [] : [setCookie];
+}
+
+function cookieValue(response: { headers: Record<string, string | string[] | undefined> }, name: string): string {
+  const header = setCookieHeaders(response).find((cookie) => cookie.startsWith(`${name}=`));
+  if (!header) {
+    throw new Error(`Missing ${name} cookie`);
+  }
+
+  const [pair] = header.split(";");
+  const [, value] = pair.split("=");
+  return decodeURIComponent(value ?? "");
+}
+
+async function signup(
+  app: Awaited<ReturnType<typeof buildServer>>,
+  email: string,
+  workspaceName: string,
+  password = "password12345"
+) {
+  return app.inject({
+    method: "POST",
+    url: "/api/auth/signup",
+    payload: {
+      fullName: "Owner",
+      email,
+      password,
+      workspaceName
+    }
+  });
+}
+
 function issueFixture(overrides: Partial<typeof issues.$inferInsert> = {}): typeof issues.$inferInsert {
   return {
     id: "issue-fixture",
@@ -449,6 +483,220 @@ describe("server", () => {
         .run("project-duplicate-domain", "Duplicate Domain", "https://default.example.com", "default.example.com", "2026-06-02T00:00:00.000Z"))
         .toThrow(/UNIQUE constraint failed/);
       dbClient.close();
+    });
+  });
+
+  it("allows first-user signup and creates an owner workspace", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const response = await app.inject({
+          method: "POST",
+          url: "/api/auth/signup",
+          payload: {
+            fullName: "Ada Lovelace",
+            email: "ADA@EXAMPLE.COM ",
+            password: "correct horse battery staple",
+            workspaceName: "Acme Accessibility Team"
+          }
+        });
+
+        expect(response.statusCode).toBe(201);
+        expect(response.json().data.user.email).toBe("ada@example.com");
+        expect(response.json().data.workspaces[0]).toMatchObject({ slug: "acme-accessibility-team", role: "owner" });
+        expect(response.headers["set-cookie"]).toBeDefined();
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("closes normal signup after first user when public signup is disabled", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        await signup(app, "owner@example.com", "Owner Workspace");
+        const response = await app.inject({
+          method: "POST",
+          url: "/api/auth/signup",
+          payload: {
+            fullName: "Member",
+            email: "member@example.com",
+            password: "password12345",
+            workspaceName: "Member Workspace"
+          }
+        });
+
+        expect(response.statusCode).toBe(403);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("logs in with normalized email and sets cookies", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        await signup(app, "ada@example.com", "Ada Workspace", "correct horse battery staple");
+
+        const response = await app.inject({
+          method: "POST",
+          url: "/api/auth/login",
+          payload: {
+            email: " ADA@EXAMPLE.COM ",
+            password: "correct horse battery staple"
+          }
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.json().data.user.email).toBe("ada@example.com");
+        expect(response.json().data.workspaces[0]).toMatchObject({ slug: "ada-workspace", role: "owner" });
+        expect(cookieValue(response, sessionCookieName)).not.toBe("");
+        expect(cookieValue(response, csrfCookieName)).not.toBe("");
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("rejects wrong login passwords with a generic error", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        await signup(app, "ada@example.com", "Ada Workspace", "correct horse battery staple");
+
+        const response = await app.inject({
+          method: "POST",
+          url: "/api/auth/login",
+          payload: {
+            email: "ada@example.com",
+            password: "wrong-password"
+          }
+        });
+
+        expect(response.statusCode).toBe(401);
+        expect(response.json()).toEqual({ error: "Invalid email or password" });
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("returns authenticated session workspaces", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const signedUp = await signup(app, "ada@example.com", "Ada Workspace");
+
+        const response = await app.inject({
+          method: "GET",
+          url: "/api/auth/session",
+          cookies: {
+            [sessionCookieName]: cookieValue(signedUp, sessionCookieName),
+            [csrfCookieName]: cookieValue(signedUp, csrfCookieName)
+          }
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.json().data).toMatchObject({
+          user: {
+            fullName: "Owner",
+            email: "ada@example.com"
+          },
+          workspaces: [
+            {
+              name: "Ada Workspace",
+              slug: "ada-workspace",
+              role: "owner"
+            }
+          ]
+        });
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("logs out with CSRF, revokes the session, and clears cookies", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const signedUp = await signup(app, "ada@example.com", "Ada Workspace");
+        const sessionToken = cookieValue(signedUp, sessionCookieName);
+        const csrfToken = cookieValue(signedUp, csrfCookieName);
+
+        const response = await app.inject({
+          method: "POST",
+          url: "/api/auth/logout",
+          headers: { "x-csrf-token": csrfToken },
+          cookies: {
+            [sessionCookieName]: sessionToken,
+            [csrfCookieName]: csrfToken
+          }
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.json()).toEqual({ data: { ok: true } });
+        expect(setCookieHeaders(response).find((cookie) => cookie.startsWith(`${sessionCookieName}=`))).toContain("Max-Age=0");
+        expect(setCookieHeaders(response).find((cookie) => cookie.startsWith(`${csrfCookieName}=`))).toContain("Max-Age=0");
+
+      } finally {
+        await app.close();
+      }
+
+      const dbClient = createDb(dbPath);
+      try {
+        const sessionRows = dbClient.db.select().from(sessions).all();
+        expect(sessionRows).toHaveLength(1);
+        expect(sessionRows[0].revokedAt).not.toBeNull();
+      } finally {
+        dbClient.close();
+      }
+    });
+  });
+
+  it("allows public signup after first user when enabled", async () => {
+    await withTempDb(async (dbPath) => {
+      const originalPublicSignups = process.env.A11YAUDIT_PUBLIC_SIGNUPS;
+      process.env.A11YAUDIT_PUBLIC_SIGNUPS = "true";
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        await signup(app, "owner@example.com", "Owner Workspace");
+        const response = await signup(app, "member@example.com", "Member Workspace");
+
+        expect(response.statusCode).toBe(201);
+        expect(response.json().data.workspaces[0]).toMatchObject({ slug: "member-workspace", role: "owner" });
+      } finally {
+        if (originalPublicSignups === undefined) {
+          delete process.env.A11YAUDIT_PUBLIC_SIGNUPS;
+        } else {
+          process.env.A11YAUDIT_PUBLIC_SIGNUPS = originalPublicSignups;
+        }
+        await app.close();
+      }
+    });
+  });
+
+  it("suffixes workspace slugs on collision", async () => {
+    await withTempDb(async (dbPath) => {
+      const originalPublicSignups = process.env.A11YAUDIT_PUBLIC_SIGNUPS;
+      process.env.A11YAUDIT_PUBLIC_SIGNUPS = "true";
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        await signup(app, "owner@example.com", "Acme");
+        const response = await signup(app, "member@example.com", "Acme");
+
+        expect(response.statusCode).toBe(201);
+        expect(response.json().data.workspaces[0]).toMatchObject({ slug: "acme-2", role: "owner" });
+      } finally {
+        if (originalPublicSignups === undefined) {
+          delete process.env.A11YAUDIT_PUBLIC_SIGNUPS;
+        } else {
+          process.env.A11YAUDIT_PUBLIC_SIGNUPS = originalPublicSignups;
+        }
+        await app.close();
+      }
     });
   });
 
