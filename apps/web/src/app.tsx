@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchIssues, getFindings, getProjects, getReports, getScans } from "./api/client";
+import { fetchIssues, getFindings, getProjects, getReports, getScans, getSession, type AuthSession } from "./api/client";
 import { Sidebar, TopBar } from "./design/shell";
 import { activeProject, emptyProject, type Project, type ScanRun } from "./data";
 import { OverviewPage } from "./pages/overview";
@@ -11,6 +11,10 @@ import { FindingsPage } from "./pages/findings";
 import { FindingDetailPage } from "./pages/finding-detail";
 import { ReportsPage } from "./pages/reports";
 import { SettingsPage } from "./pages/settings";
+import { LoginPage } from "./pages/login";
+import { SignupPage } from "./pages/signup";
+import { InvitePage } from "./pages/invite";
+import { WorkspacesPage } from "./pages/workspaces";
 import { Button, Icon, PageHeader, Panel } from "./design/ui";
 
 export type Route =
@@ -26,8 +30,83 @@ export type Route =
 
 export type Navigate = (route: Route) => void;
 
+export type WorkspacePage = Route["page"];
+
+export type AppRoute =
+  | { page: "login" }
+  | { page: "signup" }
+  | { page: "invite"; token: string }
+  | { page: "workspaces" }
+  | (Route & { workspaceSlug: string });
+
 const activeScanStatuses = new Set<ScanRun["status"]>(["queued", "crawling", "auditing", "reporting"]);
-const currentWorkspaceSlug = "default-workspace";
+const workspacePages = new Set<Exclude<WorkspacePage, "finding-detail">>([
+  "overview",
+  "projects",
+  "new-scan",
+  "scan-runs",
+  "findings",
+  "reports",
+  "settings",
+  "docs"
+]);
+
+function routePath(route: AppRoute): string {
+  if (route.page === "login") return "/login";
+  if (route.page === "signup") return "/signup";
+  if (route.page === "workspaces") return "/workspaces";
+  if (route.page === "invite") return `/invite/${encodeURIComponent(route.token)}`;
+  if (route.page === "finding-detail") {
+    return `/w/${encodeURIComponent(route.workspaceSlug)}/findings/${encodeURIComponent(route.findingId)}`;
+  }
+
+  return `/w/${encodeURIComponent(route.workspaceSlug)}/${route.page}`;
+}
+
+function isWorkspaceRoute(route: AppRoute): route is Route & { workspaceSlug: string } {
+  return "workspaceSlug" in route;
+}
+
+function dashboardRoute(route: Route & { workspaceSlug: string }): Route {
+  if (route.page === "finding-detail") return { page: "finding-detail", findingId: route.findingId };
+  return { page: route.page };
+}
+
+function destinationForSession(session: AuthSession): AppRoute {
+  if (session.workspaces.length === 1) {
+    return { page: "projects", workspaceSlug: session.workspaces[0].slug };
+  }
+
+  return { page: "workspaces" };
+}
+
+function workspaceIsAllowed(session: AuthSession | null | undefined, workspaceSlug: string): boolean {
+  return session?.workspaces.some((workspace) => workspace.slug === workspaceSlug) ?? false;
+}
+
+export function parsePath(pathname: string): AppRoute {
+  if (pathname === "/login") return { page: "login" };
+  if (pathname === "/signup") return { page: "signup" };
+  if (pathname === "/workspaces") return { page: "workspaces" };
+  const invite = pathname.match(/^\/invite\/([^/]+)$/);
+  if (invite) return { page: "invite", token: decodeURIComponent(invite[1]) };
+  const finding = pathname.match(/^\/w\/([^/]+)\/findings\/([^/]+)$/);
+  if (finding) {
+    return {
+      page: "finding-detail",
+      findingId: decodeURIComponent(finding[2]),
+      workspaceSlug: decodeURIComponent(finding[1])
+    };
+  }
+  const workspace = pathname.match(/^\/w\/([^/]+)\/([^/]+)$/);
+  if (workspace && workspacePages.has(workspace[2] as Exclude<WorkspacePage, "finding-detail">)) {
+    return {
+      page: workspace[2] as Exclude<WorkspacePage, "finding-detail">,
+      workspaceSlug: decodeURIComponent(workspace[1])
+    };
+  }
+  return { page: "login" };
+}
 
 function hasActiveScans(scans: ScanRun[] | undefined): boolean {
   return scans?.some((scan) => activeScanStatuses.has(scan.status)) ?? false;
@@ -66,25 +145,39 @@ function DocsPage() {
 }
 
 export function App() {
-  const [route, setRoute] = useState<Route>({ page: "overview" });
+  const [appRoute, setAppRoute] = useState<AppRoute>(() => parsePath(window.location.pathname));
+  const [authenticatedSession, setAuthenticatedSession] = useState<AuthSession | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">(() => {
-    const saved = globalThis.localStorage?.getItem("a11yaudit-theme");
+    const storage = globalThis.localStorage;
+    const saved = typeof storage?.getItem === "function" ? storage.getItem("a11yaudit-theme") : null;
     return saved === "dark" ? "dark" : "light";
   });
   const contentRef = useRef<HTMLElement>(null);
+  const sessionQuery = useQuery({
+    queryKey: ["auth-session"],
+    queryFn: getSession
+  });
+  const session: AuthSession | null = authenticatedSession ?? sessionQuery.data ?? null;
+  const sessionLoaded = !sessionQuery.isLoading;
+  const currentWorkspaceSlug = isWorkspaceRoute(appRoute) ? appRoute.workspaceSlug : null;
+  const hasWorkspaceAccess = currentWorkspaceSlug !== null && workspaceIsAllowed(session, currentWorkspaceSlug);
+  const dashboardQueriesEnabled = sessionLoaded && session !== null && hasWorkspaceAccess && currentWorkspaceSlug !== null;
 
   const projectsQuery = useQuery({
     queryKey: ["projects", currentWorkspaceSlug],
-    queryFn: () => getProjects(currentWorkspaceSlug)
+    queryFn: () => getProjects(currentWorkspaceSlug ?? ""),
+    enabled: dashboardQueriesEnabled
   });
   const scansQuery = useQuery({
     queryKey: ["scans", currentWorkspaceSlug],
-    queryFn: () => getScans(currentWorkspaceSlug),
+    queryFn: () => getScans(currentWorkspaceSlug ?? ""),
+    enabled: dashboardQueriesEnabled,
     refetchInterval: (query) => (hasActiveScans(query.state.data) ? 2_000 : false)
   });
   const findingsQuery = useQuery({
     queryKey: ["findings", currentWorkspaceSlug],
-    queryFn: () => getFindings(currentWorkspaceSlug)
+    queryFn: () => getFindings(currentWorkspaceSlug ?? ""),
+    enabled: dashboardQueriesEnabled
   });
   const projects = projectsQuery.data ?? [activeProject()];
   const [selectedProjectId, setSelectedProjectId] = useState<string>(activeProject().id);
@@ -96,23 +189,83 @@ export function App() {
   const issuesQuery = useQuery({
     queryKey: ["issues", currentWorkspaceSlug, selectedProject.id, selectedScan?.id ?? null],
     queryFn: () => fetchIssues(
-      currentWorkspaceSlug,
+      currentWorkspaceSlug ?? "",
       selectedScan === undefined
         ? { projectId: selectedProject.id }
         : { projectId: selectedProject.id, scanRunId: selectedScan.id }
     ),
+    enabled: dashboardQueriesEnabled,
     refetchInterval: hasActiveScans(scansQuery.data) ? 3_000 : false
   });
   const reportsQuery = useQuery({
     queryKey: ["reports", currentWorkspaceSlug],
-    queryFn: () => getReports(currentWorkspaceSlug),
+    queryFn: () => getReports(currentWorkspaceSlug ?? ""),
+    enabled: dashboardQueriesEnabled,
     refetchInterval: hasActiveScans(scansQuery.data) ? 2_000 : false
   });
 
+  const setBrowserRoute = useCallback((nextRoute: AppRoute, mode: "push" | "replace" = "push") => {
+    setAppRoute(nextRoute);
+    const nextPath = routePath(nextRoute);
+    if (window.location.pathname !== nextPath) {
+      if (mode === "replace") {
+        window.history.replaceState(null, "", nextPath);
+      } else {
+        window.history.pushState(null, "", nextPath);
+      }
+    }
+  }, []);
+
+  const routeAfterAuth = useCallback((nextSession: AuthSession) => {
+    setAuthenticatedSession(nextSession);
+    setBrowserRoute(destinationForSession(nextSession), "replace");
+  }, [setBrowserRoute]);
+
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    globalThis.localStorage?.setItem("a11yaudit-theme", theme);
+    const storage = globalThis.localStorage;
+    if (typeof storage?.setItem === "function") {
+      storage.setItem("a11yaudit-theme", theme);
+    }
   }, [theme]);
+
+  useEffect(() => {
+    function onPopState() {
+      setAppRoute(parsePath(window.location.pathname));
+    }
+
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  useEffect(() => {
+    if (!sessionLoaded) return;
+
+    if (isWorkspaceRoute(appRoute)) {
+      if (session === null) {
+        setBrowserRoute({ page: "login" }, "replace");
+        return;
+      }
+
+      if (!workspaceIsAllowed(session, appRoute.workspaceSlug)) {
+        setBrowserRoute({ page: "workspaces" }, "replace");
+      }
+      return;
+    }
+
+    if (appRoute.page === "workspaces") {
+      if (session === null) {
+        setBrowserRoute({ page: "login" }, "replace");
+      } else if (session.workspaces.length === 1) {
+        setBrowserRoute(destinationForSession(session), "replace");
+      }
+      return;
+    }
+
+    if (session !== null) {
+      setBrowserRoute(destinationForSession(session), "replace");
+    }
+  }, [appRoute, session, sessionLoaded, setBrowserRoute]);
 
   useEffect(() => {
     if (!projects.some((project) => project.id === selectedProjectId) && projects[0] !== undefined) {
@@ -121,11 +274,46 @@ export function App() {
   }, [projects, selectedProjectId]);
 
   const navigate = useCallback<Navigate>((nextRoute) => {
-    setRoute(nextRoute);
+    if (currentWorkspaceSlug !== null) {
+      setBrowserRoute({ ...nextRoute, workspaceSlug: currentWorkspaceSlug });
+    }
     contentRef.current?.scrollTo({ top: 0 });
-  }, []);
+  }, [currentWorkspaceSlug, setBrowserRoute]);
 
   const onSelectProject = useCallback((project: Project) => setSelectedProjectId(project.id), []);
+
+  if (!sessionLoaded) {
+    return (
+      <main aria-label="Main content" className="content auth-content">
+        <div className="content-inner fadein">
+          <Panel title="Loading">Preparing your session.</Panel>
+        </div>
+      </main>
+    );
+  }
+
+  if (appRoute.page === "login") {
+    return <LoginPage onAuthenticated={routeAfterAuth} />;
+  }
+
+  if (appRoute.page === "signup") {
+    return <SignupPage onAuthenticated={routeAfterAuth} />;
+  }
+
+  if (appRoute.page === "invite") {
+    return <InvitePage onAuthenticated={routeAfterAuth} token={appRoute.token} />;
+  }
+
+  if (appRoute.page === "workspaces") {
+    if (session === null) return null;
+    return <WorkspacesPage onSelectWorkspace={(slug) => setBrowserRoute({ page: "projects", workspaceSlug: slug })} session={session} />;
+  }
+
+  if (session === null || currentWorkspaceSlug === null || !hasWorkspaceAccess) {
+    return null;
+  }
+
+  const route = dashboardRoute(appRoute);
 
   const common = {
     workspaceSlug: currentWorkspaceSlug,
