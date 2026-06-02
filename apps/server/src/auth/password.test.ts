@@ -1,3 +1,5 @@
+import { scryptSync } from "node:crypto";
+
 import { describe, expect, it } from "vitest";
 
 import { hashPassword, verifyPassword } from "./password.js";
@@ -26,4 +28,43 @@ describe("password primitives", () => {
 
     await expect(verifyPassword("secret", parts.join("$"))).resolves.toBe(false);
   });
+
+  it("rejects hashes when stored scrypt parameters do not exactly match this scheme", async () => {
+    const password = "secret";
+    const hash = await hashPassword(password);
+    const [, , , , , saltText] = hash.split("$");
+    const salt = Buffer.from(saltText ?? "", "base64url");
+
+    const unsupportedHashes = [
+      forgeHash(hash, password, salt, { N: 1024, r: 8, p: 1 }),
+      forgeHash(hash, password, salt, { N: 16_384, r: 4, p: 1 }),
+      forgeHash(hash, password, salt, { N: 16_384, r: 8, p: 2 }),
+    ];
+
+    for (const unsupportedHash of unsupportedHashes) {
+      await expect(verifyPassword(password, unsupportedHash)).resolves.toBe(false);
+    }
+  });
 });
+
+function forgeHash(
+  storedHash: string,
+  password: string,
+  salt: Buffer,
+  params: { N: number; r: number; p: number },
+): string {
+  const parts = storedHash.split("$");
+  const forgedHash = scryptSync(password, salt, 64, {
+    N: params.N,
+    r: params.r,
+    p: params.p,
+    maxmem: 64 * 1024 * 1024,
+  });
+
+  parts[2] = params.N.toString();
+  parts[3] = params.r.toString();
+  parts[4] = params.p.toString();
+  parts[6] = forgedHash.toString("base64url");
+
+  return parts.join("$");
+}

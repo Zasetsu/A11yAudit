@@ -106,6 +106,10 @@ function parsePasswordHash(storedHash: string): { params: ScryptParams; salt: Bu
     return null;
   }
 
+  if (params.N !== SCRYPT_N || params.r !== SCRYPT_R || params.p !== SCRYPT_P) {
+    return null;
+  }
+
   const salt = Buffer.from(saltText, "base64url");
   const hash = Buffer.from(hashText, "base64url");
 
