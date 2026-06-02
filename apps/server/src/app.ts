@@ -5,6 +5,7 @@ import { LocalStorageAdapter } from "@a11yaudit/storage";
 import { eq, inArray } from "drizzle-orm";
 import Fastify, { type FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
+import { readAuthFromRequest, validateCsrf } from "./auth/session.js";
 import { createDb, initializeDb, type DbClient } from "./db/client.js";
 import { findings, issues, reports, scanRuns } from "./db/schema.js";
 import { LocalJobRunner } from "./jobs/local-job-runner.js";
@@ -29,6 +30,13 @@ function chunkArray<T>(items: T[], chunkSize: number): T[][] {
     chunks.push(items.slice(index, index + chunkSize));
   }
   return chunks;
+}
+
+function shouldSkipCsrf(requestUrl: string): boolean {
+  const pathname = requestUrl.startsWith("http") ? new URL(requestUrl).pathname : requestUrl.split("?")[0];
+  return pathname === "/health"
+    || pathname === "/api/auth/login"
+    || pathname === "/api/auth/signup";
 }
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
@@ -193,10 +201,22 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
 
   initializeDb(dbClient.sqlite);
   markInterruptedScansFailed(dbClient);
-  app.addHook("onRequest", async (_request, reply) => {
+  app.addHook("onRequest", async (request, reply) => {
     reply.header("Access-Control-Allow-Origin", "http://localhost:5173");
     reply.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-    reply.header("Access-Control-Allow-Headers", "Content-Type,Accept");
+    reply.header("Access-Control-Allow-Headers", "Content-Type,Accept,X-CSRF-Token");
+    reply.header("Access-Control-Allow-Credentials", "true");
+
+    request.auth = readAuthFromRequest(dbClient.db, request);
+
+    if (shouldSkipCsrf(request.url)) {
+      return;
+    }
+
+    const csrf = validateCsrf(dbClient.db, request);
+    if (!csrf.valid) {
+      await reply.code(csrf.statusCode).send({ error: csrf.error });
+    }
   });
 
   app.options("/*", async (_request, reply) => reply.code(204).send());

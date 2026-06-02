@@ -3,8 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildServer } from "./app.js";
+import { csrfCookieName, sessionCookieName } from "./auth/cookies.js";
+import { createSession } from "./auth/session.js";
 import { createDb, initializeDb } from "./db/client.js";
-import { findings, issues, projects, reports, scanRuns } from "./db/schema.js";
+import { findings, issues, projects, reports, scanRuns, users } from "./db/schema.js";
 
 const { runScanMock } = vi.hoisted(() => ({
   runScanMock: vi.fn()
@@ -366,6 +368,41 @@ describe("server", () => {
         expect(response.statusCode).toBe(204);
         expect(response.headers["access-control-allow-origin"]).toBe("http://localhost:5173");
         expect(response.headers["access-control-allow-methods"]).toBe("GET,POST,OPTIONS");
+        expect(response.headers["access-control-allow-headers"]).toContain("X-CSRF-Token");
+        expect(response.headers["access-control-allow-credentials"]).toBe("true");
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("rejects unsafe authenticated requests without CSRF", async () => {
+    await withTempDb(async (dbPath) => {
+      const dbClient = createDb(dbPath);
+      initializeDb(dbClient.sqlite);
+      dbClient.db.insert(users).values({
+        id: "user-1",
+        fullName: "Ada Lovelace",
+        email: "ada@example.com",
+        passwordHash: "hash",
+        createdAt: "2026-06-02T00:00:00.000Z"
+      }).run();
+      const session = createSession(dbClient.db, "user-1", new Date("2026-06-02T00:00:00.000Z"));
+      dbClient.close();
+
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const response = await app.inject({
+          method: "POST",
+          url: "/api/projects",
+          cookies: { [sessionCookieName]: session.sessionToken, [csrfCookieName]: session.csrfToken },
+          payload: {
+            name: "Portal",
+            url: "https://portal.example.test/"
+          }
+        });
+
+        expect(response.statusCode).toBe(403);
       } finally {
         await app.close();
       }
