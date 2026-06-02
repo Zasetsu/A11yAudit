@@ -111,7 +111,7 @@ export function FindingDetailPage({ workspaceSlug, findings, issues, findingId, 
           ) : (
             <div className="evidence-grid">
               {finding.evidenceArtifacts.map((artifact) => {
-                const downloadUrl = getArtifactDownloadUrl(artifact.artifactKey, workspaceSlug);
+                const downloadUrl = getArtifactDownloadUrl(workspaceSlug, artifact.artifactKey);
                 const isImage = artifact.mimeType.startsWith("image/");
                 return (
                   <div className="evidence-card" key={artifact.artifactKey}>

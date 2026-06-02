@@ -9,7 +9,7 @@ export function reportActionLabel(report: PageProps["reports"][number]): string 
 }
 
 export function reportDownloadUrl(report: PageProps["reports"][number], workspaceSlug: string): string | null {
-  return report.status === "ready" ? getReportDownloadUrl(report.id, workspaceSlug) : null;
+  return report.status === "ready" ? getReportDownloadUrl(workspaceSlug, report.id) : null;
 }
 
 export function reportDownloadTitle(report: PageProps["reports"][number]): string {

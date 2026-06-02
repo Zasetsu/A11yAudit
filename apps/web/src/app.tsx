@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { currentWorkspaceSlug, fetchIssues, getFindings, getProjects, getReports, getScans } from "./api/client";
+import { fetchIssues, getFindings, getProjects, getReports, getScans } from "./api/client";
 import { Sidebar, TopBar } from "./design/shell";
 import { activeProject, emptyProject, type Project, type ScanRun } from "./data";
 import { OverviewPage } from "./pages/overview";
@@ -27,6 +27,7 @@ export type Route =
 export type Navigate = (route: Route) => void;
 
 const activeScanStatuses = new Set<ScanRun["status"]>(["queued", "crawling", "auditing", "reporting"]);
+const currentWorkspaceSlug = "default-workspace";
 
 function hasActiveScans(scans: ScanRun[] | undefined): boolean {
   return scans?.some((scan) => activeScanStatuses.has(scan.status)) ?? false;
@@ -95,10 +96,10 @@ export function App() {
   const issuesQuery = useQuery({
     queryKey: ["issues", currentWorkspaceSlug, selectedProject.id, selectedScan?.id ?? null],
     queryFn: () => fetchIssues(
+      currentWorkspaceSlug,
       selectedScan === undefined
         ? { projectId: selectedProject.id }
-        : { projectId: selectedProject.id, scanRunId: selectedScan.id },
-      currentWorkspaceSlug
+        : { projectId: selectedProject.id, scanRunId: selectedScan.id }
     ),
     refetchInterval: hasActiveScans(scansQuery.data) ? 3_000 : false
   });

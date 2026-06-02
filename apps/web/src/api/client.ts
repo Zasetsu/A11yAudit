@@ -18,8 +18,38 @@ interface ApiList<T> {
 }
 
 const apiBaseUrl = import.meta.env.VITE_A11YAUDIT_API_BASE_URL as string | undefined;
-const configuredWorkspaceSlug = import.meta.env.VITE_A11YAUDIT_WORKSPACE_SLUG as string | undefined;
-export const currentWorkspaceSlug = configuredWorkspaceSlug?.trim() || "default-workspace";
+
+export interface AuthSession {
+  user: { id: string; fullName: string; email: string };
+  workspaces: Array<{ id: string; name: string; slug: string; role: "owner" | "member" }>;
+}
+
+export interface SignupInput {
+  fullName: string;
+  email: string;
+  password: string;
+  workspaceName: string;
+}
+
+export interface LoginInput {
+  email: string;
+  password: string;
+}
+
+export interface InviteAcceptInput {
+  fullName: string;
+  email: string;
+  password: string;
+}
+
+export interface CreateScanInput {
+  projectId: string;
+  url: string;
+  mode: "single_url" | "same_domain_crawl";
+  maxPages: number;
+  maxDepth: number;
+  viewports: Array<"desktop" | "mobile">;
+}
 
 type ApiListResult<T> =
   | { status: "not_configured" }
@@ -116,43 +146,76 @@ function apiUrl(path: string): string | null {
   return new URL(relativePath, normalizedBase).href;
 }
 
-function workspaceScansPath(workspaceSlug = currentWorkspaceSlug): string {
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  const prefix = `${encodeURIComponent(name)}=`;
+  const cookie = document.cookie
+    .split(";")
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(prefix));
+
+  return cookie === undefined ? null : decodeURIComponent(cookie.slice(prefix.length));
+}
+
+async function apiFetch(path: string, options: RequestInit = {}): Promise<Response | null> {
+  const url = apiUrl(path);
+  if (url === null) {
+    return null;
+  }
+
+  const headers = new Headers(options.headers);
+  headers.set("Accept", "application/json");
+  if (options.body !== undefined) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const csrfToken = readCookie("a11yaudit_csrf");
+  if (csrfToken !== null && csrfToken !== "") {
+    headers.set("X-CSRF-Token", csrfToken);
+  }
+
+  return fetch(url, { ...options, credentials: "include", headers });
+}
+
+function workspaceScansPath(workspaceSlug: string): string {
   return `/api/workspaces/${encodeURIComponent(workspaceSlug)}/scans`;
 }
 
-function workspaceProjectsPath(workspaceSlug = currentWorkspaceSlug): string {
+function workspaceProjectsPath(workspaceSlug: string): string {
   return `/api/workspaces/${encodeURIComponent(workspaceSlug)}/projects`;
 }
 
-function workspaceReportsPath(workspaceSlug = currentWorkspaceSlug): string {
+function workspaceReportsPath(workspaceSlug: string): string {
   return `/api/workspaces/${encodeURIComponent(workspaceSlug)}/reports`;
 }
 
-function workspaceFindingsPath(workspaceSlug = currentWorkspaceSlug): string {
+function workspaceFindingsPath(workspaceSlug: string): string {
   return `/api/workspaces/${encodeURIComponent(workspaceSlug)}/findings`;
 }
 
-function workspaceIssuesPath(workspaceSlug = currentWorkspaceSlug): string {
+function workspaceIssuesPath(workspaceSlug: string): string {
   return `/api/workspaces/${encodeURIComponent(workspaceSlug)}/issues`;
 }
 
-function workspaceReportDownloadPath(reportId: string, workspaceSlug = currentWorkspaceSlug): string {
+function workspaceReportDownloadPath(workspaceSlug: string, reportId: string): string {
   return `${workspaceReportsPath(workspaceSlug)}/${encodeURIComponent(reportId)}/download`;
 }
 
-function workspaceArtifactDownloadPath(artifactKey: string, workspaceSlug = currentWorkspaceSlug): string {
+function workspaceArtifactDownloadPath(workspaceSlug: string, artifactKey: string): string {
   const encoded = encodeURIComponent(artifactKey);
   return `/api/workspaces/${encodeURIComponent(workspaceSlug)}/artifacts/download?key=${encoded}`;
 }
 
 async function fetchList<T>(path: string): Promise<ApiListResult<T>> {
-  const url = apiUrl(path);
-  if (url === null) {
+  const response = await apiFetch(path);
+  if (response === null) {
     return { status: "not_configured" };
   }
 
   try {
-    const response = await fetch(url, { headers: { Accept: "application/json" } });
     if (!response.ok) {
       return { status: "unavailable" };
     }
@@ -162,6 +225,50 @@ async function fetchList<T>(path: string): Promise<ApiListResult<T>> {
   } catch {
     return { status: "unavailable" };
   }
+}
+
+function isAuthSession(value: unknown): value is AuthSession {
+  if (value === null || typeof value !== "object") return false;
+  const session = value as Partial<AuthSession>;
+  const user = session.user;
+
+  return user !== undefined &&
+    isNonEmptyString(user.id) &&
+    isNonEmptyString(user.fullName) &&
+    isNonEmptyString(user.email) &&
+    Array.isArray(session.workspaces) &&
+    session.workspaces.every((workspace) =>
+      workspace !== null &&
+      typeof workspace === "object" &&
+      isNonEmptyString((workspace as Partial<AuthSession["workspaces"][number]>).id) &&
+      isNonEmptyString((workspace as Partial<AuthSession["workspaces"][number]>).name) &&
+      isNonEmptyString((workspace as Partial<AuthSession["workspaces"][number]>).slug) &&
+      (((workspace as Partial<AuthSession["workspaces"][number]>).role) === "owner" ||
+        ((workspace as Partial<AuthSession["workspaces"][number]>).role) === "member")
+    );
+}
+
+async function readAuthSession(response: Response): Promise<AuthSession | null> {
+  const payload = (await response.json()) as { data?: unknown };
+  return isAuthSession(payload.data) ? payload.data : null;
+}
+
+async function postAuth(path: string, input: SignupInput | LoginInput | InviteAcceptInput): Promise<AuthSession> {
+  const response = await apiFetch(path, {
+    body: JSON.stringify(input),
+    method: "POST"
+  });
+
+  if (response === null || !response.ok) {
+    throw new Error("Auth API is unavailable");
+  }
+
+  const session = await readAuthSession(response);
+  if (session === null) {
+    throw new Error("Invalid auth response");
+  }
+
+  return session;
 }
 
 function projectName(projectId: string): string {
@@ -303,7 +410,39 @@ function mapIssue(row: ServerIssue): Issue {
   };
 }
 
-export async function getProjects(workspaceSlug = currentWorkspaceSlug): Promise<Project[]> {
+export async function getSession(): Promise<AuthSession | null> {
+  const response = await apiFetch("/api/auth/session");
+  if (response === null || !response.ok) {
+    return null;
+  }
+
+  try {
+    return await readAuthSession(response);
+  } catch {
+    return null;
+  }
+}
+
+export async function signup(input: SignupInput): Promise<AuthSession> {
+  return postAuth("/api/auth/signup", input);
+}
+
+export async function login(input: LoginInput): Promise<AuthSession> {
+  return postAuth("/api/auth/login", input);
+}
+
+export async function logout(): Promise<void> {
+  const response = await apiFetch("/api/auth/logout", { method: "POST" });
+  if (response === null || !response.ok) {
+    throw new Error("Auth API is unavailable");
+  }
+}
+
+export async function acceptInvite(token: string, input: InviteAcceptInput): Promise<AuthSession> {
+  return postAuth(`/api/invitations/${encodeURIComponent(token)}/accept`, input);
+}
+
+export async function getProjects(workspaceSlug: string): Promise<Project[]> {
   const result = await fetchList<ServerProject>(workspaceProjectsPath(workspaceSlug));
   if (result.status === "not_configured") {
     return demoProjects;
@@ -326,7 +465,7 @@ export async function getProjects(workspaceSlug = currentWorkspaceSlug): Promise
   }));
 }
 
-export async function getScans(workspaceSlug = currentWorkspaceSlug): Promise<ScanRun[]> {
+export async function getScans(workspaceSlug: string): Promise<ScanRun[]> {
   const result = await fetchList<ServerScanRun>(workspaceScansPath(workspaceSlug));
   if (result.status === "not_configured") {
     return demoScanRuns;
@@ -355,7 +494,7 @@ export async function getScans(workspaceSlug = currentWorkspaceSlug): Promise<Sc
   }));
 }
 
-export async function getFindings(workspaceSlug = currentWorkspaceSlug): Promise<Finding[]> {
+export async function getFindings(workspaceSlug: string): Promise<Finding[]> {
   const result = await fetchList<ServerFinding>(workspaceFindingsPath(workspaceSlug));
   if (result.status === "not_configured") {
     return demoFindings;
@@ -385,8 +524,8 @@ export async function getFindings(workspaceSlug = currentWorkspaceSlug): Promise
 }
 
 export async function fetchIssues(
-  params: { projectId?: string; scanRunId?: string } = {},
-  workspaceSlug = currentWorkspaceSlug
+  workspaceSlug: string,
+  params: { projectId?: string; scanRunId?: string } = {}
 ): Promise<Issue[]> {
   const search = new URLSearchParams();
   if (params.projectId !== undefined) search.set("projectId", params.projectId);
@@ -402,7 +541,7 @@ export async function fetchIssues(
   return result.data.filter(isServerIssue).map(mapIssue);
 }
 
-export async function getReports(workspaceSlug = currentWorkspaceSlug): Promise<Report[]> {
+export async function getReports(workspaceSlug: string): Promise<Report[]> {
   const result = await fetchList<ServerReport>(workspaceReportsPath(workspaceSlug));
   if (result.status === "not_configured") {
     return demoReports;
@@ -423,27 +562,25 @@ export async function getReports(workspaceSlug = currentWorkspaceSlug): Promise<
   }));
 }
 
-export function getReportDownloadUrl(reportId: string, workspaceSlug = currentWorkspaceSlug): string | null {
-  return apiUrl(workspaceReportDownloadPath(reportId, workspaceSlug));
+export function getReportDownloadUrl(workspaceSlug: string, reportId: string): string | null {
+  return apiUrl(workspaceReportDownloadPath(workspaceSlug, reportId));
 }
 
-export function getArtifactDownloadUrl(artifactKey: string, workspaceSlug = currentWorkspaceSlug): string | null {
-  return apiUrl(workspaceArtifactDownloadPath(artifactKey, workspaceSlug));
+export function getArtifactDownloadUrl(workspaceSlug: string, artifactKey: string): string | null {
+  return apiUrl(workspaceArtifactDownloadPath(workspaceSlug, artifactKey));
 }
 
-export async function createProject(payload: { name?: string; url: string }, workspaceSlug = currentWorkspaceSlug): Promise<Project | null> {
-  const url = apiUrl(workspaceProjectsPath(workspaceSlug));
-  if (url === null) {
+export async function createProject(workspaceSlug: string, payload: { name?: string; url: string }): Promise<Project | null> {
+  const response = await apiFetch(workspaceProjectsPath(workspaceSlug), {
+    body: JSON.stringify(payload),
+    method: "POST"
+  });
+
+  if (response === null) {
     return null;
   }
 
   try {
-    const response = await fetch(url, {
-      body: JSON.stringify(payload),
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
-      method: "POST"
-    });
-
     if (!response.ok) {
       return null;
     }
@@ -468,26 +605,17 @@ export async function createProject(payload: { name?: string; url: string }, wor
   }
 }
 
-export async function createScan(payload: {
-  projectId: string;
-  url: string;
-  mode: "single_url" | "same_domain_crawl";
-  maxPages: number;
-  maxDepth: number;
-  viewports: Array<"desktop" | "mobile">;
-}, workspaceSlug = currentWorkspaceSlug): Promise<ScanRun | null> {
-  const url = apiUrl(workspaceScansPath(workspaceSlug));
-  if (url === null) {
+export async function createScan(workspaceSlug: string, payload: CreateScanInput): Promise<ScanRun | null> {
+  const response = await apiFetch(workspaceScansPath(workspaceSlug), {
+    body: JSON.stringify(payload),
+    method: "POST"
+  });
+
+  if (response === null) {
     return null;
   }
 
   try {
-    const response = await fetch(url, {
-      body: JSON.stringify(payload),
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
-      method: "POST"
-    });
-
     if (!response.ok) {
       return null;
     }

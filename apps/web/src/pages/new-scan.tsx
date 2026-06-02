@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createProject, createScan, currentWorkspaceSlug } from "../api/client";
+import { createProject, createScan } from "../api/client";
 import { Button, Field, Icon, PageHeader, Panel, SelectInput, TextInput, Toggle } from "../design/ui";
 import type { Project } from "../data";
 import type { PageProps } from "./page-props";
@@ -16,7 +16,7 @@ function defaultProjectId(project: Project, projects: Project[]): string {
   return projects.some((candidate) => candidate.id === project.id) ? project.id : projects[0]?.id ?? "";
 }
 
-export function NewScanPage({ project, projects, navigate, onSelectProject }: PageProps & { onSelectProject: (project: Project) => void }) {
+export function NewScanPage({ workspaceSlug, project, projects, navigate, onSelectProject }: PageProps & { onSelectProject: (project: Project) => void }) {
   const [projectMode, setProjectMode] = useState<ProjectMode>(() => defaultProjectMode(projects));
   const [projectId, setProjectId] = useState(() => defaultProjectId(project, projects));
   const selected = projects.find((candidate) => candidate.id === projectId) ?? project;
@@ -35,19 +35,19 @@ export function NewScanPage({ project, projects, navigate, onSelectProject }: Pa
       if (selectedViewports.length === 0) return null;
 
       const scanProject = projectMode === "new"
-        ? await createProject({ name: projectName.trim() === "" ? undefined : projectName, url }, currentWorkspaceSlug)
+        ? await createProject(workspaceSlug, { name: projectName.trim() === "" ? undefined : projectName, url })
         : selected;
 
       if (scanProject === null || scanProject.id === "") return null;
 
-      const scan = await createScan({
+      const scan = await createScan(workspaceSlug, {
         projectId: scanProject.id,
         url,
         mode: scanMode,
         maxPages,
         maxDepth: scanMode === "single_url" ? 0 : maxDepth,
         viewports: selectedViewports
-      }, currentWorkspaceSlug);
+      });
 
       return scan === null ? null : { project: scanProject, scan };
     },
@@ -57,11 +57,11 @@ export function NewScanPage({ project, projects, navigate, onSelectProject }: Pa
       }
 
       onSelectProject(scan.project);
-      void queryClient.invalidateQueries({ queryKey: ["projects", currentWorkspaceSlug] });
-      void queryClient.invalidateQueries({ queryKey: ["scans", currentWorkspaceSlug] });
-      void queryClient.invalidateQueries({ queryKey: ["findings", currentWorkspaceSlug] });
-      void queryClient.invalidateQueries({ queryKey: ["issues", currentWorkspaceSlug] });
-      void queryClient.invalidateQueries({ queryKey: ["reports", currentWorkspaceSlug] });
+      void queryClient.invalidateQueries({ queryKey: ["projects", workspaceSlug] });
+      void queryClient.invalidateQueries({ queryKey: ["scans", workspaceSlug] });
+      void queryClient.invalidateQueries({ queryKey: ["findings", workspaceSlug] });
+      void queryClient.invalidateQueries({ queryKey: ["issues", workspaceSlug] });
+      void queryClient.invalidateQueries({ queryKey: ["reports", workspaceSlug] });
       navigate({ page: "scan-runs" });
     }
   });
