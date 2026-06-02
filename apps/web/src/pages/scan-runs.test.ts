@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { scanProgressLabel, scanProgressTone, scanProgressValue } from "./scan-runs";
+import { scanProgressLabel, scanProgressTone, scanProgressValue, scanRunMessage, scanRunMessageClass } from "./scan-runs";
 import type { ScanRun } from "../data";
 
 function scan(overrides: Partial<ScanRun>): ScanRun {
@@ -38,5 +38,20 @@ describe("scan run presentation", () => {
     expect(scanProgressValue(failed)).toBe(100);
     expect(scanProgressTone(failed)).toBe("var(--critical)");
     expect(scanProgressLabel(failed)).toBe("Failed after 102/102 pages");
+    expect(scanRunMessageClass(failed)).toBe("error-text");
+    expect(scanRunMessage(failed)).toBe("too many SQL variables");
+  });
+
+  it("shows completed report generation warnings without marking progress failed", () => {
+    const completedWithWarning = scan({
+      status: "completed",
+      errorMessage: "PDF report failed: page.pdf: Protocol error (Page.printToPDF): Printing failed"
+    });
+
+    expect(scanProgressValue(completedWithWarning)).toBe(100);
+    expect(scanProgressTone(completedWithWarning)).toBe("var(--accent)");
+    expect(scanProgressLabel(completedWithWarning)).toBe("10/10 pages");
+    expect(scanRunMessageClass(completedWithWarning)).toBe("warning-text");
+    expect(scanRunMessage(completedWithWarning)).toContain("PDF report failed");
   });
 });

@@ -23,7 +23,7 @@ export function ProjectsPage({ projects, project, navigate, onSelectProject }: P
               <ScoreRing score={candidate.score} size={72} />
             </div>
             <div className="project-stats">
-              <div><strong className="tnum">{candidate.openFindings}</strong><span>open findings</span></div>
+              <div><strong className="tnum">{candidate.openFindings}</strong><span>unique issues</span></div>
               <div><strong className="tnum">{candidate.reports}</strong><span>reports</span></div>
               <div><strong>{candidate.viewports}</strong><span>viewports</span></div>
             </div>

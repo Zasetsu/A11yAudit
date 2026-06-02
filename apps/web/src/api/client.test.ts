@@ -80,43 +80,41 @@ describe("api client", () => {
   });
 
   it("maps grouped issues from configured API", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        jsonResponse([
-          {
-            id: "issue-1",
-            projectId: "project-1",
-            scanRunId: "run-1",
-            issueKey: "button-name|4.1.2|aside button|/haberler/*|aside|Elementor widget button",
-            title: "Buttons must have discernible text",
-            severity: "critical",
-            source: "axe",
-            certainty: "automatic_violation",
-            ruleId: "button-name",
-            wcagCriteria: "4.1.2",
-            description: "Description",
-            recommendation: "Add an accessible name.",
-            likelyScope: "URL group /haberler/*",
-            urlScopeGroup: "/haberler/*",
-            componentArea: "aside",
-            cmsHint: "Elementor widget button",
-            confidence: "medium",
-            affectedPages: 183,
-            occurrences: 366,
-            viewportSummary: "desktop,mobile",
-            representativeUrl: "https://example.com/haberler/a",
-            representativeSelector: "aside .elementor-widget-button a",
-            representativeHtmlSnippet: "<a></a>",
-            sampleUrls: ["https://example.com/haberler/a"],
-            createdAt: "2026-06-01T00:00:00.000Z"
-          }
-        ])
-      )
+    const fetchMock = vi.fn(async () =>
+      jsonResponse([
+        {
+          id: "issue-1",
+          projectId: "project-1",
+          scanRunId: "run-1",
+          issueKey: "button-name|4.1.2|aside button|/haberler/*|aside|Elementor widget button",
+          title: "Buttons must have discernible text",
+          severity: "critical",
+          source: "axe",
+          certainty: "automatic_violation",
+          ruleId: "button-name",
+          wcagCriteria: "4.1.2",
+          description: "Description",
+          recommendation: "Add an accessible name.",
+          likelyScope: "URL group /haberler/*",
+          urlScopeGroup: "/haberler/*",
+          componentArea: "aside",
+          cmsHint: "Elementor widget button",
+          confidence: "medium",
+          affectedPages: 183,
+          occurrences: 366,
+          viewportSummary: "desktop,mobile",
+          representativeUrl: "https://example.com/haberler/a",
+          representativeSelector: "aside .elementor-widget-button a",
+          representativeHtmlSnippet: "<a></a>",
+          sampleUrls: ["https://example.com/haberler/a"],
+          createdAt: "2026-06-01T00:00:00.000Z"
+        }
+      ])
     );
+    vi.stubGlobal("fetch", fetchMock);
     const { fetchIssues } = await importClient("https://api.example.test/");
 
-    await expect(fetchIssues()).resolves.toMatchObject([
+    await expect(fetchIssues({ projectId: "project-1" })).resolves.toMatchObject([
       {
         id: "issue-1",
         affectedPages: 183,
@@ -124,21 +122,41 @@ describe("api client", () => {
         cmsHint: "Elementor widget button"
       }
     ]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.test/api/issues?projectId=project-1",
+      expect.objectContaining({ headers: { Accept: "application/json" } })
+    );
+  });
+
+  it("requests grouped issues with project and scan filters", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+    const { fetchIssues } = await importClient("https://api.example.test/");
+
+    await expect(fetchIssues({ projectId: "project-1", scanRunId: "run-1" })).resolves.toEqual([]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.test/api/issues?projectId=project-1&scanRunId=run-1",
+      expect.objectContaining({ headers: { Accept: "application/json" } })
+    );
+  });
+
+  it("requests grouped issues with scan filters", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+    const { fetchIssues } = await importClient("https://api.example.test/");
+
+    await expect(fetchIssues({ scanRunId: "run-1" })).resolves.toEqual([]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.test/api/issues?scanRunId=run-1",
+      expect.objectContaining({ headers: { Accept: "application/json" } })
+    );
   });
 
   it("does not fabricate required grouped issue fields for malformed API rows", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => jsonResponse([{}])));
     const { fetchIssues } = await importClient("https://api.example.test/");
 
-    await expect(fetchIssues()).resolves.toEqual([
-      expect.objectContaining({
-        id: undefined,
-        title: undefined,
-        affectedPages: undefined,
-        occurrences: undefined,
-        createdAt: undefined
-      })
-    ]);
+    await expect(fetchIssues({ projectId: "project-1" })).resolves.toEqual([]);
   });
 
   it("creates projects against the configured API", async () => {

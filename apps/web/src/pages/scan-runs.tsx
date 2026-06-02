@@ -16,6 +16,14 @@ export function scanProgressLabel(scan: ScanRun): string {
   return scan.status === "failed" ? `Failed after ${pages}` : pages;
 }
 
+export function scanRunMessage(scan: ScanRun): string | null {
+  return scan.errorMessage;
+}
+
+export function scanRunMessageClass(scan: ScanRun): string {
+  return scan.status === "failed" ? "error-text" : "warning-text";
+}
+
 export function ScanRunsPage({ scans, navigate }: PageProps) {
   return (
     <div className="content-inner fadein">
@@ -45,12 +53,12 @@ export function ScanRunsPage({ scans, navigate }: PageProps) {
                 <tr key={scan.id}>
                   <td className="mono">{scan.id}</td>
                   <td>{scan.projectName}</td>
-                  <td>
-                    <RunStatusBadge status={scan.status} />
-                    {scan.status === "failed" && scan.errorMessage !== null ? (
-                      <div className="table-sub error-text">{scan.errorMessage}</div>
-                    ) : null}
-                  </td>
+	                  <td>
+	                    <RunStatusBadge status={scan.status} />
+	                    {scanRunMessage(scan) !== null ? (
+	                      <div className={`table-sub ${scanRunMessageClass(scan)}`}>{scanRunMessage(scan)}</div>
+	                    ) : null}
+	                  </td>
                   <td>
                     <strong>{scan.mode === "same_domain_crawl" ? "Full site" : "Single URL"}</strong>
                     <div className="table-sub">{scan.viewports} · {scan.maxPages} pages · depth {scan.maxDepth}</div>

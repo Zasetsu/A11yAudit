@@ -83,9 +83,9 @@ type ServerIssue = Partial<Omit<Issue, "severity" | "source" | "certainty" | "co
   scanRunId: string;
   issueKey: string;
   title: string;
-  severity: string;
-  source: string;
-  certainty: string;
+  severity: Issue["severity"];
+  source: Issue["source"];
+  certainty: Issue["certainty"];
   ruleId: string;
   wcagCriteria: string;
   description: string;
@@ -94,7 +94,7 @@ type ServerIssue = Partial<Omit<Issue, "severity" | "source" | "certainty" | "co
   urlScopeGroup: string;
   componentArea: string;
   cmsHint: string;
-  confidence: string;
+  confidence: Issue["confidence"];
   affectedPages: number;
   occurrences: number;
   viewportSummary: string;
@@ -191,6 +191,56 @@ function issueSampleUrls(sampleUrls: unknown): string[] {
   return Array.isArray(sampleUrls) ? sampleUrls.filter((url): url is string => typeof url === "string") : [];
 }
 
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim() !== "";
+}
+
+function isSeverity(value: unknown): value is Issue["severity"] {
+  return value === "critical" || value === "serious" || value === "moderate" || value === "minor";
+}
+
+function isSource(value: unknown): value is Issue["source"] {
+  return value === "axe" || value === "custom" || value === "crawler";
+}
+
+function isCertainty(value: unknown): value is Issue["certainty"] {
+  return value === "automatic_violation" ||
+    value === "needs_manual_verification" ||
+    value === "not_automatically_testable";
+}
+
+function isConfidence(value: unknown): value is Issue["confidence"] {
+  return value === "high" || value === "medium" || value === "low";
+}
+
+function isServerIssue(row: unknown): row is ServerIssue {
+  if (row === null || typeof row !== "object") return false;
+  const issue = row as Partial<ServerIssue>;
+
+  return isNonEmptyString(issue.id) &&
+    isNonEmptyString(issue.projectId) &&
+    isNonEmptyString(issue.scanRunId) &&
+    isNonEmptyString(issue.issueKey) &&
+    isNonEmptyString(issue.title) &&
+    isSeverity(issue.severity) &&
+    isSource(issue.source) &&
+    isCertainty(issue.certainty) &&
+    isNonEmptyString(issue.ruleId) &&
+    isNonEmptyString(issue.wcagCriteria) &&
+    isNonEmptyString(issue.description) &&
+    isNonEmptyString(issue.recommendation) &&
+    isNonEmptyString(issue.likelyScope) &&
+    isNonEmptyString(issue.urlScopeGroup) &&
+    isNonEmptyString(issue.componentArea) &&
+    isNonEmptyString(issue.cmsHint) &&
+    isConfidence(issue.confidence) &&
+    typeof issue.affectedPages === "number" &&
+    typeof issue.occurrences === "number" &&
+    isNonEmptyString(issue.viewportSummary) &&
+    isNonEmptyString(issue.representativeUrl) &&
+    isNonEmptyString(issue.createdAt);
+}
+
 function mapIssue(row: ServerIssue): Issue {
   return {
     id: row.id,
@@ -198,9 +248,9 @@ function mapIssue(row: ServerIssue): Issue {
     scanRunId: row.scanRunId,
     issueKey: row.issueKey,
     title: row.title,
-    severity: row.severity as Issue["severity"],
-    source: row.source as Issue["source"],
-    certainty: row.certainty as Issue["certainty"],
+    severity: row.severity,
+    source: row.source,
+    certainty: row.certainty,
     ruleId: row.ruleId,
     wcagCriteria: row.wcagCriteria,
     description: row.description,
@@ -209,7 +259,7 @@ function mapIssue(row: ServerIssue): Issue {
     urlScopeGroup: row.urlScopeGroup,
     componentArea: row.componentArea,
     cmsHint: row.cmsHint,
-    confidence: row.confidence as Issue["confidence"],
+    confidence: row.confidence,
     affectedPages: row.affectedPages,
     occurrences: row.occurrences,
     viewportSummary: row.viewportSummary,
@@ -314,7 +364,7 @@ export async function fetchIssues(params: { projectId?: string; scanRunId?: stri
   }
   if (result.status === "unavailable") return [];
 
-  return result.data.map(mapIssue);
+  return result.data.filter(isServerIssue).map(mapIssue);
 }
 
 export async function getReports(): Promise<Report[]> {

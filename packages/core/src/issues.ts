@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { ScanFinding, ViewportName } from "./models.js";
+import type { AuditedPage, ScanFinding, ViewportName } from "./models.js";
 
 export type IssueConfidence = "high" | "medium" | "low";
 export type ComponentArea = "header" | "footer" | "nav" | "aside" | "form" | "main" | "unknown";
@@ -57,6 +57,10 @@ export interface AggregatedIssue {
   sampleUrls: string[];
   occurrenceFingerprints: string[];
   occurrenceIds: string[];
+}
+
+export interface AggregateScanIssuesOptions {
+  auditedPages?: AuditedPage[];
 }
 
 interface IssueAccumulator {
@@ -133,8 +137,12 @@ export function createIssueKey(input: IssueKeyInput): string {
   ]);
 }
 
-export function aggregateScanIssues(findings: ScanFinding[]): AggregatedIssue[] {
+export function aggregateScanIssues(
+  findings: ScanFinding[],
+  options: AggregateScanIssuesOptions = {}
+): AggregatedIssue[] {
   const accumulators = new Map<string, IssueAccumulator>();
+  const groupPageCounts = buildGroupPageCounts(findings, options.auditedPages);
 
   for (const finding of findings) {
     const elementSignature = getElementSignature(finding);
@@ -174,13 +182,17 @@ export function aggregateScanIssues(findings: ScanFinding[]): AggregatedIssue[] 
     });
   }
 
-  return [...accumulators.values()].map(toAggregatedIssue);
+  return [...accumulators.values()].map((accumulator) => toAggregatedIssue(accumulator, groupPageCounts));
 }
 
-function toAggregatedIssue(accumulator: IssueAccumulator): AggregatedIssue {
+function toAggregatedIssue(accumulator: IssueAccumulator, groupPageCounts: Map<string, number>): AggregatedIssue {
   const sampleUrls = [...accumulator.pages.values()];
   const affectedPages = sampleUrls.length;
   const urlScope = inferUrlScope(accumulator.first.pageUrl, affectedPages);
+  const denominatorGroupKey = firstSegmentScopeGroup(accumulator.first.pageUrl);
+  const auditedGroupPages = groupPageCounts.get(
+    urlGroupCountKey(getUrlOrigin(accumulator.first.pageUrl), denominatorGroupKey)
+  ) ?? affectedPages;
   const issueKey = createIssueKey({
     ruleId: accumulator.first.ruleId,
     wcagCriteria: accumulator.first.wcagCriteria,
@@ -213,7 +225,7 @@ function toAggregatedIssue(accumulator: IssueAccumulator): AggregatedIssue {
     affectedPages,
     occurrences: accumulator.occurrences,
     viewportSummary: summarizeViewports(accumulator.viewports),
-    confidence: inferConfidence(affectedPages),
+    confidence: inferConfidence(affectedPages, auditedGroupPages),
     representativeUrl: accumulator.first.pageUrl,
     representativeSelector: accumulator.first.selector,
     representativeHtmlSnippet: accumulator.first.htmlSnippet,
@@ -223,10 +235,32 @@ function toAggregatedIssue(accumulator: IssueAccumulator): AggregatedIssue {
   };
 }
 
-function inferConfidence(affectedPages: number): IssueConfidence {
-  if (affectedPages >= 5) return "high";
-  if (affectedPages >= 3) return "medium";
+function inferConfidence(affectedPages: number, auditedGroupPages: number): IssueConfidence {
+  const coverage = auditedGroupPages > 0 ? affectedPages / auditedGroupPages : 0;
+
+  if (coverage >= 0.8 && auditedGroupPages >= 5) return "high";
+  if (coverage >= 0.4 && auditedGroupPages >= 3) return "medium";
   return "low";
+}
+
+function buildGroupPageCounts(findings: ScanFinding[], auditedPages?: AuditedPage[]): Map<string, number> {
+  const pagesByGroup = new Map<string, Set<string>>();
+
+  const urls = auditedPages && auditedPages.length > 0
+    ? auditedPages.map((page) => page.normalizedUrl || page.finalUrl || page.url)
+    : findings.map((finding) => finding.pageUrl);
+
+  for (const url of urls) {
+    const normalizedUrl = normalizeUrlWithoutHash(url);
+    const groupKey = firstSegmentScopeGroup(normalizedUrl);
+    const countKey = urlGroupCountKey(getUrlOrigin(normalizedUrl), groupKey);
+    const pages = pagesByGroup.get(countKey) ?? new Set<string>();
+
+    pages.add(normalizedUrl);
+    pagesByGroup.set(countKey, pages);
+  }
+
+  return new Map([...pagesByGroup].map(([countKey, pages]) => [countKey, pages.size]));
 }
 
 function summarizeViewports(viewports: Set<ViewportName>): ViewportSummary {
@@ -243,6 +277,10 @@ function firstSegmentScopeGroup(url: string): string {
   const path = normalizeUrlPath(url);
   const firstSegment = path.split("/").filter(Boolean)[0];
   return firstSegment ? `/${firstSegment}/*` : "/";
+}
+
+function urlGroupCountKey(origin: string, groupKey: string): string {
+  return JSON.stringify([origin, groupKey]);
 }
 
 function getElementSignature(finding: ScanFinding): string {

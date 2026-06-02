@@ -74,7 +74,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
             const issueIdByFingerprint = new Map<string, string>();
 
             if (result.findings.length > 0) {
-              const issueRows = aggregateScanIssues(result.findings).map((issue) => {
+              const issueRows = aggregateScanIssues(result.findings, { auditedPages: result.pages }).map((issue) => {
                 const issueId = `${result.runId}-${issue.id}`;
 
                 for (const fingerprint of issue.occurrenceFingerprints) {

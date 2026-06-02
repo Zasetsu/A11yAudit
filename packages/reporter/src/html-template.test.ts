@@ -346,7 +346,38 @@ describe("real report rendering", () => {
         maxDepth: 1,
         respectRobotsTxt: true
       },
-      pages: [],
+      pages: [
+        {
+          url: "https://example.com/haberler/a",
+          normalizedUrl: "https://example.com/haberler/a",
+          title: null,
+          viewport: "desktop",
+          statusCode: 200,
+          finalUrl: "https://example.com/haberler/a",
+          durationMs: 100,
+          errorMessage: null
+        },
+        {
+          url: "https://example.com/haberler/b",
+          normalizedUrl: "https://example.com/haberler/b",
+          title: null,
+          viewport: "desktop",
+          statusCode: 200,
+          finalUrl: "https://example.com/haberler/b",
+          durationMs: 100,
+          errorMessage: null
+        },
+        {
+          url: "https://example.com/haberler/c",
+          normalizedUrl: "https://example.com/haberler/c",
+          title: null,
+          viewport: "desktop",
+          statusCode: 200,
+          finalUrl: "https://example.com/haberler/c",
+          durationMs: 100,
+          errorMessage: null
+        }
+      ],
       findings: [
         {
           id: "finding-confidence-1",
@@ -389,28 +420,6 @@ describe("real report rendering", () => {
           visibleText: null,
           helpUrl: null,
           fingerprint: "fingerprint-confidence-2",
-          evidence: [],
-          instances: 1
-        },
-        {
-          id: "finding-confidence-control",
-          title: "Images must have alternate text",
-          severity: "minor",
-          status: "new",
-          source: "axe",
-          certainty: "automatic_violation",
-          origin: "unknown",
-          wcagCriteria: ["1.1.1"],
-          ruleId: "image-alt",
-          description: "Ensures images have alternate text",
-          recommendation: "Add meaningful alternate text.",
-          pageUrl: "https://example.com/haberler/c",
-          viewport: "desktop",
-          selector: "main img",
-          htmlSnippet: "<main><img></main>",
-          visibleText: null,
-          helpUrl: null,
-          fingerprint: "fingerprint-confidence-control",
           evidence: [],
           instances: 1
         }
