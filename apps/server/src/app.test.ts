@@ -478,6 +478,45 @@ async function listScans(
   });
 }
 
+async function listIssues(
+  app: Awaited<ReturnType<typeof buildServer>>,
+  signedIn: SignedInResponse,
+  query = "",
+  workspaceSlug = primaryWorkspaceSlug(signedIn)
+) {
+  return app.inject({
+    method: "GET",
+    url: `/api/workspaces/${workspaceSlug}/issues${query}`,
+    cookies: authCookies(signedIn)
+  });
+}
+
+async function getIssue(
+  app: Awaited<ReturnType<typeof buildServer>>,
+  signedIn: SignedInResponse,
+  issueId: string,
+  workspaceSlug = primaryWorkspaceSlug(signedIn)
+) {
+  return app.inject({
+    method: "GET",
+    url: `/api/workspaces/${workspaceSlug}/issues/${issueId}`,
+    cookies: authCookies(signedIn)
+  });
+}
+
+async function listFindings(
+  app: Awaited<ReturnType<typeof buildServer>>,
+  signedIn: SignedInResponse,
+  query = "",
+  workspaceSlug = primaryWorkspaceSlug(signedIn)
+) {
+  return app.inject({
+    method: "GET",
+    url: `/api/workspaces/${workspaceSlug}/findings${query}`,
+    cookies: authCookies(signedIn)
+  });
+}
+
 async function startScan(
   app: Awaited<ReturnType<typeof buildServer>>,
   signedIn: SignedInResponse,
@@ -550,6 +589,31 @@ function issueFixture(overrides: Partial<typeof issues.$inferInsert> = {}): type
     representativeSelector: "img",
     representativeHtmlSnippet: "<img>",
     sampleUrls: JSON.stringify(["https://fixture.example.com"]),
+    createdAt: "2026-05-31T00:00:01.000Z",
+    ...overrides
+  };
+}
+
+function findingFixture(overrides: Partial<typeof findings.$inferInsert> = {}): typeof findings.$inferInsert {
+  return {
+    id: "finding-fixture",
+    projectId: "project-fixture",
+    scanRunId: "run-fixture",
+    issueId: null,
+    pageUrl: "https://fixture.example.com",
+    ruleId: "image-alt",
+    title: "Image missing alternative text",
+    severity: "serious",
+    status: "new",
+    viewport: "desktop",
+    certainty: "automatic_violation",
+    wcagCriteria: "1.1.1",
+    selector: "img",
+    description: "Image elements must have alternate text.",
+    helpUrl: null,
+    evidence: "[]",
+    fingerprint: "fingerprint-fixture",
+    instances: 1,
     createdAt: "2026-05-31T00:00:01.000Z",
     ...overrides
   };
@@ -2269,10 +2333,7 @@ describe("server", () => {
         expect(scan.statusCode).toBe(201);
         await waitForCompletedScan(app, owner, scan.json().id);
 
-        const findingsResponse = await app.inject({
-          method: "GET",
-          url: `/api/findings?scanRunId=${scan.json().id}`
-        });
+        const findingsResponse = await listFindings(app, owner, `?scanRunId=${scan.json().id}`);
         expect(findingsResponse.statusCode).toBe(200);
         expect(findingsResponse.json().data.length).toBeGreaterThan(0);
         expect(JSON.parse(findingsResponse.json().data[0].evidence)).toMatchObject([
@@ -2404,10 +2465,7 @@ describe("server", () => {
 
         await waitForCompletedScan(app, owner, scan.json().id);
 
-        const response = await app.inject({
-          method: "GET",
-          url: `/api/issues?scanRunId=${scan.json().id}`
-        });
+        const response = await listIssues(app, owner, `?scanRunId=${scan.json().id}`);
 
         expect(response.statusCode).toBe(200);
         expect(response.json().data[0]).toMatchObject({
@@ -2422,25 +2480,65 @@ describe("server", () => {
     });
   });
 
-  it("rejects unfiltered grouped issue requests", async () => {
+  it("returns 404 for old global issue and finding routes", async () => {
     const dbClient = createDb(":memory:");
     const app = await buildServer({ dbClient, executeScans: false });
 
     try {
-      const response = await app.inject({
-        method: "GET",
-        url: "/api/issues"
-      });
+      const issuesList = await app.inject({ method: "GET", url: "/api/issues" });
+      const issueDetail = await app.inject({ method: "GET", url: "/api/issues/issue-fixture" });
+      const findingsList = await app.inject({ method: "GET", url: "/api/findings" });
 
-      expect(response.statusCode).toBe(400);
-      expect(response.json()).toMatchObject({ error: "Issue query requires a projectId or scanRunId filter" });
+      expect(issuesList.statusCode).toBe(404);
+      expect(issueDetail.statusCode).toBe(404);
+      expect(findingsList.statusCode).toBe(404);
     } finally {
       await app.close();
       dbClient.close();
     }
   });
 
-  it("applies project filters for grouped issues", async () => {
+  it("requires authentication for scoped issue and finding routes", async () => {
+    const dbClient = createDb(":memory:");
+    const app = await buildServer({ dbClient, executeScans: false });
+
+    try {
+      const issuesList = await app.inject({ method: "GET", url: "/api/workspaces/acme/issues" });
+      const issueDetail = await app.inject({ method: "GET", url: "/api/workspaces/acme/issues/issue-fixture" });
+      const findingsList = await app.inject({ method: "GET", url: "/api/workspaces/acme/findings" });
+
+      expect(issuesList.statusCode).toBe(401);
+      expect(issueDetail.statusCode).toBe(401);
+      expect(findingsList.statusCode).toBe(401);
+    } finally {
+      await app.close();
+      dbClient.close();
+    }
+  });
+
+  it("returns 404 for nonmember scoped issue and finding routes", async () => {
+    const dbClient = createDb(":memory:");
+    const app = await buildServer({ dbClient, executeScans: false });
+
+    try {
+      const owner = await signup(app, "owner@example.com", "Owner Workspace");
+      const nonmember = await signupWithPublicSignup(app, "outsider@example.com", "Outsider Workspace");
+      const workspaceSlug = primaryWorkspaceSlug(owner);
+
+      const issuesList = await listIssues(app, nonmember, "", workspaceSlug);
+      const issueDetail = await getIssue(app, nonmember, "issue-fixture", workspaceSlug);
+      const findingsList = await listFindings(app, nonmember, "", workspaceSlug);
+
+      expect(issuesList.statusCode).toBe(404);
+      expect(issueDetail.statusCode).toBe(404);
+      expect(findingsList.statusCode).toBe(404);
+    } finally {
+      await app.close();
+      dbClient.close();
+    }
+  });
+
+  it("applies project filters for grouped issues inside a workspace", async () => {
     const dbClient = createDb(":memory:");
     const app = await buildServer({ dbClient, executeScans: false });
 
@@ -2472,10 +2570,7 @@ describe("server", () => {
         })
       ]).run();
 
-      const response = await app.inject({
-        method: "GET",
-        url: `/api/issues?projectId=${projectA.json().id}`
-      });
+      const response = await listIssues(app, owner, `?projectId=${projectA.json().id}`);
 
       expect(response.statusCode).toBe(200);
       expect(response.json().data).toHaveLength(1);
@@ -2489,7 +2584,7 @@ describe("server", () => {
     }
   });
 
-  it("applies project and scan filters together for grouped issues", async () => {
+  it("applies project and scan filters together for grouped issues inside a workspace", async () => {
     const dbClient = createDb(":memory:");
     const app = await buildServer({ dbClient, executeScans: false });
 
@@ -2509,10 +2604,7 @@ describe("server", () => {
         sampleUrls: JSON.stringify(["https://project-b.example.com"])
       })).run();
 
-      const response = await app.inject({
-        method: "GET",
-        url: `/api/issues?projectId=${projectA.json().id}&scanRunId=${scanB.json().id}`
-      });
+      const response = await listIssues(app, owner, `?projectId=${projectA.json().id}&scanRunId=${scanB.json().id}`);
 
       expect(response.statusCode).toBe(200);
       expect(response.json().data).toEqual([]);
@@ -2522,7 +2614,218 @@ describe("server", () => {
     }
   });
 
-  it("defaults malformed stored issue sample URLs to an empty array", async () => {
+  it("allows unfiltered grouped issues inside a workspace without leaking other workspaces", async () => {
+    const dbClient = createDb(":memory:");
+    const app = await buildServer({ dbClient, executeScans: false });
+
+    try {
+      const owner = await signup(app, "owner@example.com", "Owner Workspace");
+      const otherOwner = await signupWithPublicSignup(app, "other@example.com", "Other Workspace");
+      const project = await createProject(app, owner, "Project A", "https://project-a.example.com");
+      const otherProject = await createProject(app, otherOwner, "Project B", "https://project-b.example.com");
+      const scan = await startScan(app, owner, project.json().id, { url: "https://project-a.example.com" });
+      const otherScan = await startScan(app, otherOwner, otherProject.json().id, { url: "https://project-b.example.com" });
+
+      dbClient.db.insert(issues).values([
+        issueFixture({
+          id: "issue-workspace-a",
+          projectId: project.json().id,
+          scanRunId: scan.json().id,
+          representativeUrl: "https://project-a.example.com",
+          sampleUrls: JSON.stringify(["https://project-a.example.com"])
+        }),
+        issueFixture({
+          id: "issue-workspace-b",
+          projectId: otherProject.json().id,
+          scanRunId: otherScan.json().id,
+          representativeUrl: "https://project-b.example.com",
+          sampleUrls: JSON.stringify(["https://project-b.example.com"])
+        })
+      ]).run();
+
+      const response = await listIssues(app, owner);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().data).toHaveLength(1);
+      expect(response.json().data[0]).toMatchObject({ id: "issue-workspace-a" });
+    } finally {
+      await app.close();
+      dbClient.close();
+    }
+  });
+
+  it("allows unfiltered findings inside a workspace without leaking other workspaces", async () => {
+    const dbClient = createDb(":memory:");
+    const app = await buildServer({ dbClient, executeScans: false });
+
+    try {
+      const owner = await signup(app, "owner@example.com", "Owner Workspace");
+      const otherOwner = await signupWithPublicSignup(app, "other@example.com", "Other Workspace");
+      const project = await createProject(app, owner, "Project A", "https://project-a.example.com");
+      const otherProject = await createProject(app, otherOwner, "Project B", "https://project-b.example.com");
+      const scan = await startScan(app, owner, project.json().id, { url: "https://project-a.example.com" });
+      const otherScan = await startScan(app, otherOwner, otherProject.json().id, { url: "https://project-b.example.com" });
+
+      dbClient.db.insert(findings).values([
+        findingFixture({
+          id: "finding-workspace-a",
+          projectId: project.json().id,
+          scanRunId: scan.json().id,
+          pageUrl: "https://project-a.example.com",
+          createdAt: "2026-05-31T00:00:02.000Z"
+        }),
+        findingFixture({
+          id: "finding-workspace-b",
+          projectId: otherProject.json().id,
+          scanRunId: otherScan.json().id,
+          pageUrl: "https://project-b.example.com",
+          createdAt: "2026-05-31T00:00:01.000Z"
+        })
+      ]).run();
+
+      const response = await listFindings(app, owner);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().data).toHaveLength(1);
+      expect(response.json().data[0]).toMatchObject({ id: "finding-workspace-a" });
+    } finally {
+      await app.close();
+      dbClient.close();
+    }
+  });
+
+  it("returns issue detail with parsed sample URLs inside a workspace", async () => {
+    const dbClient = createDb(":memory:");
+    const app = await buildServer({ dbClient, executeScans: false });
+
+    try {
+      const owner = await signup(app, "owner@example.com", "Owner Workspace");
+      const project = await createProject(app, owner, "Detail Fixture", "https://detail.example.com");
+      const scan = await startScan(app, owner, project.json().id, { url: "https://detail.example.com" });
+
+      dbClient.db.insert(issues).values(issueFixture({
+        id: "issue-detail",
+        projectId: project.json().id,
+        scanRunId: scan.json().id,
+        sampleUrls: JSON.stringify(["https://detail.example.com/a", "https://detail.example.com/b"])
+      })).run();
+
+      const detail = await getIssue(app, owner, "issue-detail");
+
+      expect(detail.statusCode).toBe(200);
+      expect(detail.json()).toMatchObject({ id: "issue-detail", sampleUrls: ["https://detail.example.com/a", "https://detail.example.com/b"] });
+    } finally {
+      await app.close();
+      dbClient.close();
+    }
+  });
+
+  it("returns 404 for issue detail from another workspace", async () => {
+    const dbClient = createDb(":memory:");
+    const app = await buildServer({ dbClient, executeScans: false });
+
+    try {
+      const owner = await signup(app, "owner@example.com", "Owner Workspace");
+      const otherOwner = await signupWithPublicSignup(app, "other@example.com", "Other Workspace");
+      const project = await createProject(app, owner, "Project A", "https://project-a.example.com");
+      const otherProject = await createProject(app, otherOwner, "Project B", "https://project-b.example.com");
+      await startScan(app, owner, project.json().id, { url: "https://project-a.example.com" });
+      const otherScan = await startScan(app, otherOwner, otherProject.json().id, { url: "https://project-b.example.com" });
+
+      dbClient.db.insert(issues).values(issueFixture({
+        id: "issue-other-workspace",
+        projectId: otherProject.json().id,
+        scanRunId: otherScan.json().id,
+        sampleUrls: JSON.stringify(["https://project-b.example.com"])
+      })).run();
+
+      const detail = await getIssue(app, owner, "issue-other-workspace");
+
+      expect(detail.statusCode).toBe(404);
+    } finally {
+      await app.close();
+      dbClient.close();
+    }
+  });
+
+  it("applies project and scan filters together for findings inside a workspace", async () => {
+    const dbClient = createDb(":memory:");
+    const app = await buildServer({ dbClient, executeScans: false });
+
+    try {
+      const owner = await signup(app, "owner@example.com", "Owner Workspace");
+      const projectA = await createProject(app, owner, "Project A", "https://project-a.example.com");
+      const projectB = await createProject(app, owner, "Project B", "https://project-b.example.com");
+      const scanA = await startScan(app, owner, projectA.json().id, { url: "https://project-a.example.com" });
+      const scanB = await startScan(app, owner, projectB.json().id, { url: "https://project-b.example.com" });
+
+      dbClient.db.insert(findings).values([
+        findingFixture({
+          id: "finding-project-a",
+          projectId: projectA.json().id,
+          scanRunId: scanA.json().id,
+          pageUrl: "https://project-a.example.com"
+        }),
+        findingFixture({
+          id: "finding-project-b",
+          projectId: projectB.json().id,
+          scanRunId: scanB.json().id,
+          pageUrl: "https://project-b.example.com"
+        })
+      ]).run();
+
+      const mismatch = await listFindings(app, owner, `?projectId=${projectA.json().id}&scanRunId=${scanB.json().id}`);
+      const match = await listFindings(app, owner, `?projectId=${projectA.json().id}&scanRunId=${scanA.json().id}`);
+
+      expect(mismatch.statusCode).toBe(200);
+      expect(mismatch.json().data).toEqual([]);
+      expect(match.statusCode).toBe(200);
+      expect(match.json().data).toHaveLength(1);
+      expect(match.json().data[0]).toMatchObject({ id: "finding-project-a" });
+    } finally {
+      await app.close();
+      dbClient.close();
+    }
+  });
+
+  it("applies project filters for findings inside a workspace", async () => {
+    const dbClient = createDb(":memory:");
+    const app = await buildServer({ dbClient, executeScans: false });
+
+    try {
+      const owner = await signup(app, "owner@example.com", "Owner Workspace");
+      const projectA = await createProject(app, owner, "Project A", "https://project-a.example.com");
+      const projectB = await createProject(app, owner, "Project B", "https://project-b.example.com");
+      const scanA = await startScan(app, owner, projectA.json().id, { url: "https://project-a.example.com" });
+      const scanB = await startScan(app, owner, projectB.json().id, { url: "https://project-b.example.com" });
+
+      dbClient.db.insert(findings).values([
+        findingFixture({
+          id: "finding-project-a-filter",
+          projectId: projectA.json().id,
+          scanRunId: scanA.json().id,
+          pageUrl: "https://project-a.example.com"
+        }),
+        findingFixture({
+          id: "finding-project-b-filter",
+          projectId: projectB.json().id,
+          scanRunId: scanB.json().id,
+          pageUrl: "https://project-b.example.com"
+        })
+      ]).run();
+
+      const response = await listFindings(app, owner, `?projectId=${projectA.json().id}`);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().data).toHaveLength(1);
+      expect(response.json().data[0]).toMatchObject({ id: "finding-project-a-filter" });
+    } finally {
+      await app.close();
+      dbClient.close();
+    }
+  });
+
+  it("defaults malformed stored issue sample URLs to an empty array in list and detail", async () => {
     const dbClient = createDb(":memory:");
     const app = await buildServer({ dbClient, executeScans: false });
 
@@ -2540,14 +2843,8 @@ describe("server", () => {
         sampleUrls: "not-json"
       })).run();
 
-      const listed = await app.inject({
-        method: "GET",
-        url: `/api/issues?scanRunId=${scan.json().id}`
-      });
-      const detail = await app.inject({
-        method: "GET",
-        url: "/api/issues/issue-malformed-sample-urls"
-      });
+      const listed = await listIssues(app, owner, `?scanRunId=${scan.json().id}`);
+      const detail = await getIssue(app, owner, "issue-malformed-sample-urls");
 
       expect(listed.statusCode).toBe(200);
       expect(listed.json().data[0].sampleUrls).toEqual([]);

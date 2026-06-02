@@ -1,99 +1,83 @@
-import { and, desc, eq } from "drizzle-orm";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
+
+import { requireAuth } from "../auth/session.js";
 import type { SqliteDatabase } from "../db/client.js";
-import { issues } from "../db/schema.js";
+import { getIssueForWorkspace, listIssuesForWorkspace } from "../repositories/issues.js";
+import { getAuthorizedWorkspaceBySlug, type WorkspaceAuthContext } from "../repositories/workspaces.js";
 
 const issueQuerySchema = z.object({
   projectId: z.string().optional(),
   scanRunId: z.string().optional()
 });
 
-type IssueRow = typeof issues.$inferSelect;
-type IssueResponse = Omit<IssueRow, "sampleUrls"> & { sampleUrls: string[] };
+const workspaceParamsSchema = z.object({
+  workspaceSlug: z.string().trim().min(1)
+});
+
+const issueParamsSchema = workspaceParamsSchema.extend({
+  issueId: z.string().trim().min(1)
+});
 
 export interface IssueRouteOptions {
   db: SqliteDatabase;
 }
 
-function parseSampleUrls(value: string | string[]): string[] {
-  if (Array.isArray(value)) {
-    return value.filter((url): url is string => typeof url === "string");
+async function requireWorkspaceMembership(
+  db: SqliteDatabase,
+  userId: string,
+  workspaceSlug: string,
+  reply: FastifyReply
+): Promise<WorkspaceAuthContext | undefined> {
+  const context = await getAuthorizedWorkspaceBySlug(db, userId, workspaceSlug);
+  if (!context) {
+    await reply.code(404).send({ error: "Workspace not found" });
+    return undefined;
   }
 
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed.filter((url): url is string => typeof url === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
-function mapIssueRow(row: IssueRow): IssueResponse {
-  return {
-    ...row,
-    sampleUrls: parseSampleUrls(row.sampleUrls)
-  };
+  return context;
 }
 
 export async function registerIssueRoutes(app: FastifyInstance, options: IssueRouteOptions): Promise<void> {
   const { db } = options;
 
-  app.get("/api/issues", async (request, reply) => {
+  app.get("/api/workspaces/:workspaceSlug/issues", async (request, reply) => {
+    const user = await requireAuth(request, reply);
+    if (!user) return undefined;
+
+    const params = workspaceParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return reply.code(400).send({ error: "Invalid workspace parameters", issues: params.error.issues });
+    }
+
     const parsed = issueQuerySchema.safeParse(request.query);
     if (!parsed.success) {
       return reply.code(400).send({ error: "Invalid issue query", issues: parsed.error.issues });
     }
 
-    if (parsed.data.projectId === undefined && parsed.data.scanRunId === undefined) {
-      return reply.code(400).send({ error: "Issue query requires a projectId or scanRunId filter" });
-    }
+    const context = await requireWorkspaceMembership(db, user.id, params.data.workspaceSlug, reply);
+    if (!context) return undefined;
 
-    if (parsed.data.projectId !== undefined && parsed.data.scanRunId !== undefined) {
-      return {
-        data: db
-          .select()
-          .from(issues)
-          .where(and(eq(issues.projectId, parsed.data.projectId), eq(issues.scanRunId, parsed.data.scanRunId)))
-          .orderBy(desc(issues.occurrences))
-          .all()
-          .map(mapIssueRow)
-      };
-    }
-
-    if (parsed.data.scanRunId !== undefined) {
-      return {
-        data: db
-          .select()
-          .from(issues)
-          .where(eq(issues.scanRunId, parsed.data.scanRunId))
-          .orderBy(desc(issues.occurrences))
-          .all()
-          .map(mapIssueRow)
-      };
-    }
-
-    if (parsed.data.projectId !== undefined) {
-      return {
-        data: db
-          .select()
-          .from(issues)
-          .where(eq(issues.projectId, parsed.data.projectId))
-          .orderBy(desc(issues.occurrences))
-          .all()
-          .map(mapIssueRow)
-      };
-    }
-
+    return { data: await listIssuesForWorkspace(db, context.workspaceId, parsed.data) };
   });
 
-  app.get("/api/issues/:id", async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const issue = db.select().from(issues).where(eq(issues.id, id)).get();
-    if (issue === undefined) {
+  app.get("/api/workspaces/:workspaceSlug/issues/:issueId", async (request, reply) => {
+    const user = await requireAuth(request, reply);
+    if (!user) return undefined;
+
+    const params = issueParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return reply.code(400).send({ error: "Invalid issue parameters", issues: params.error.issues });
+    }
+
+    const context = await requireWorkspaceMembership(db, user.id, params.data.workspaceSlug, reply);
+    if (!context) return undefined;
+
+    const issue = await getIssueForWorkspace(db, context.workspaceId, params.data.issueId);
+    if (!issue) {
       return reply.code(404).send({ error: "Issue not found" });
     }
 
-    return mapIssueRow(issue);
+    return issue;
   });
 }
