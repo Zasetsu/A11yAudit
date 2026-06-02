@@ -366,6 +366,21 @@ function authCookies(response: { headers: Record<string, string | string[] | und
   };
 }
 
+async function createWorkspaceInvite(
+  app: Awaited<ReturnType<typeof buildServer>>,
+  cookies: Record<string, string>,
+  workspaceSlug: string,
+  email: string
+) {
+  return app.inject({
+    method: "POST",
+    url: `/api/workspaces/${workspaceSlug}/invitations`,
+    headers: { "x-csrf-token": cookies[csrfCookieName] },
+    cookies,
+    payload: { email }
+  });
+}
+
 function issueFixture(overrides: Partial<typeof issues.$inferInsert> = {}): typeof issues.$inferInsert {
   return {
     id: "issue-fixture",
@@ -784,6 +799,29 @@ describe("server", () => {
     });
   });
 
+  it("rejects unauthenticated workspace list and detail requests", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        await signup(app, "owner@example.com", "Owner Workspace");
+
+        const list = await app.inject({
+          method: "GET",
+          url: "/api/workspaces"
+        });
+        const detail = await app.inject({
+          method: "GET",
+          url: "/api/workspaces/owner-workspace"
+        });
+
+        expect(list.statusCode).toBe(401);
+        expect(detail.statusCode).toBe(401);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
   it("returns workspace detail with membership info", async () => {
     await withTempDb(async (dbPath) => {
       const app = await buildServer({ dbPath, executeScans: false });
@@ -834,20 +872,19 @@ describe("server", () => {
       try {
         const owner = await signup(app, "owner@example.com", "Owner Workspace");
         const cookies = authCookies(owner);
+        const beforeCreate = Date.now();
 
-        const response = await app.inject({
-          method: "POST",
-          url: "/api/workspaces/owner-workspace/invitations",
-          headers: { "x-csrf-token": cookies[csrfCookieName] },
-          cookies,
-          payload: { email: " INVITEE@EXAMPLE.COM " }
-        });
+        const response = await createWorkspaceInvite(app, cookies, "owner-workspace", " INVITEE@EXAMPLE.COM ");
+        const afterCreate = Date.now();
 
         expect(response.statusCode).toBe(201);
         expect(response.json().data.invitation).toMatchObject({
           email: "invitee@example.com",
           role: "member"
         });
+        const expiresAt = Date.parse(response.json().data.invitation.expiresAt);
+        expect(expiresAt).toBeGreaterThanOrEqual(beforeCreate + 7 * 24 * 60 * 60 * 1000);
+        expect(expiresAt).toBeLessThanOrEqual(afterCreate + 7 * 24 * 60 * 60 * 1000);
         const token = response.json().data.inviteUrl.replace("/invite/", "");
         expect(token).not.toBe("");
 
@@ -867,19 +904,68 @@ describe("server", () => {
     });
   });
 
+  it("rejects invite creation with non-member roles", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const cookies = authCookies(owner);
+
+        const response = await app.inject({
+          method: "POST",
+          url: "/api/workspaces/owner-workspace/invitations",
+          headers: { "x-csrf-token": cookies[csrfCookieName] },
+          cookies,
+          payload: { email: "invitee@example.com", role: "owner" }
+        });
+
+        expect(response.statusCode).toBe(400);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("rejects invite creation and revoke by non-members", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const ownerCookies = authCookies(owner);
+        const outsider = await signupWithPublicSignup(app, "outsider@example.com", "Other Workspace");
+        const outsiderCookies = authCookies(outsider);
+        const invite = await createWorkspaceInvite(app, ownerCookies, "owner-workspace", "invitee@example.com");
+        const invitationId = invite.json().data.invitation.id;
+
+        const created = await app.inject({
+          method: "POST",
+          url: "/api/workspaces/owner-workspace/invitations",
+          headers: { "x-csrf-token": outsiderCookies[csrfCookieName] },
+          cookies: outsiderCookies,
+          payload: { email: "another@example.com" }
+        });
+        const revoked = await app.inject({
+          method: "DELETE",
+          url: `/api/workspaces/owner-workspace/invitations/${invitationId}`,
+          headers: { "x-csrf-token": outsiderCookies[csrfCookieName] },
+          cookies: outsiderCookies
+        });
+
+        expect(created.statusCode).toBe(404);
+        expect(revoked.statusCode).toBe(404);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
   it("rejects invite creation by workspace members", async () => {
     await withTempDb(async (dbPath) => {
       const app = await buildServer({ dbPath, executeScans: false });
       try {
         const owner = await signup(app, "owner@example.com", "Owner Workspace");
         const ownerCookies = authCookies(owner);
-        const invite = await app.inject({
-          method: "POST",
-          url: "/api/workspaces/owner-workspace/invitations",
-          headers: { "x-csrf-token": ownerCookies[csrfCookieName] },
-          cookies: ownerCookies,
-          payload: { email: "member@example.com" }
-        });
+        const invite = await createWorkspaceInvite(app, ownerCookies, "owner-workspace", "member@example.com");
         const token = invite.json().data.inviteUrl.replace("/invite/", "");
         const accepted = await app.inject({
           method: "POST",
@@ -907,19 +993,48 @@ describe("server", () => {
     });
   });
 
+  it("rejects invite revoke by workspace members", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const ownerCookies = authCookies(owner);
+        const memberInvite = await createWorkspaceInvite(app, ownerCookies, "owner-workspace", "member@example.com");
+        const memberToken = memberInvite.json().data.inviteUrl.replace("/invite/", "");
+        const accepted = await app.inject({
+          method: "POST",
+          url: `/api/invitations/${memberToken}/accept`,
+          payload: {
+            fullName: "Member",
+            email: "member@example.com",
+            password: "password12345"
+          }
+        });
+        const memberCookies = authCookies(accepted);
+        const targetInvite = await createWorkspaceInvite(app, ownerCookies, "owner-workspace", "target@example.com");
+        const invitationId = targetInvite.json().data.invitation.id;
+
+        const response = await app.inject({
+          method: "DELETE",
+          url: `/api/workspaces/owner-workspace/invitations/${invitationId}`,
+          headers: { "x-csrf-token": memberCookies[csrfCookieName] },
+          cookies: memberCookies
+        });
+
+        expect(response.statusCode).toBe(403);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
   it("lets an owner revoke an invite and rejects revoked invite acceptance", async () => {
     await withTempDb(async (dbPath) => {
       const app = await buildServer({ dbPath, executeScans: false });
       try {
         const owner = await signup(app, "owner@example.com", "Owner Workspace");
         const cookies = authCookies(owner);
-        const invite = await app.inject({
-          method: "POST",
-          url: "/api/workspaces/owner-workspace/invitations",
-          headers: { "x-csrf-token": cookies[csrfCookieName] },
-          cookies,
-          payload: { email: "invitee@example.com" }
-        });
+        const invite = await createWorkspaceInvite(app, cookies, "owner-workspace", "invitee@example.com");
         const invitationId = invite.json().data.invitation.id;
         const token = invite.json().data.inviteUrl.replace("/invite/", "");
 
@@ -931,6 +1046,16 @@ describe("server", () => {
         });
         expect(revoked.statusCode).toBe(200);
         expect(revoked.json()).toEqual({ data: { ok: true } });
+
+        const dbClient = createDb(dbPath);
+        try {
+          const row = dbClient.sqlite
+            .prepare("select revoked_at from workspace_invitations where id = ?")
+            .get(invitationId) as { revoked_at: string | null };
+          expect(row.revoked_at).not.toBeNull();
+        } finally {
+          dbClient.close();
+        }
 
         const accepted = await app.inject({
           method: "POST",
@@ -955,13 +1080,8 @@ describe("server", () => {
       try {
         const owner = await signup(app, "owner@example.com", "Owner Workspace");
         const cookies = authCookies(owner);
-        const invite = await app.inject({
-          method: "POST",
-          url: "/api/workspaces/owner-workspace/invitations",
-          headers: { "x-csrf-token": cookies[csrfCookieName] },
-          cookies,
-          payload: { email: "member@example.com" }
-        });
+        const invite = await createWorkspaceInvite(app, cookies, "owner-workspace", "member@example.com");
+        const invitationId = invite.json().data.invitation.id;
         const token = invite.json().data.inviteUrl.replace("/invite/", "");
 
         const response = await app.inject({
@@ -988,6 +1108,64 @@ describe("server", () => {
         ]);
         expect(cookieValue(response, sessionCookieName)).not.toBe("");
         expect(cookieValue(response, csrfCookieName)).not.toBe("");
+
+        const dbClient = createDb(dbPath);
+        try {
+          const row = dbClient.sqlite
+            .prepare("select accepted_at from workspace_invitations where id = ?")
+            .get(invitationId) as { accepted_at: string | null };
+          expect(row.accepted_at).not.toBeNull();
+        } finally {
+          dbClient.close();
+        }
+
+        const secondAcceptance = await app.inject({
+          method: "POST",
+          url: `/api/invitations/${token}/accept`,
+          payload: {
+            fullName: "Member User",
+            email: "member@example.com",
+            password: "password12345"
+          }
+        });
+
+        expect(secondAcceptance.statusCode).toBe(410);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("rejects expired invite acceptance", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const cookies = authCookies(owner);
+        const invite = await createWorkspaceInvite(app, cookies, "owner-workspace", "expired@example.com");
+        const invitationId = invite.json().data.invitation.id;
+        const token = invite.json().data.inviteUrl.replace("/invite/", "");
+
+        const dbClient = createDb(dbPath);
+        try {
+          dbClient.sqlite
+            .prepare("update workspace_invitations set expires_at = ? where id = ?")
+            .run("2026-01-01T00:00:00.000Z", invitationId);
+        } finally {
+          dbClient.close();
+        }
+
+        const response = await app.inject({
+          method: "POST",
+          url: `/api/invitations/${token}/accept`,
+          payload: {
+            fullName: "Expired User",
+            email: "expired@example.com",
+            password: "password12345"
+          }
+        });
+
+        expect(response.statusCode).toBe(410);
       } finally {
         await app.close();
       }
@@ -1071,6 +1249,72 @@ describe("server", () => {
         ]));
         expect(cookieValue(response, sessionCookieName)).not.toBe("");
         expect(cookieValue(response, csrfCookieName)).not.toBe("");
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("accepts an invite for an existing workspace member without duplicating membership", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const ownerCookies = authCookies(owner);
+        const firstInvite = await createWorkspaceInvite(app, ownerCookies, "owner-workspace", "member@example.com");
+        const firstToken = firstInvite.json().data.inviteUrl.replace("/invite/", "");
+        const accepted = await app.inject({
+          method: "POST",
+          url: `/api/invitations/${firstToken}/accept`,
+          payload: {
+            fullName: "Member User",
+            email: "member@example.com",
+            password: "password12345"
+          }
+        });
+        expect(accepted.statusCode).toBe(200);
+
+        const secondInvite = await createWorkspaceInvite(app, ownerCookies, "owner-workspace", "member@example.com");
+        const secondInvitationId = secondInvite.json().data.invitation.id;
+        const secondToken = secondInvite.json().data.inviteUrl.replace("/invite/", "");
+
+        const response = await app.inject({
+          method: "POST",
+          url: `/api/invitations/${secondToken}/accept`,
+          payload: {
+            fullName: "Member User",
+            email: "member@example.com",
+            password: "password12345"
+          }
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.json().data.workspaces).toEqual(expect.arrayContaining([
+          expect.objectContaining({ slug: "owner-workspace", role: "member" })
+        ]));
+
+        const dbClient = createDb(dbPath);
+        try {
+          const row = dbClient.sqlite
+            .prepare(`
+              select
+                count(*) as membership_count,
+                max(workspace_invitations.accepted_at) as accepted_at
+              from users
+              inner join workspace_members on workspace_members.user_id = users.id
+              inner join workspaces on workspaces.id = workspace_members.workspace_id
+              left join workspace_invitations on workspace_invitations.id = ?
+              where users.email = ? and workspaces.slug = ?
+            `)
+            .get(secondInvitationId, "member@example.com", "owner-workspace") as {
+              membership_count: number;
+              accepted_at: string | null;
+            };
+          expect(row.membership_count).toBe(1);
+          expect(row.accepted_at).not.toBeNull();
+        } finally {
+          dbClient.close();
+        }
       } finally {
         await app.close();
       }
