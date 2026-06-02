@@ -52,6 +52,11 @@ function readMaxConcurrentScans(): number {
   return parsed > 0 ? parsed : 1;
 }
 
+export function readServerDbPath(): string | undefined {
+  const value = process.env.A11YAUDIT_DB_PATH?.trim();
+  return value === "" ? undefined : value;
+}
+
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: options.logger ?? false });
   const dbClient = options.dbClient ?? createDb(options.dbPath);
@@ -277,6 +282,6 @@ function markInterruptedScansFailed(dbClient: DbClient): void {
 const entryPoint = process.argv[1] ? pathToFileURL(process.argv[1]).href : undefined;
 
 if (import.meta.url === entryPoint) {
-  const app = await buildServer({ logger: true });
+  const app = await buildServer({ logger: true, dbPath: readServerDbPath() });
   await app.listen({ host: "0.0.0.0", port: Number(process.env.PORT ?? 7842) });
 }

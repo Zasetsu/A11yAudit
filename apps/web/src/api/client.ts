@@ -17,7 +17,10 @@ interface ApiList<T> {
   data: T[];
 }
 
-const apiBaseUrl = import.meta.env.VITE_A11YAUDIT_API_BASE_URL as string | undefined;
+const apiBaseUrl = (
+  import.meta.env.VITE_A11YAUDIT_API_BASE_URL
+  ?? import.meta.env.A11YAUDIT_SERVER_URL
+) as string | undefined;
 
 export interface AuthSession {
   user: { id: string; fullName: string; email: string };

@@ -142,7 +142,7 @@ pnpm --filter @a11yaudit/server dev
 Start the web UI:
 
 ```bash
-VITE_A11YAUDIT_API_BASE_URL=http://localhost:7842 pnpm --filter @a11yaudit/web dev
+A11YAUDIT_SERVER_URL=http://localhost:7842 pnpm --filter @a11yaudit/web dev
 ```
 
 Open:

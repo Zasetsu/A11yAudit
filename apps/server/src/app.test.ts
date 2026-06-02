@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildServer } from "./app.js";
+import { buildServer, readServerDbPath } from "./app.js";
 import { csrfCookieName, sessionCookieName } from "./auth/cookies.js";
 import { createSession } from "./auth/session.js";
 import { hashToken } from "./auth/tokens.js";
@@ -680,9 +680,20 @@ async function writeStoredArtifact(storageRoot: string, key: string, body: Buffe
 
 afterEach(() => {
   runScanMock.mockReset();
+  vi.unstubAllEnvs();
 });
 
 describe("server", () => {
+  it("reads the server database path from environment configuration", () => {
+    vi.stubEnv("A11YAUDIT_DB_PATH", "/tmp/a11yaudit.db");
+
+    expect(readServerDbPath()).toBe("/tmp/a11yaudit.db");
+
+    vi.stubEnv("A11YAUDIT_DB_PATH", "");
+
+    expect(readServerDbPath()).toBeUndefined();
+  });
+
   it("returns health without requiring a network listener", async () => {
     await withTempDb(async (dbPath) => {
       const app = await buildServer({ dbPath, executeScans: false });

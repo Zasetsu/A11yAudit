@@ -14,11 +14,14 @@ function jsonResponse(data: unknown, status = 200): Response {
   });
 }
 
-async function importClient(apiBaseUrl?: string) {
+async function importClient(apiBaseUrl?: string, serverUrl?: string) {
   vi.resetModules();
   vi.unstubAllEnvs();
   if (apiBaseUrl !== undefined) {
     vi.stubEnv("VITE_A11YAUDIT_API_BASE_URL", apiBaseUrl);
+  }
+  if (serverUrl !== undefined) {
+    vi.stubEnv("A11YAUDIT_SERVER_URL", serverUrl);
   }
 
   return import("./client");
@@ -61,6 +64,30 @@ describe("api client", () => {
     const { getSession } = await importClient();
 
     await expect(getSession()).resolves.toBeNull();
+  });
+
+  it("uses A11YAUDIT_SERVER_URL as the web API base URL fallback", async () => {
+    const fetchMock = vi.fn(async () => jsonDataResponse(sessionPayload()));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getSession } = await importClient(undefined, "https://server.example.test/");
+
+    await expect(getSession()).resolves.toEqual(sessionPayload());
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://server.example.test/api/auth/session",
+      expect.objectContaining({ credentials: "include" })
+    );
+  });
+
+  it("keeps VITE_A11YAUDIT_API_BASE_URL precedence over A11YAUDIT_SERVER_URL", async () => {
+    const fetchMock = vi.fn(async () => jsonDataResponse(sessionPayload()));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getSession } = await importClient("https://vite-api.example.test/", "https://server.example.test/");
+
+    await expect(getSession()).resolves.toEqual(sessionPayload());
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://vite-api.example.test/api/auth/session",
+      expect.objectContaining({ credentials: "include" })
+    );
   });
 
   it("getSession returns null for 401 and invalid responses", async () => {
