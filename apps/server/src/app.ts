@@ -16,6 +16,7 @@ import { registerIssueRoutes } from "./routes/issues.js";
 import { registerProjectRoutes } from "./routes/projects.js";
 import { registerReportRoutes } from "./routes/reports.js";
 import { registerScanRoutes, type ScanJobPayload } from "./routes/scans.js";
+import { registerWorkspaceRoutes } from "./routes/workspaces.js";
 
 export interface BuildServerOptions {
   dbPath?: string;
@@ -37,7 +38,8 @@ function shouldSkipCsrf(requestUrl: string): boolean {
   const pathname = requestUrl.startsWith("http") ? new URL(requestUrl).pathname : requestUrl.split("?")[0];
   return pathname === "/health"
     || pathname === "/api/auth/login"
-    || pathname === "/api/auth/signup";
+    || pathname === "/api/auth/signup"
+    || /^\/api\/invitations\/[^/]+\/accept$/.test(pathname);
 }
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
@@ -206,7 +208,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
 
   app.addHook("onRequest", async (request, reply) => {
     reply.header("Access-Control-Allow-Origin", trustedBrowserOrigin);
-    reply.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    reply.header("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
     reply.header("Access-Control-Allow-Headers", "Content-Type,Accept,X-CSRF-Token");
     reply.header("Access-Control-Allow-Credentials", "true");
 
@@ -238,6 +240,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   }));
 
   await registerAuthRoutes(app, { db: dbClient.db });
+  await registerWorkspaceRoutes(app, { db: dbClient.db });
   await registerProjectRoutes(app, { db: dbClient.db });
   await registerScanRoutes(app, { db: dbClient.db, runner });
   await registerFindingRoutes(app, { db: dbClient.db });

@@ -5,8 +5,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildServer } from "./app.js";
 import { csrfCookieName, sessionCookieName } from "./auth/cookies.js";
 import { createSession } from "./auth/session.js";
+import { hashToken } from "./auth/tokens.js";
 import { createDb, initializeDb } from "./db/client.js";
-import { findings, issues, projects, reports, scanRuns, sessions, users } from "./db/schema.js";
+import { findings, issues, projects, reports, scanRuns, sessions, users, workspaceInvitations } from "./db/schema.js";
 
 const { runScanMock } = vi.hoisted(() => ({
   runScanMock: vi.fn()
@@ -339,6 +340,32 @@ async function signup(
   });
 }
 
+async function signupWithPublicSignup(
+  app: Awaited<ReturnType<typeof buildServer>>,
+  email: string,
+  workspaceName: string,
+  password = "password12345"
+) {
+  const originalPublicSignups = process.env.A11YAUDIT_PUBLIC_SIGNUPS;
+  process.env.A11YAUDIT_PUBLIC_SIGNUPS = "true";
+  try {
+    return await signup(app, email, workspaceName, password);
+  } finally {
+    if (originalPublicSignups === undefined) {
+      delete process.env.A11YAUDIT_PUBLIC_SIGNUPS;
+    } else {
+      process.env.A11YAUDIT_PUBLIC_SIGNUPS = originalPublicSignups;
+    }
+  }
+}
+
+function authCookies(response: { headers: Record<string, string | string[] | undefined> }): Record<string, string> {
+  return {
+    [sessionCookieName]: cookieValue(response, sessionCookieName),
+    [csrfCookieName]: cookieValue(response, csrfCookieName)
+  };
+}
+
 function issueFixture(overrides: Partial<typeof issues.$inferInsert> = {}): typeof issues.$inferInsert {
   return {
     id: "issue-fixture",
@@ -401,7 +428,7 @@ describe("server", () => {
 
         expect(response.statusCode).toBe(204);
         expect(response.headers["access-control-allow-origin"]).toBe("http://localhost:5173");
-        expect(response.headers["access-control-allow-methods"]).toBe("GET,POST,OPTIONS");
+        expect(response.headers["access-control-allow-methods"]).toBe("GET,POST,DELETE,OPTIONS");
         expect(response.headers["access-control-allow-headers"]).toContain("X-CSRF-Token");
         expect(response.headers["access-control-allow-credentials"]).toBe("true");
       } finally {
@@ -726,6 +753,325 @@ describe("server", () => {
         } else {
           process.env.A11YAUDIT_PUBLIC_SIGNUPS = originalPublicSignups;
         }
+        await app.close();
+      }
+    });
+  });
+
+  it("lists workspaces for the authenticated user", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+
+        const response = await app.inject({
+          method: "GET",
+          url: "/api/workspaces",
+          cookies: authCookies(owner)
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.json().data.workspaces).toMatchObject([
+          {
+            name: "Owner Workspace",
+            slug: "owner-workspace",
+            role: "owner"
+          }
+        ]);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("returns workspace detail with membership info", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+
+        const response = await app.inject({
+          method: "GET",
+          url: "/api/workspaces/owner-workspace",
+          cookies: authCookies(owner)
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.json().data.workspace).toMatchObject({
+          name: "Owner Workspace",
+          slug: "owner-workspace",
+          role: "owner"
+        });
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("rejects workspace detail for non-members", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const outsider = await signupWithPublicSignup(app, "outsider@example.com", "Other Workspace");
+
+        const response = await app.inject({
+          method: "GET",
+          url: `/api/workspaces/${owner.json().data.workspaces[0].slug}`,
+          cookies: authCookies(outsider)
+        });
+
+        expect(response.statusCode).toBe(404);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("lets an owner create an invite and stores only the token hash", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const cookies = authCookies(owner);
+
+        const response = await app.inject({
+          method: "POST",
+          url: "/api/workspaces/owner-workspace/invitations",
+          headers: { "x-csrf-token": cookies[csrfCookieName] },
+          cookies,
+          payload: { email: " INVITEE@EXAMPLE.COM " }
+        });
+
+        expect(response.statusCode).toBe(201);
+        expect(response.json().data.invitation).toMatchObject({
+          email: "invitee@example.com",
+          role: "member"
+        });
+        const token = response.json().data.inviteUrl.replace("/invite/", "");
+        expect(token).not.toBe("");
+
+        const dbClient = createDb(dbPath);
+        try {
+          const invitations = dbClient.db.select().from(workspaceInvitations).all();
+          expect(invitations).toHaveLength(1);
+          expect(invitations[0].email).toBe("invitee@example.com");
+          expect(invitations[0].tokenHash).toBe(hashToken(token));
+          expect(invitations[0].tokenHash).not.toBe(token);
+        } finally {
+          dbClient.close();
+        }
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("rejects invite creation by workspace members", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const ownerCookies = authCookies(owner);
+        const invite = await app.inject({
+          method: "POST",
+          url: "/api/workspaces/owner-workspace/invitations",
+          headers: { "x-csrf-token": ownerCookies[csrfCookieName] },
+          cookies: ownerCookies,
+          payload: { email: "member@example.com" }
+        });
+        const token = invite.json().data.inviteUrl.replace("/invite/", "");
+        const accepted = await app.inject({
+          method: "POST",
+          url: `/api/invitations/${token}/accept`,
+          payload: {
+            fullName: "Member",
+            email: "member@example.com",
+            password: "password12345"
+          }
+        });
+        const memberCookies = authCookies(accepted);
+
+        const response = await app.inject({
+          method: "POST",
+          url: "/api/workspaces/owner-workspace/invitations",
+          headers: { "x-csrf-token": memberCookies[csrfCookieName] },
+          cookies: memberCookies,
+          payload: { email: "another@example.com" }
+        });
+
+        expect(response.statusCode).toBe(403);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("lets an owner revoke an invite and rejects revoked invite acceptance", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const cookies = authCookies(owner);
+        const invite = await app.inject({
+          method: "POST",
+          url: "/api/workspaces/owner-workspace/invitations",
+          headers: { "x-csrf-token": cookies[csrfCookieName] },
+          cookies,
+          payload: { email: "invitee@example.com" }
+        });
+        const invitationId = invite.json().data.invitation.id;
+        const token = invite.json().data.inviteUrl.replace("/invite/", "");
+
+        const revoked = await app.inject({
+          method: "DELETE",
+          url: `/api/workspaces/owner-workspace/invitations/${invitationId}`,
+          headers: { "x-csrf-token": cookies[csrfCookieName] },
+          cookies
+        });
+        expect(revoked.statusCode).toBe(200);
+        expect(revoked.json()).toEqual({ data: { ok: true } });
+
+        const accepted = await app.inject({
+          method: "POST",
+          url: `/api/invitations/${token}/accept`,
+          payload: {
+            fullName: "Invitee",
+            email: "invitee@example.com",
+            password: "password12345"
+          }
+        });
+
+        expect(accepted.statusCode).toBe(410);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("accepts an invite by creating a member user and session while public signup is disabled", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const cookies = authCookies(owner);
+        const invite = await app.inject({
+          method: "POST",
+          url: "/api/workspaces/owner-workspace/invitations",
+          headers: { "x-csrf-token": cookies[csrfCookieName] },
+          cookies,
+          payload: { email: "member@example.com" }
+        });
+        const token = invite.json().data.inviteUrl.replace("/invite/", "");
+
+        const response = await app.inject({
+          method: "POST",
+          url: `/api/invitations/${token}/accept`,
+          payload: {
+            fullName: "Member User",
+            email: " MEMBER@EXAMPLE.COM ",
+            password: "password12345"
+          }
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.json().data.user).toMatchObject({
+          fullName: "Member User",
+          email: "member@example.com"
+        });
+        expect(response.json().data.workspaces).toMatchObject([
+          {
+            name: "Owner Workspace",
+            slug: "owner-workspace",
+            role: "member"
+          }
+        ]);
+        expect(cookieValue(response, sessionCookieName)).not.toBe("");
+        expect(cookieValue(response, csrfCookieName)).not.toBe("");
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("rejects invite acceptance with a mismatched email", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const cookies = authCookies(owner);
+        const invite = await app.inject({
+          method: "POST",
+          url: "/api/workspaces/owner-workspace/invitations",
+          headers: { "x-csrf-token": cookies[csrfCookieName] },
+          cookies,
+          payload: { email: "member@example.com" }
+        });
+        const token = invite.json().data.inviteUrl.replace("/invite/", "");
+
+        const response = await app.inject({
+          method: "POST",
+          url: `/api/invitations/${token}/accept`,
+          payload: {
+            fullName: "Wrong User",
+            email: "wrong@example.com",
+            password: "password12345"
+          }
+        });
+
+        expect(response.statusCode).toBe(400);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("accepts an invite for an existing user after password verification", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        await signupWithPublicSignup(app, "existing@example.com", "Existing Workspace", "correct horse battery staple");
+        const cookies = authCookies(owner);
+        const invite = await app.inject({
+          method: "POST",
+          url: "/api/workspaces/owner-workspace/invitations",
+          headers: { "x-csrf-token": cookies[csrfCookieName] },
+          cookies,
+          payload: { email: "existing@example.com" }
+        });
+        const token = invite.json().data.inviteUrl.replace("/invite/", "");
+
+        const wrongPassword = await app.inject({
+          method: "POST",
+          url: `/api/invitations/${token}/accept`,
+          payload: {
+            fullName: "Existing User",
+            email: "existing@example.com",
+            password: "wrong-password"
+          }
+        });
+        expect(wrongPassword.statusCode).toBe(401);
+
+        const response = await app.inject({
+          method: "POST",
+          url: `/api/invitations/${token}/accept`,
+          payload: {
+            fullName: "Existing User",
+            email: "existing@example.com",
+            password: "correct horse battery staple"
+          }
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.json().data.user.email).toBe("existing@example.com");
+        expect(response.json().data.workspaces).toEqual(expect.arrayContaining([
+          expect.objectContaining({ slug: "existing-workspace", role: "owner" }),
+          expect.objectContaining({ slug: "owner-workspace", role: "member" })
+        ]));
+        expect(cookieValue(response, sessionCookieName)).not.toBe("");
+        expect(cookieValue(response, csrfCookieName)).not.toBe("");
+      } finally {
         await app.close();
       }
     });
