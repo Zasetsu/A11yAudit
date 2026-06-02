@@ -99,8 +99,8 @@ export function App() {
     refetchInterval: hasActiveScans(scansQuery.data) ? 3_000 : false
   });
   const reportsQuery = useQuery({
-    queryKey: ["reports"],
-    queryFn: getReports,
+    queryKey: ["reports", currentWorkspaceSlug],
+    queryFn: () => getReports(currentWorkspaceSlug),
     refetchInterval: hasActiveScans(scansQuery.data) ? 2_000 : false
   });
 
@@ -123,6 +123,7 @@ export function App() {
   const onSelectProject = useCallback((project: Project) => setSelectedProjectId(project.id), []);
 
   const common = {
+    workspaceSlug: currentWorkspaceSlug,
     project: selectedProject,
     projects,
     scans: scansQuery.data ?? [],

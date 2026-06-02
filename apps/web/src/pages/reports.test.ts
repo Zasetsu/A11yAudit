@@ -25,11 +25,12 @@ describe("report presentation", () => {
 
   it("allows ready HTML reports to use the normal report download endpoint", async () => {
     vi.stubEnv("VITE_A11YAUDIT_API_BASE_URL", "https://api.example.test/");
+    vi.stubEnv("VITE_A11YAUDIT_WORKSPACE_SLUG", "owner-workspace");
     const { reportActionLabel, reportDownloadTitle, reportDownloadUrl } = await import("./reports");
     const html = report({ id: "report-html", kind: "html", mimeType: "text/html" });
 
     expect(reportActionLabel(html)).toBe("HTML");
-    expect(reportDownloadUrl(html)).toBe("https://api.example.test/api/reports/report-html/download");
+    expect(reportDownloadUrl(html, "owner-workspace")).toBe("https://api.example.test/api/workspaces/owner-workspace/reports/report-html/download");
     expect(reportDownloadTitle(html)).toBe("Download HTML report");
   });
 
@@ -38,7 +39,7 @@ describe("report presentation", () => {
     const { reportDownloadTitle, reportDownloadUrl } = await import("./reports");
     const generating = report({ kind: "pdf", mimeType: "application/pdf", status: "generating" });
 
-    expect(reportDownloadUrl(generating)).toBeNull();
+    expect(reportDownloadUrl(generating, "owner-workspace")).toBeNull();
     expect(reportDownloadTitle(generating)).toBe("PDF report is still generating");
   });
 });

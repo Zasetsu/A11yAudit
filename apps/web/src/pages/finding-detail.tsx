@@ -13,7 +13,7 @@ function confidenceLabel(confidence: Issue["confidence"]): string {
   return `${confidence[0].toUpperCase()}${confidence.slice(1)} confidence`;
 }
 
-export function FindingDetailPage({ findings, issues, findingId, navigate }: PageProps & { findingId: string }) {
+export function FindingDetailPage({ workspaceSlug, findings, issues, findingId, navigate }: PageProps & { findingId: string }) {
   const issue = issues.find((candidate) => candidate.id === findingId);
   const finding = findings.find((candidate) => candidate.id === findingId) ?? findings[0];
 
@@ -111,7 +111,7 @@ export function FindingDetailPage({ findings, issues, findingId, navigate }: Pag
           ) : (
             <div className="evidence-grid">
               {finding.evidenceArtifacts.map((artifact) => {
-                const downloadUrl = getArtifactDownloadUrl(artifact.artifactKey);
+                const downloadUrl = getArtifactDownloadUrl(artifact.artifactKey, workspaceSlug);
                 const isImage = artifact.mimeType.startsWith("image/");
                 return (
                   <div className="evidence-card" key={artifact.artifactKey}>

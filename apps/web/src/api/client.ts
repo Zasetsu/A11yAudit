@@ -124,6 +124,19 @@ function workspaceProjectsPath(workspaceSlug = currentWorkspaceSlug): string {
   return `/api/workspaces/${encodeURIComponent(workspaceSlug)}/projects`;
 }
 
+function workspaceReportsPath(workspaceSlug = currentWorkspaceSlug): string {
+  return `/api/workspaces/${encodeURIComponent(workspaceSlug)}/reports`;
+}
+
+function workspaceReportDownloadPath(reportId: string, workspaceSlug = currentWorkspaceSlug): string {
+  return `${workspaceReportsPath(workspaceSlug)}/${encodeURIComponent(reportId)}/download`;
+}
+
+function workspaceArtifactDownloadPath(artifactKey: string, workspaceSlug = currentWorkspaceSlug): string {
+  const encoded = encodeURIComponent(artifactKey);
+  return `/api/workspaces/${encodeURIComponent(workspaceSlug)}/artifacts/download?key=${encoded}`;
+}
+
 async function fetchList<T>(path: string): Promise<ApiListResult<T>> {
   const url = apiUrl(path);
   if (url === null) {
@@ -378,8 +391,8 @@ export async function fetchIssues(params: { projectId?: string; scanRunId?: stri
   return result.data.filter(isServerIssue).map(mapIssue);
 }
 
-export async function getReports(): Promise<Report[]> {
-  const result = await fetchList<ServerReport>("/api/reports");
+export async function getReports(workspaceSlug = currentWorkspaceSlug): Promise<Report[]> {
+  const result = await fetchList<ServerReport>(workspaceReportsPath(workspaceSlug));
   if (result.status === "not_configured") {
     return demoReports;
   }
@@ -399,13 +412,12 @@ export async function getReports(): Promise<Report[]> {
   }));
 }
 
-export function getReportDownloadUrl(reportId: string): string | null {
-  return apiUrl(`/api/reports/${reportId}/download`);
+export function getReportDownloadUrl(reportId: string, workspaceSlug = currentWorkspaceSlug): string | null {
+  return apiUrl(workspaceReportDownloadPath(reportId, workspaceSlug));
 }
 
-export function getArtifactDownloadUrl(artifactKey: string): string | null {
-  const encoded = encodeURIComponent(artifactKey);
-  return apiUrl(`/api/artifacts/download?key=${encoded}`);
+export function getArtifactDownloadUrl(artifactKey: string, workspaceSlug = currentWorkspaceSlug): string | null {
+  return apiUrl(workspaceArtifactDownloadPath(artifactKey, workspaceSlug));
 }
 
 export async function createProject(payload: { name?: string; url: string }, workspaceSlug = currentWorkspaceSlug): Promise<Project | null> {

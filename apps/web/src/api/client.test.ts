@@ -79,9 +79,7 @@ describe("api client", () => {
   });
 
   it("maps configured API reports when available", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
+    const fetchMock = vi.fn(async () =>
         jsonResponse([
           {
             id: "report-1",
@@ -92,9 +90,9 @@ describe("api client", () => {
             mimeType: "application/pdf"
           }
         ])
-      )
     );
-    const { getReports } = await importClient("https://api.example.test/");
+    vi.stubGlobal("fetch", fetchMock);
+    const { getReports } = await importClient("https://api.example.test/", "owner-workspace");
 
     await expect(getReports()).resolves.toMatchObject([
       {
@@ -104,6 +102,18 @@ describe("api client", () => {
         status: "ready"
       }
     ]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.test/api/workspaces/owner-workspace/reports",
+      expect.objectContaining({ headers: { Accept: "application/json" } })
+    );
+  });
+
+  it("builds scoped report download URLs from the current workspace", async () => {
+    const { getReportDownloadUrl } = await importClient("https://api.example.test/", "owner-workspace");
+
+    expect(getReportDownloadUrl("report-1")).toBe(
+      "https://api.example.test/api/workspaces/owner-workspace/reports/report-1/download"
+    );
   });
 
   it("maps grouped issues from configured API", async () => {
@@ -300,7 +310,7 @@ describe("api client", () => {
         ])
       )
     );
-    const { getArtifactDownloadUrl, getFindings } = await importClient("https://api.example.test/");
+    const { getArtifactDownloadUrl, getFindings } = await importClient("https://api.example.test/", "owner-workspace");
 
     await expect(getFindings()).resolves.toMatchObject([
       {
@@ -316,7 +326,7 @@ describe("api client", () => {
       }
     ]);
     expect(getArtifactDownloadUrl("runs/run-1/screenshot/page.png")).toBe(
-      "https://api.example.test/api/artifacts/download?key=runs%2Frun-1%2Fscreenshot%2Fpage.png"
+      "https://api.example.test/api/workspaces/owner-workspace/artifacts/download?key=runs%2Frun-1%2Fscreenshot%2Fpage.png"
     );
   });
 });
