@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Keyboard unreachable clickable fail fixture</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        padding: 2rem;
+      }
+
+      .fake-button {
+        background: #174ea6;
+        color: #fff;
+        cursor: pointer;
+        display: inline-block;
+        margin-right: 1rem;
+        padding: 0.75rem 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Keyboard unreachable clickable fail fixture</h1>
+      <div class="fake-button" onclick="window.clicked = true">Save changes</div>
+      <section aria-label="Duplicate custom controls">
+        <div class="fake-button" tabindex="0" onclick="window.reachableDuplicate = true">Reachable duplicate</div>
+        <div class="fake-button" onclick="window.unreachableDuplicate = true">Unreachable duplicate</div>
+      </section>
+      <button type="button">Reachable native button</button>
+    </main>
+  </body>
+</html>

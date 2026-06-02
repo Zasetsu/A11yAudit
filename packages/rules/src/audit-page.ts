@@ -4,6 +4,7 @@ import { createFindingFingerprint } from "@a11yaudit/core";
 import type { Result, NodeResult } from "axe-core";
 import type { Page } from "playwright";
 import { runAxeOnPage } from "./axe-runner.js";
+import { runInteractionRules, type InteractionRuleFinding } from "./interaction/index.js";
 import { normalizeAxeImpact, wcagTagsToCriteria } from "./normalize.js";
 
 export interface AuditPageInput {
@@ -22,7 +23,9 @@ export async function auditPage(input: AuditPageInput): Promise<AuditPageResult>
   const startedAt = Date.now();
   const results = await runAxeOnPage(input.page);
   const title = await input.page.title().catch(() => null);
-  const findings = results.violations.flatMap((violation) => mapViolationToFindings(violation, input));
+  const axeFindings = results.violations.flatMap((violation) => mapViolationToFindings(violation, input));
+  const interactionFindings = await runInteractionRules(input);
+  const findings = [...axeFindings, ...interactionFindings.map((finding) => mapInteractionFinding(finding, input))];
   const durationMs = Date.now() - startedAt;
 
   return {
@@ -77,6 +80,40 @@ function mapViolationToFindings(violation: Result, input: AuditPageInput): ScanF
       instances: 1
     };
   });
+}
+
+function mapInteractionFinding(finding: InteractionRuleFinding, input: AuditPageInput): ScanFinding {
+  const elementSignature = finding.selector ?? finding.htmlSnippet ?? finding.title;
+  const fingerprint = createFindingFingerprint({
+    normalizedUrl: input.normalizedUrl,
+    viewport: input.viewport.name,
+    ruleId: finding.ruleId,
+    wcagCriteria: finding.wcagCriteria,
+    elementSignature
+  });
+
+  return {
+    id: createStableFindingId(fingerprint),
+    title: finding.title,
+    severity: finding.severity,
+    status: "new",
+    source: "custom",
+    certainty: finding.certainty,
+    origin: "unknown",
+    wcagCriteria: finding.wcagCriteria,
+    ruleId: finding.ruleId,
+    description: finding.description,
+    recommendation: finding.recommendation,
+    pageUrl: input.url,
+    viewport: input.viewport.name,
+    selector: finding.selector,
+    htmlSnippet: finding.htmlSnippet,
+    visibleText: finding.visibleText,
+    helpUrl: null,
+    fingerprint,
+    evidence: [],
+    instances: 1
+  };
 }
 
 function createStableFindingId(fingerprint: string): string {
