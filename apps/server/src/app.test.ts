@@ -1837,7 +1837,7 @@ describe("server", () => {
     });
   });
 
-  it("allows workspace members to list projects but not create or delete them", async () => {
+  it("allows workspace members to read and scan but not create projects", async () => {
     await withTempDb(async (dbPath) => {
       const app = await buildServer({ dbPath, executeScans: false });
       try {
@@ -1849,6 +1849,7 @@ describe("server", () => {
         const memberCookies = authCookies(member);
 
         const listed = await listProjects(app, member, "owner-workspace");
+        const scanned = await startScan(app, member, project.json().id, {}, "owner-workspace");
         const created = await app.inject({
           method: "POST",
           url: "/api/workspaces/owner-workspace/projects",
@@ -1865,6 +1866,7 @@ describe("server", () => {
 
         expect(listed.statusCode).toBe(200);
         expect(listed.json().data).toHaveLength(1);
+        expect(scanned.statusCode).toBe(201);
         expect(created.statusCode).toBe(403);
         expect(deleted.statusCode).toBe(403);
       } finally {
@@ -1963,7 +1965,7 @@ describe("server", () => {
     });
   });
 
-  it("returns 404 for old global project list and create routes", async () => {
+  it("does not expose old global project list and create routes", async () => {
     await withTempDb(async (dbPath) => {
       const app = await buildServer({ dbPath, executeScans: false });
       try {
@@ -2114,17 +2116,19 @@ describe("server", () => {
     });
   });
 
-  it("returns 404 when creating a scan for a project outside the current workspace", async () => {
+  it("rejects scans for projects outside the current workspace even when using the foreign project URL", async () => {
     await withTempDb(async (dbPath) => {
       const app = await buildServer({ dbPath, executeScans: false });
       try {
         const acme = await signup(app, "acme@example.com", "Acme");
         const beta = await signupWithPublicSignup(app, "beta@example.com", "Beta");
-        const betaProject = await createProject(app, beta, "Beta Portal", "https://beta.example.test/");
+        const betaUrl = "https://beta.example.test/";
+        const betaProject = await createProject(app, beta, "Beta Portal", betaUrl);
 
-        const created = await startScan(app, acme, betaProject.json().id);
+        const created = await startScan(app, acme, betaProject.json().id, { url: betaUrl }, "acme");
 
         expect(created.statusCode).toBe(404);
+        expect((await listScans(app, acme)).json().data).toHaveLength(0);
         expect((await listScans(app, beta)).json().data).toHaveLength(0);
       } finally {
         await app.close();
