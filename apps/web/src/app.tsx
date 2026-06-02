@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchIssues, getFindings, getProjects, getReports, getScans } from "./api/client";
+import { currentWorkspaceSlug, fetchIssues, getFindings, getProjects, getReports, getScans } from "./api/client";
 import { Sidebar, TopBar } from "./design/shell";
 import { activeProject, emptyProject, type Project, type ScanRun } from "./data";
 import { OverviewPage } from "./pages/overview";
@@ -74,8 +74,8 @@ export function App() {
 
   const projectsQuery = useQuery({ queryKey: ["projects"], queryFn: getProjects });
   const scansQuery = useQuery({
-    queryKey: ["scans"],
-    queryFn: getScans,
+    queryKey: ["scans", currentWorkspaceSlug],
+    queryFn: () => getScans(currentWorkspaceSlug),
     refetchInterval: (query) => (hasActiveScans(query.state.data) ? 2_000 : false)
   });
   const findingsQuery = useQuery({ queryKey: ["findings"], queryFn: getFindings });

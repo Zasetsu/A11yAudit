@@ -18,6 +18,9 @@ interface ApiList<T> {
 }
 
 const apiBaseUrl = import.meta.env.VITE_A11YAUDIT_API_BASE_URL as string | undefined;
+const configuredWorkspaceSlug = import.meta.env.VITE_A11YAUDIT_WORKSPACE_SLUG as string | undefined;
+export const currentWorkspaceSlug = configuredWorkspaceSlug?.trim() || "default-workspace";
+
 type ApiListResult<T> =
   | { status: "not_configured" }
   | { status: "unavailable" }
@@ -111,6 +114,10 @@ function apiUrl(path: string): string | null {
   const normalizedBase = apiBaseUrl.trim().endsWith("/") ? apiBaseUrl.trim() : `${apiBaseUrl.trim()}/`;
   const relativePath = path.replace(/^\/+/, "");
   return new URL(relativePath, normalizedBase).href;
+}
+
+function workspaceScansPath(workspaceSlug = currentWorkspaceSlug): string {
+  return `/api/workspaces/${encodeURIComponent(workspaceSlug)}/scans`;
 }
 
 async function fetchList<T>(path: string): Promise<ApiListResult<T>> {
@@ -294,8 +301,8 @@ export async function getProjects(): Promise<Project[]> {
   }));
 }
 
-export async function getScans(): Promise<ScanRun[]> {
-  const result = await fetchList<ServerScanRun>("/api/scans");
+export async function getScans(workspaceSlug = currentWorkspaceSlug): Promise<ScanRun[]> {
+  const result = await fetchList<ServerScanRun>(workspaceScansPath(workspaceSlug));
   if (result.status === "not_configured") {
     return demoScanRuns;
   }
@@ -441,8 +448,8 @@ export async function createScan(payload: {
   maxPages: number;
   maxDepth: number;
   viewports: Array<"desktop" | "mobile">;
-}): Promise<ScanRun | null> {
-  const url = apiUrl("/api/scans");
+}, workspaceSlug = currentWorkspaceSlug): Promise<ScanRun | null> {
+  const url = apiUrl(workspaceScansPath(workspaceSlug));
   if (url === null) {
     return null;
   }

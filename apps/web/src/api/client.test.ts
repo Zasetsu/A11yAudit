@@ -7,11 +7,14 @@ function jsonResponse(data: unknown): Response {
   });
 }
 
-async function importClient(apiBaseUrl?: string) {
+async function importClient(apiBaseUrl?: string, workspaceSlug?: string) {
   vi.resetModules();
   vi.unstubAllEnvs();
   if (apiBaseUrl !== undefined) {
     vi.stubEnv("VITE_A11YAUDIT_API_BASE_URL", apiBaseUrl);
+  }
+  if (workspaceSlug !== undefined) {
+    vi.stubEnv("VITE_A11YAUDIT_WORKSPACE_SLUG", workspaceSlug);
   }
 
   return import("./client");
@@ -49,6 +52,18 @@ describe("api client", () => {
     await expect(getProjects()).resolves.toEqual([]);
     await expect(getScans()).resolves.toEqual([]);
     await expect(getFindings()).resolves.toEqual([]);
+  });
+
+  it("requests scans from the current workspace route", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getScans } = await importClient("https://api.example.test/", "owner-workspace");
+
+    await expect(getScans()).resolves.toEqual([]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.test/api/workspaces/owner-workspace/scans",
+      expect.objectContaining({ headers: { Accept: "application/json" } })
+    );
   });
 
   it("maps configured API reports when available", async () => {
@@ -212,7 +227,7 @@ describe("api client", () => {
       )
     );
     vi.stubGlobal("fetch", fetchMock);
-    const { createScan } = await importClient("https://api.example.test/");
+    const { createScan } = await importClient("https://api.example.test/", "owner-workspace");
 
     await expect(
       createScan({
@@ -231,7 +246,7 @@ describe("api client", () => {
       viewports: "Desktop"
     });
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://api.example.test/api/scans",
+      "https://api.example.test/api/workspaces/owner-workspace/scans",
       expect.objectContaining({
         body: JSON.stringify({
           projectId: "project-1",

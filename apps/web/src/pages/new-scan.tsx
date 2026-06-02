@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createProject, createScan } from "../api/client";
+import { createProject, createScan, currentWorkspaceSlug } from "../api/client";
 import { Button, Field, Icon, PageHeader, Panel, SelectInput, TextInput, Toggle } from "../design/ui";
 import type { Project } from "../data";
 import type { PageProps } from "./page-props";
@@ -47,7 +47,7 @@ export function NewScanPage({ project, projects, navigate, onSelectProject }: Pa
         maxPages,
         maxDepth: scanMode === "single_url" ? 0 : maxDepth,
         viewports: selectedViewports
-      });
+      }, currentWorkspaceSlug);
 
       return scan === null ? null : { project: scanProject, scan };
     },
@@ -58,7 +58,7 @@ export function NewScanPage({ project, projects, navigate, onSelectProject }: Pa
 
       onSelectProject(scan.project);
       void queryClient.invalidateQueries({ queryKey: ["projects"] });
-      void queryClient.invalidateQueries({ queryKey: ["scans"] });
+      void queryClient.invalidateQueries({ queryKey: ["scans", currentWorkspaceSlug] });
       void queryClient.invalidateQueries({ queryKey: ["findings"] });
       void queryClient.invalidateQueries({ queryKey: ["reports"] });
       navigate({ page: "scan-runs" });

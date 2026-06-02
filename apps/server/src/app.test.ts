@@ -607,10 +607,16 @@ describe("server", () => {
     expect(runner.get("job-2")?.status).toBe("completed");
   });
 
-  it("normalizes fractional local worker concurrency below one", async () => {
+  it.each([
+    0,
+    -1,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    0.5
+  ])("normalizes invalid local worker concurrency %s", async (maxConcurrentJobs) => {
     const started: string[] = [];
     const runner = new LocalJobRunner<{ label: string }>({
-      maxConcurrentJobs: 0.5,
+      maxConcurrentJobs,
       execute: (job) => {
         started.push(job.id);
       }
@@ -621,6 +627,27 @@ describe("server", () => {
 
     expect(started).toEqual(["job-1"]);
     expect(runner.get("job-1")?.status).toBe("completed");
+  });
+
+  it("continues draining queued local jobs after a failure", async () => {
+    const started: string[] = [];
+    const runner = new LocalJobRunner<{ label: string }>({
+      maxConcurrentJobs: 1,
+      execute: (job) => {
+        started.push(job.id);
+        if (job.id === "job-1") {
+          throw new Error("first failed");
+        }
+      }
+    });
+
+    runner.enqueue("job-1", { label: "first" });
+    runner.enqueue("job-2", { label: "second" });
+    await runner.waitForIdle();
+
+    expect(started).toEqual(["job-1", "job-2"]);
+    expect(runner.get("job-1")).toMatchObject({ status: "failed", error: "first failed" });
+    expect(runner.get("job-2")?.status).toBe("completed");
   });
 
   it("allows the local web UI origin", async () => {
