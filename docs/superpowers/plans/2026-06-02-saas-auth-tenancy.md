@@ -772,7 +772,7 @@ it("allows members to read and scan but rejects project creation", async () => {
 - Modify: `docs/wcag-22-coverage-guide.md`
 - Create: `docs/deployment.md`
 
-- [ ] Document the SaaS bootstrap flow:
+- [x] Document the SaaS bootstrap flow:
 
 ```text
 1. Start the server with an empty SQLite database.
@@ -781,7 +781,7 @@ it("allows members to read and scan but rejects project creation", async () => {
 4. After that, set A11YAUDIT_PUBLIC_SIGNUPS=true for open signup or invite users from a workspace.
 ```
 
-- [ ] Document environment variables:
+- [x] Document environment variables:
 
 ```text
 A11YAUDIT_PUBLIC_SIGNUPS=false
@@ -791,44 +791,46 @@ PORT=7842
 NODE_ENV=production
 ```
 
-- [ ] Document that CLI scans remain offline and account-free.
-- [ ] Document that old global web API endpoints are replaced by workspace-scoped endpoints.
-- [ ] Run: `rtk npm exec pnpm@9 -- build`
-- [ ] Commit: `git add README.md docs/deployment.md docs/wcag-22-coverage-guide.md && git commit -m "docs: document SaaS workspace deployment"`
+Implemented current env contract uses `A11YAUDIT_DB_PATH` for server startup, `A11YAUDIT_SERVER_URL` for the web API origin, and `A11YAUDIT_WEB_ORIGIN` for trusted browser origin checks. `DATABASE_URL` is documented as not the current server database setting.
+
+- [x] Document that CLI scans remain offline and account-free.
+- [x] Document that old global web API endpoints are replaced by workspace-scoped endpoints.
+- [x] Run: `rtk npm exec pnpm@9 -- build`
+- [x] Commit: `git add README.md docs/deployment.md docs/wcag-22-coverage-guide.md && git commit -m "docs: document SaaS workspace deployment"`
 
 ## Verification
 
-- [ ] Run server auth/unit tests:
+- [x] Run server auth/unit tests:
 
 ```bash
 rtk npm exec pnpm@9 -- test apps/server/src/auth/password.test.ts apps/server/src/auth/tokens.test.ts apps/server/src/auth/slug.test.ts apps/server/src/auth/session.test.ts
 ```
 
-- [ ] Run server integration tests:
+- [x] Run server integration tests:
 
 ```bash
 rtk npm exec pnpm@9 -- test apps/server/src/app.test.ts
 ```
 
-- [ ] Run web API/page tests:
+- [x] Run web API/page tests:
 
 ```bash
 rtk npm exec pnpm@9 -- test apps/web/src/api/client.test.ts apps/web/src/pages/auth.test.tsx apps/web/src/pages/scan-runs.test.ts apps/web/src/pages/reports.test.ts
 ```
 
-- [ ] Run full tests:
+- [x] Run full tests:
 
 ```bash
 rtk npm exec pnpm@9 -- test
 ```
 
-- [ ] Run typecheck:
+- [x] Run typecheck:
 
 ```bash
 rtk npm exec pnpm@9 -- typecheck
 ```
 
-- [ ] Run build:
+- [x] Run build:
 
 ```bash
 rtk npm exec pnpm@9 -- build
