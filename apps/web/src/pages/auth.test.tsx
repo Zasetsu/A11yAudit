@@ -131,7 +131,17 @@ async function renderApp() {
     );
   });
 
-  return { container, root };
+  return { container, queryClient, root };
+}
+
+type RenderedApp = Awaited<ReturnType<typeof renderApp>>;
+
+const dashboardQueryNames = new Set(["projects", "scans", "findings", "issues", "reports"]);
+
+function dashboardQueryKeys({ queryClient }: RenderedApp) {
+  return queryClient.getQueryCache().getAll()
+    .map((query) => query.queryKey)
+    .filter((queryKey) => dashboardQueryNames.has(String(queryKey[0])));
 }
 
 async function waitFor(assertion: () => void | Promise<void>) {
@@ -298,6 +308,38 @@ describe("auth routes", () => {
     await waitFor(() => expect(window.location.pathname).toBe("/workspaces"));
   });
 
+  it("does not instantiate workspace dashboard queries on public or workspace chooser routes", async () => {
+    mockSession(null);
+    const publicRoute = await renderApp();
+    roots.push(publicRoute.root);
+
+    await waitFor(() => expect(api.getSession).toHaveBeenCalled());
+    expect(dashboardQueryKeys(publicRoute)).toEqual([]);
+    expect(api.getProjects).not.toHaveBeenCalled();
+    expect(api.getScans).not.toHaveBeenCalled();
+    expect(api.getFindings).not.toHaveBeenCalled();
+    expect(api.fetchIssues).not.toHaveBeenCalled();
+    expect(api.getReports).not.toHaveBeenCalled();
+
+    await act(async () => publicRoute.root.unmount());
+    roots = roots.filter((root) => root !== publicRoute.root);
+    document.body.innerHTML = "";
+    vi.clearAllMocks();
+    setupQueryMocks();
+    setPath("/workspaces");
+    mockSession(multiWorkspaceSession);
+    const workspaceChooser = await renderApp();
+    roots.push(workspaceChooser.root);
+
+    await waitFor(() => expect(window.location.pathname).toBe("/workspaces"));
+    expect(dashboardQueryKeys(workspaceChooser)).toEqual([]);
+    expect(api.getProjects).not.toHaveBeenCalled();
+    expect(api.getScans).not.toHaveBeenCalled();
+    expect(api.getFindings).not.toHaveBeenCalled();
+    expect(api.fetchIssues).not.toHaveBeenCalled();
+    expect(api.getReports).not.toHaveBeenCalled();
+  });
+
   it("submits login and redirects to the workspace route", async () => {
     mockSession(null);
     api.login.mockResolvedValue(acmeSession);
@@ -452,10 +494,13 @@ describe("auth routes", () => {
     roots.push(rendered.root);
 
     await waitFor(() => expect(api.getProjects).toHaveBeenCalledWith("acme"));
+    expect(dashboardQueryKeys(rendered).some((queryKey) => queryKey[1] === null || queryKey[1] === "")).toBe(false);
+    expect(dashboardQueryKeys(rendered)).toContainEqual(["projects", "acme"]);
     await clickButtonContaining(rendered.container, "/acme");
     await clickButtonContaining(rendered.container, "/beta");
 
     await waitFor(() => expect(window.location.pathname).toBe("/w/beta/projects"));
     await waitFor(() => expect(api.getProjects).toHaveBeenCalledWith("beta"));
+    expect(dashboardQueryKeys(rendered)).toContainEqual(["projects", "beta"]);
   });
 });

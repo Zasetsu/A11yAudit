@@ -84,14 +84,6 @@ function workspaceIsAllowed(session: AuthSession | null | undefined, workspaceSl
   return session?.workspaces.some((workspace) => workspace.slug === workspaceSlug) ?? false;
 }
 
-function requireWorkspaceSlug(workspaceSlug: string | null): string {
-  if (workspaceSlug === null) {
-    throw new Error("Dashboard data queries require a workspace route.");
-  }
-
-  return workspaceSlug;
-}
-
 function safeDecodePathPart(value: string): string | null {
   try {
     return decodeURIComponent(value);
@@ -170,41 +162,39 @@ function DocsPage() {
   );
 }
 
-export function App() {
-  const [appRoute, setAppRoute] = useState<AppRoute>(() => parsePath(window.location.pathname));
-  const [authenticatedSession, setAuthenticatedSession] = useState<AuthSession | null>(null);
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    const storage = globalThis.localStorage;
-    const saved = typeof storage?.getItem === "function" ? storage.getItem("a11yaudit-theme") : null;
-    return saved === "dark" ? "dark" : "light";
-  });
-  const contentRef = useRef<HTMLElement>(null);
-  const sessionQuery = useQuery({
-    queryKey: ["auth-session"],
-    queryFn: getSession
-  });
-  const session: AuthSession | null = authenticatedSession ?? sessionQuery.data ?? null;
-  const sessionLoaded = !sessionQuery.isLoading;
-  const currentWorkspaceSlug = isWorkspaceRoute(appRoute) ? appRoute.workspaceSlug : null;
-  const currentWorkspace = session?.workspaces.find((workspace) => workspace.slug === currentWorkspaceSlug) ?? null;
-  const hasWorkspaceAccess = currentWorkspaceSlug !== null && workspaceIsAllowed(session, currentWorkspaceSlug);
-  const dashboardQueriesEnabled = sessionLoaded && session !== null && hasWorkspaceAccess && currentWorkspaceSlug !== null;
+type WorkspaceSession = AuthSession["workspaces"][number];
+type SetBrowserRoute = (nextRoute: AppRoute, mode?: "push" | "replace") => void;
 
+function DashboardApp({
+  appRoute,
+  currentWorkspace,
+  currentWorkspaceSlug,
+  session,
+  setBrowserRoute,
+  theme,
+  setTheme
+}: {
+  appRoute: Route & { workspaceSlug: string };
+  currentWorkspace: WorkspaceSession;
+  currentWorkspaceSlug: string;
+  session: AuthSession;
+  setBrowserRoute: SetBrowserRoute;
+  theme: "light" | "dark";
+  setTheme: (setValue: (value: "light" | "dark") => "light" | "dark") => void;
+}) {
+  const contentRef = useRef<HTMLElement>(null);
   const projectsQuery = useQuery({
     queryKey: ["projects", currentWorkspaceSlug],
-    queryFn: () => getProjects(requireWorkspaceSlug(currentWorkspaceSlug)),
-    enabled: dashboardQueriesEnabled
+    queryFn: () => getProjects(currentWorkspaceSlug)
   });
   const scansQuery = useQuery({
     queryKey: ["scans", currentWorkspaceSlug],
-    queryFn: () => getScans(requireWorkspaceSlug(currentWorkspaceSlug)),
-    enabled: dashboardQueriesEnabled,
+    queryFn: () => getScans(currentWorkspaceSlug),
     refetchInterval: (query) => (hasActiveScans(query.state.data) ? 2_000 : false)
   });
   const findingsQuery = useQuery({
     queryKey: ["findings", currentWorkspaceSlug],
-    queryFn: () => getFindings(requireWorkspaceSlug(currentWorkspaceSlug)),
-    enabled: dashboardQueriesEnabled
+    queryFn: () => getFindings(currentWorkspaceSlug)
   });
   const projects = projectsQuery.data ?? [activeProject()];
   const [selectedProjectId, setSelectedProjectId] = useState<string>(activeProject().id);
@@ -216,83 +206,18 @@ export function App() {
   const issuesQuery = useQuery({
     queryKey: ["issues", currentWorkspaceSlug, selectedProject.id, selectedScan?.id ?? null],
     queryFn: () => fetchIssues(
-      requireWorkspaceSlug(currentWorkspaceSlug),
+      currentWorkspaceSlug,
       selectedScan === undefined
         ? { projectId: selectedProject.id }
         : { projectId: selectedProject.id, scanRunId: selectedScan.id }
     ),
-    enabled: dashboardQueriesEnabled,
     refetchInterval: hasActiveScans(scansQuery.data) ? 3_000 : false
   });
   const reportsQuery = useQuery({
     queryKey: ["reports", currentWorkspaceSlug],
-    queryFn: () => getReports(requireWorkspaceSlug(currentWorkspaceSlug)),
-    enabled: dashboardQueriesEnabled,
+    queryFn: () => getReports(currentWorkspaceSlug),
     refetchInterval: hasActiveScans(scansQuery.data) ? 2_000 : false
   });
-
-  const setBrowserRoute = useCallback((nextRoute: AppRoute, mode: "push" | "replace" = "push") => {
-    setAppRoute(nextRoute);
-    const nextPath = routePath(nextRoute);
-    if (window.location.pathname !== nextPath) {
-      if (mode === "replace") {
-        window.history.replaceState(null, "", nextPath);
-      } else {
-        window.history.pushState(null, "", nextPath);
-      }
-    }
-  }, []);
-
-  const routeAfterAuth = useCallback((nextSession: AuthSession) => {
-    setAuthenticatedSession(nextSession);
-    setBrowserRoute(destinationForSession(nextSession), "replace");
-  }, [setBrowserRoute]);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    const storage = globalThis.localStorage;
-    if (typeof storage?.setItem === "function") {
-      storage.setItem("a11yaudit-theme", theme);
-    }
-  }, [theme]);
-
-  useEffect(() => {
-    function onPopState() {
-      setAppRoute(parsePath(window.location.pathname));
-    }
-
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, []);
-
-  useEffect(() => {
-    if (!sessionLoaded) return;
-
-    if (isWorkspaceRoute(appRoute)) {
-      if (session === null) {
-        setBrowserRoute({ page: "login" }, "replace");
-        return;
-      }
-
-      if (!workspaceIsAllowed(session, appRoute.workspaceSlug)) {
-        setBrowserRoute({ page: "workspaces" }, "replace");
-      }
-      return;
-    }
-
-    if (appRoute.page === "workspaces") {
-      if (session === null) {
-        setBrowserRoute({ page: "login" }, "replace");
-      } else if (session.workspaces.length === 1) {
-        setBrowserRoute(destinationForSession(session), "replace");
-      }
-      return;
-    }
-
-    if (session !== null) {
-      setBrowserRoute(destinationForSession(session), "replace");
-    }
-  }, [appRoute, session, sessionLoaded, setBrowserRoute]);
 
   useEffect(() => {
     if (!projects.some((project) => project.id === selectedProjectId) && projects[0] !== undefined) {
@@ -301,47 +226,12 @@ export function App() {
   }, [projects, selectedProjectId]);
 
   const navigate = useCallback<Navigate>((nextRoute) => {
-    if (currentWorkspaceSlug !== null) {
-      setBrowserRoute({ ...nextRoute, workspaceSlug: currentWorkspaceSlug });
-    }
+    setBrowserRoute({ ...nextRoute, workspaceSlug: currentWorkspaceSlug });
     contentRef.current?.scrollTo({ top: 0 });
   }, [currentWorkspaceSlug, setBrowserRoute]);
 
   const onSelectProject = useCallback((project: Project) => setSelectedProjectId(project.id), []);
-
-  if (!sessionLoaded) {
-    return (
-      <main aria-label="Main content" className="content auth-content">
-        <div className="content-inner fadein">
-          <Panel title="Loading">Preparing your session.</Panel>
-        </div>
-      </main>
-    );
-  }
-
-  if (appRoute.page === "login") {
-    return <LoginPage onAuthenticated={routeAfterAuth} />;
-  }
-
-  if (appRoute.page === "signup") {
-    return <SignupPage onAuthenticated={routeAfterAuth} />;
-  }
-
-  if (appRoute.page === "invite") {
-    return <InvitePage onAuthenticated={routeAfterAuth} token={appRoute.token} />;
-  }
-
-  if (appRoute.page === "workspaces") {
-    if (session === null) return null;
-    return <WorkspacesPage onSelectWorkspace={(slug) => setBrowserRoute({ page: "projects", workspaceSlug: slug })} session={session} />;
-  }
-
-  if (session === null || currentWorkspaceSlug === null || currentWorkspace === null || !hasWorkspaceAccess) {
-    return null;
-  }
-
   const route = dashboardRoute(appRoute);
-
   const common = {
     workspaceSlug: currentWorkspaceSlug,
     workspaceRole: currentWorkspace.role,
@@ -413,5 +303,130 @@ export function App() {
         </main>
       </div>
     </div>
+  );
+}
+
+export function App() {
+  const [appRoute, setAppRoute] = useState<AppRoute>(() => parsePath(window.location.pathname));
+  const [authenticatedSession, setAuthenticatedSession] = useState<AuthSession | null>(null);
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    const storage = globalThis.localStorage;
+    const saved = typeof storage?.getItem === "function" ? storage.getItem("a11yaudit-theme") : null;
+    return saved === "dark" ? "dark" : "light";
+  });
+  const sessionQuery = useQuery({
+    queryKey: ["auth-session"],
+    queryFn: getSession
+  });
+  const session: AuthSession | null = authenticatedSession ?? sessionQuery.data ?? null;
+  const sessionLoaded = !sessionQuery.isLoading;
+  const currentWorkspaceSlug = isWorkspaceRoute(appRoute) ? appRoute.workspaceSlug : null;
+  const currentWorkspace = session?.workspaces.find((workspace) => workspace.slug === currentWorkspaceSlug) ?? null;
+  const hasWorkspaceAccess = currentWorkspaceSlug !== null && workspaceIsAllowed(session, currentWorkspaceSlug);
+
+  const setBrowserRoute = useCallback((nextRoute: AppRoute, mode: "push" | "replace" = "push") => {
+    setAppRoute(nextRoute);
+    const nextPath = routePath(nextRoute);
+    if (window.location.pathname !== nextPath) {
+      if (mode === "replace") {
+        window.history.replaceState(null, "", nextPath);
+      } else {
+        window.history.pushState(null, "", nextPath);
+      }
+    }
+  }, []);
+
+  const routeAfterAuth = useCallback((nextSession: AuthSession) => {
+    setAuthenticatedSession(nextSession);
+    setBrowserRoute(destinationForSession(nextSession), "replace");
+  }, [setBrowserRoute]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    const storage = globalThis.localStorage;
+    if (typeof storage?.setItem === "function") {
+      storage.setItem("a11yaudit-theme", theme);
+    }
+  }, [theme]);
+
+  useEffect(() => {
+    function onPopState() {
+      setAppRoute(parsePath(window.location.pathname));
+    }
+
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  useEffect(() => {
+    if (!sessionLoaded) return;
+
+    if (isWorkspaceRoute(appRoute)) {
+      if (session === null) {
+        setBrowserRoute({ page: "login" }, "replace");
+        return;
+      }
+
+      if (!workspaceIsAllowed(session, appRoute.workspaceSlug)) {
+        setBrowserRoute({ page: "workspaces" }, "replace");
+      }
+      return;
+    }
+
+    if (appRoute.page === "workspaces") {
+      if (session === null) {
+        setBrowserRoute({ page: "login" }, "replace");
+      } else if (session.workspaces.length === 1) {
+        setBrowserRoute(destinationForSession(session), "replace");
+      }
+      return;
+    }
+
+    if (session !== null) {
+      setBrowserRoute(destinationForSession(session), "replace");
+    }
+  }, [appRoute, session, sessionLoaded, setBrowserRoute]);
+
+  if (!sessionLoaded) {
+    return (
+      <main aria-label="Main content" className="content auth-content">
+        <div className="content-inner fadein">
+          <Panel title="Loading">Preparing your session.</Panel>
+        </div>
+      </main>
+    );
+  }
+
+  if (appRoute.page === "login") {
+    return <LoginPage onAuthenticated={routeAfterAuth} />;
+  }
+
+  if (appRoute.page === "signup") {
+    return <SignupPage onAuthenticated={routeAfterAuth} />;
+  }
+
+  if (appRoute.page === "invite") {
+    return <InvitePage onAuthenticated={routeAfterAuth} token={appRoute.token} />;
+  }
+
+  if (appRoute.page === "workspaces") {
+    if (session === null) return null;
+    return <WorkspacesPage onSelectWorkspace={(slug) => setBrowserRoute({ page: "projects", workspaceSlug: slug })} session={session} />;
+  }
+
+  if (!isWorkspaceRoute(appRoute) || session === null || currentWorkspaceSlug === null || currentWorkspace === null || !hasWorkspaceAccess) {
+    return null;
+  }
+
+  return (
+    <DashboardApp
+      appRoute={appRoute}
+      currentWorkspace={currentWorkspace}
+      currentWorkspaceSlug={currentWorkspaceSlug}
+      session={session}
+      setBrowserRoute={setBrowserRoute}
+      setTheme={setTheme}
+      theme={theme}
+    />
   );
 }
