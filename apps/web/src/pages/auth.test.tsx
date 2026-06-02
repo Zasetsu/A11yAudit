@@ -71,6 +71,13 @@ const betaProject = project({
   domain: "beta.example.test"
 });
 
+const newProject = project({
+  id: "project-new",
+  name: "New Portal",
+  url: "https://new.example.test/",
+  domain: "new.example.test"
+});
+
 function setPath(pathname: string) {
   window.history.replaceState(null, "", pathname);
 }
@@ -157,7 +164,8 @@ async function fillInput(container: HTMLElement, label: string, value: string) {
   });
 
   await act(async () => {
-    input!.value = value;
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    valueSetter?.call(input, value);
     input!.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
@@ -173,6 +181,22 @@ async function inputValue(container: HTMLElement, label: string): Promise<string
   });
 
   return input!.value;
+}
+
+async function selectOption(container: HTMLElement, label: string, value: string) {
+  let select: HTMLSelectElement | null | undefined;
+
+  await waitFor(() => {
+    select = Array.from(container.querySelectorAll("label")).find((candidate) =>
+      candidate.textContent?.includes(label)
+    )?.querySelector("select");
+    expect(select).toBeTruthy();
+  });
+
+  await act(async () => {
+    select!.value = value;
+    select!.dispatchEvent(new Event("change", { bubbles: true }));
+  });
 }
 
 async function routeTo(pathname: string) {
@@ -383,6 +407,39 @@ describe("auth routes", () => {
       expect(actionSelect?.value).toBe("existing");
       expect(Array.from(actionSelect?.querySelectorAll("option") ?? []).some((option) => option.value === "new")).toBe(false);
     });
+
+    await clickButton(rendered.container, "Start Scan");
+
+    await waitFor(() => expect(api.createScan).toHaveBeenCalledWith("acme", expect.objectContaining({
+      projectId: acmeProject.id,
+      url: acmeProject.url
+    })));
+    expect(api.createProject).not.toHaveBeenCalled();
+  });
+
+  it("owners can create a project and start a scan from the new scan page", async () => {
+    setPath("/w/acme/new-scan");
+    mockSession(acmeSession);
+    api.getProjects.mockResolvedValue([acmeProject]);
+    api.createProject.mockResolvedValue(newProject);
+    const rendered = await renderApp();
+    roots.push(rendered.root);
+
+    await waitFor(async () => expect(await inputValue(rendered.container, "Public URL")).toBe(acmeProject.url));
+    await selectOption(rendered.container, "Project action", "new");
+    await fillInput(rendered.container, "Project name", newProject.name);
+    await fillInput(rendered.container, "Public URL", newProject.url);
+    await clickButton(rendered.container, "Start Scan");
+
+    await waitFor(() => expect(api.createProject).toHaveBeenCalledWith("acme", {
+      name: newProject.name,
+      url: newProject.url
+    }));
+    await waitFor(() => expect(api.createScan).toHaveBeenCalledWith("acme", expect.objectContaining({
+      projectId: newProject.id,
+      url: newProject.url
+    })));
+    expect(api.createProject.mock.invocationCallOrder[0]).toBeLessThan(api.createScan.mock.invocationCallOrder[0]);
   });
 
   it("switches workspaces from the top bar and scopes API calls to the selected workspace", async () => {
