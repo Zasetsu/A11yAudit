@@ -1,6 +1,6 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildServer } from "./app.js";
 import { csrfCookieName, sessionCookieName } from "./auth/cookies.js";
@@ -517,6 +517,45 @@ async function listFindings(
   });
 }
 
+async function listReports(
+  app: Awaited<ReturnType<typeof buildServer>>,
+  signedIn: SignedInResponse,
+  query = "",
+  workspaceSlug = primaryWorkspaceSlug(signedIn)
+) {
+  return app.inject({
+    method: "GET",
+    url: `/api/workspaces/${workspaceSlug}/reports${query}`,
+    cookies: authCookies(signedIn)
+  });
+}
+
+async function downloadReport(
+  app: Awaited<ReturnType<typeof buildServer>>,
+  signedIn: SignedInResponse,
+  reportId: string,
+  workspaceSlug = primaryWorkspaceSlug(signedIn)
+) {
+  return app.inject({
+    method: "GET",
+    url: `/api/workspaces/${workspaceSlug}/reports/${reportId}/download`,
+    cookies: authCookies(signedIn)
+  });
+}
+
+async function downloadArtifact(
+  app: Awaited<ReturnType<typeof buildServer>>,
+  signedIn: SignedInResponse,
+  key: string,
+  workspaceSlug = primaryWorkspaceSlug(signedIn)
+) {
+  return app.inject({
+    method: "GET",
+    url: `/api/workspaces/${workspaceSlug}/artifacts/download?key=${encodeURIComponent(key)}`,
+    cookies: authCookies(signedIn)
+  });
+}
+
 async function startScan(
   app: Awaited<ReturnType<typeof buildServer>>,
   signedIn: SignedInResponse,
@@ -617,6 +656,26 @@ function findingFixture(overrides: Partial<typeof findings.$inferInsert> = {}): 
     createdAt: "2026-05-31T00:00:01.000Z",
     ...overrides
   };
+}
+
+function reportFixture(overrides: Partial<typeof reports.$inferInsert> = {}): typeof reports.$inferInsert {
+  return {
+    id: "report-fixture",
+    projectId: "project-fixture",
+    scanRunId: "run-fixture",
+    kind: "pdf",
+    artifactKey: "runs/run-fixture/report/audit-report.pdf",
+    mimeType: "application/pdf",
+    sizeBytes: 100,
+    createdAt: "2026-05-31T00:00:01.000Z",
+    ...overrides
+  };
+}
+
+async function writeStoredArtifact(storageRoot: string, key: string, body: Buffer | string): Promise<void> {
+  const path = join(storageRoot, key);
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, body);
 }
 
 afterEach(() => {
@@ -2341,26 +2400,17 @@ describe("server", () => {
           { kind: "html_snippet", mimeType: "text/plain" }
         ]);
 
-        const reportsResponse = await app.inject({
-          method: "GET",
-          url: `/api/reports?scanRunId=${scan.json().id}`
-        });
+        const reportsResponse = await listReports(app, owner, `?scanRunId=${scan.json().id}`);
         expect(reportsResponse.statusCode).toBe(200);
         const pdfReport = reportsResponse.json().data.find((report: { kind: string }) => report.kind === "pdf");
         expect(pdfReport).toBeDefined();
 
-        const download = await app.inject({
-          method: "GET",
-          url: `/api/reports/${pdfReport.id}/download`
-        });
+        const download = await downloadReport(app, owner, pdfReport.id);
         expect(download.statusCode).toBe(200);
         expect(download.headers["content-type"]).toContain("application/pdf");
 
         const screenshotKey = JSON.parse(findingsResponse.json().data[0].evidence)[0].artifactKey;
-        const screenshotDownload = await app.inject({
-          method: "GET",
-          url: `/api/artifacts/download?key=${encodeURIComponent(screenshotKey)}`
-        });
+        const screenshotDownload = await downloadArtifact(app, owner, screenshotKey);
         expect(screenshotDownload.statusCode).toBe(200);
         expect(screenshotDownload.headers["content-type"]).toContain("image/png");
       } finally {
@@ -2392,10 +2442,7 @@ describe("server", () => {
           "PDF report failed: page.pdf: Protocol error (Page.printToPDF): Printing failed"
         );
 
-        const reportsResponse = await app.inject({
-          method: "GET",
-          url: `/api/reports?scanRunId=${scan.json().id}`
-        });
+        const reportsResponse = await listReports(app, owner, `?scanRunId=${scan.json().id}`);
         expect(reportsResponse.statusCode).toBe(200);
         expect(reportsResponse.json().data.map((report: { kind: string }) => report.kind)).toEqual(["html"]);
       } finally {
@@ -2498,6 +2545,27 @@ describe("server", () => {
     }
   });
 
+  it("returns 404 for old global report and artifact routes", async () => {
+    const dbClient = createDb(":memory:");
+    const app = await buildServer({ dbClient, executeScans: false });
+
+    try {
+      const reportsList = await app.inject({ method: "GET", url: "/api/reports" });
+      const reportDownload = await app.inject({ method: "GET", url: "/api/reports/report-fixture/download" });
+      const artifactDownload = await app.inject({
+        method: "GET",
+        url: `/api/artifacts/download?key=${encodeURIComponent("runs/run-1/screenshot/page.png")}`
+      });
+
+      expect(reportsList.statusCode).toBe(404);
+      expect(reportDownload.statusCode).toBe(404);
+      expect(artifactDownload.statusCode).toBe(404);
+    } finally {
+      await app.close();
+      dbClient.close();
+    }
+  });
+
   it("requires authentication for scoped issue and finding routes", async () => {
     const dbClient = createDb(":memory:");
     const app = await buildServer({ dbClient, executeScans: false });
@@ -2510,6 +2578,27 @@ describe("server", () => {
       expect(issuesList.statusCode).toBe(401);
       expect(issueDetail.statusCode).toBe(401);
       expect(findingsList.statusCode).toBe(401);
+    } finally {
+      await app.close();
+      dbClient.close();
+    }
+  });
+
+  it("requires authentication for scoped report and artifact routes", async () => {
+    const dbClient = createDb(":memory:");
+    const app = await buildServer({ dbClient, executeScans: false });
+
+    try {
+      const reportsList = await app.inject({ method: "GET", url: "/api/workspaces/acme/reports" });
+      const reportDownload = await app.inject({ method: "GET", url: "/api/workspaces/acme/reports/report-fixture/download" });
+      const artifactDownload = await app.inject({
+        method: "GET",
+        url: `/api/workspaces/acme/artifacts/download?key=${encodeURIComponent("runs/run-1/screenshot/page.png")}`
+      });
+
+      expect(reportsList.statusCode).toBe(401);
+      expect(reportDownload.statusCode).toBe(401);
+      expect(artifactDownload.statusCode).toBe(401);
     } finally {
       await app.close();
       dbClient.close();
@@ -2532,6 +2621,28 @@ describe("server", () => {
       expect(issuesList.statusCode).toBe(404);
       expect(issueDetail.statusCode).toBe(404);
       expect(findingsList.statusCode).toBe(404);
+    } finally {
+      await app.close();
+      dbClient.close();
+    }
+  });
+
+  it("returns 404 for nonmember scoped report and artifact routes", async () => {
+    const dbClient = createDb(":memory:");
+    const app = await buildServer({ dbClient, executeScans: false });
+
+    try {
+      const owner = await signup(app, "owner@example.com", "Owner Workspace");
+      const nonmember = await signupWithPublicSignup(app, "outsider@example.com", "Outsider Workspace");
+      const workspaceSlug = primaryWorkspaceSlug(owner);
+
+      const reportsList = await listReports(app, nonmember, "", workspaceSlug);
+      const reportDownload = await downloadReport(app, nonmember, "report-fixture", workspaceSlug);
+      const artifactDownload = await downloadArtifact(app, nonmember, "runs/run-1/screenshot/page.png", workspaceSlug);
+
+      expect(reportsList.statusCode).toBe(404);
+      expect(reportDownload.statusCode).toBe(404);
+      expect(artifactDownload.statusCode).toBe(404);
     } finally {
       await app.close();
       dbClient.close();
@@ -2870,6 +2981,249 @@ describe("server", () => {
     }
   });
 
+  it("allows unfiltered reports inside a workspace without leaking other workspaces", async () => {
+    const dbClient = createDb(":memory:");
+    const app = await buildServer({ dbClient, executeScans: false });
+
+    try {
+      const owner = await signup(app, "owner@example.com", "Owner Workspace");
+      const otherOwner = await signupWithPublicSignup(app, "other@example.com", "Other Workspace");
+      const project = await createProject(app, owner, "Project A", "https://report-a.example.com");
+      const otherProject = await createProject(app, otherOwner, "Project B", "https://report-b.example.com");
+      const scan = await startScan(app, owner, project.json().id, { url: "https://report-a.example.com" });
+      const otherScan = await startScan(app, otherOwner, otherProject.json().id, { url: "https://report-b.example.com" });
+
+      dbClient.db.insert(reports).values([
+        reportFixture({
+          id: "report-workspace-a",
+          projectId: project.json().id,
+          scanRunId: scan.json().id,
+          artifactKey: "runs/report-workspace-a/report.pdf"
+        }),
+        reportFixture({
+          id: "report-workspace-b",
+          projectId: otherProject.json().id,
+          scanRunId: otherScan.json().id,
+          artifactKey: "runs/report-workspace-b/report.pdf"
+        })
+      ]).run();
+
+      const response = await listReports(app, owner);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().data).toHaveLength(1);
+      expect(response.json().data[0]).toMatchObject({
+        id: "report-workspace-a",
+        projectName: "Project A"
+      });
+    } finally {
+      await app.close();
+      dbClient.close();
+    }
+  });
+
+  it("applies project and scan filters for reports inside a workspace", async () => {
+    const dbClient = createDb(":memory:");
+    const app = await buildServer({ dbClient, executeScans: false });
+
+    try {
+      const owner = await signup(app, "owner@example.com", "Owner Workspace");
+      const projectA = await createProject(app, owner, "Project A", "https://report-filter-a.example.com");
+      const projectB = await createProject(app, owner, "Project B", "https://report-filter-b.example.com");
+      const scanA = await startScan(app, owner, projectA.json().id, { url: "https://report-filter-a.example.com" });
+      const scanB = await startScan(app, owner, projectB.json().id, { url: "https://report-filter-b.example.com" });
+
+      dbClient.db.insert(reports).values([
+        reportFixture({
+          id: "report-project-a",
+          projectId: projectA.json().id,
+          scanRunId: scanA.json().id,
+          artifactKey: "runs/report-project-a/report.pdf"
+        }),
+        reportFixture({
+          id: "report-project-b",
+          projectId: projectB.json().id,
+          scanRunId: scanB.json().id,
+          artifactKey: "runs/report-project-b/report.pdf"
+        })
+      ]).run();
+
+      const projectOnly = await listReports(app, owner, `?projectId=${projectA.json().id}`);
+      const match = await listReports(app, owner, `?projectId=${projectA.json().id}&scanRunId=${scanA.json().id}`);
+      const mismatch = await listReports(app, owner, `?projectId=${projectA.json().id}&scanRunId=${scanB.json().id}`);
+
+      expect(projectOnly.statusCode).toBe(200);
+      expect(projectOnly.json().data).toHaveLength(1);
+      expect(projectOnly.json().data[0]).toMatchObject({ id: "report-project-a" });
+      expect(match.statusCode).toBe(200);
+      expect(match.json().data).toHaveLength(1);
+      expect(match.json().data[0]).toMatchObject({ id: "report-project-a" });
+      expect(mismatch.statusCode).toBe(200);
+      expect(mismatch.json().data).toEqual([]);
+    } finally {
+      await app.close();
+      dbClient.close();
+    }
+  });
+
+  it("allows workspace owners and members to list and download reports and artifacts", async () => {
+    const dbClient = createDb(":memory:");
+    const storageRoot = join(tmpdir(), "a11yaudit-scoped-artifacts-readable");
+    const app = await buildServer({ dbClient, executeScans: false, storageRoot });
+
+    try {
+      const owner = await signup(app, "owner@example.com", "Owner Workspace");
+      const workspaceSlug = primaryWorkspaceSlug(owner);
+      const project = await createProject(app, owner, "Readable", "https://readable.example.com", workspaceSlug);
+      const scan = await startScan(app, owner, project.json().id, { url: "https://readable.example.com" }, workspaceSlug);
+      const invite = await createWorkspaceInvite(app, authCookies(owner), workspaceSlug, "member@example.com");
+      const member = await acceptWorkspaceInvite(app, invite, "member@example.com");
+
+      await writeStoredArtifact(storageRoot, "runs/readable/report.pdf", "%PDF-1.4\n");
+      await writeStoredArtifact(storageRoot, "runs/readable/screenshot.png", "png");
+      await writeStoredArtifact(storageRoot, "runs/readable/snippet.txt", "snippet");
+      dbClient.db.insert(reports).values(reportFixture({
+        id: "report-readable",
+        projectId: project.json().id,
+        scanRunId: scan.json().id,
+        artifactKey: "runs/readable/report.pdf",
+        sizeBytes: 9
+      })).run();
+      dbClient.db.insert(findings).values(findingFixture({
+        id: "finding-readable",
+        projectId: project.json().id,
+        scanRunId: scan.json().id,
+        evidence: JSON.stringify([
+          { kind: "page_screenshot", artifactKey: "runs/readable/screenshot.png", mimeType: "image/png" },
+          { kind: "html_snippet", artifactKey: "runs/readable/snippet.txt", mimeType: "text/plain" }
+        ])
+      })).run();
+
+      const ownerList = await listReports(app, owner, "", workspaceSlug);
+      const memberList = await listReports(app, member, "", workspaceSlug);
+      const reportDownload = await downloadReport(app, member, "report-readable", workspaceSlug);
+      const screenshotDownload = await downloadArtifact(app, member, "runs/readable/screenshot.png", workspaceSlug);
+      const snippetDownload = await downloadArtifact(app, owner, "runs/readable/snippet.txt", workspaceSlug);
+
+      expect(ownerList.statusCode).toBe(200);
+      expect(ownerList.json().data).toHaveLength(1);
+      expect(memberList.statusCode).toBe(200);
+      expect(memberList.json().data).toHaveLength(1);
+      expect(reportDownload.statusCode).toBe(200);
+      expect(reportDownload.headers["content-type"]).toContain("application/pdf");
+      expect(screenshotDownload.statusCode).toBe(200);
+      expect(screenshotDownload.headers["content-type"]).toContain("image/png");
+      expect(snippetDownload.statusCode).toBe(200);
+      expect(snippetDownload.headers["content-type"]).toContain("text/plain");
+    } finally {
+      await app.close();
+      dbClient.close();
+      await rm(storageRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("returns 404 for report downloads outside the current workspace", async () => {
+    const dbClient = createDb(":memory:");
+    const storageRoot = join(tmpdir(), "a11yaudit-report-cross-workspace");
+    const app = await buildServer({ dbClient, executeScans: false, storageRoot });
+
+    try {
+      const owner = await signup(app, "owner@example.com", "Owner Workspace");
+      const otherOwner = await signupWithPublicSignup(app, "other@example.com", "Other Workspace");
+      const project = await createProject(app, owner, "Project A", "https://report-current.example.com");
+      const otherProject = await createProject(app, otherOwner, "Project B", "https://report-other.example.com");
+      await startScan(app, owner, project.json().id, { url: "https://report-current.example.com" });
+      const otherScan = await startScan(app, otherOwner, otherProject.json().id, { url: "https://report-other.example.com" });
+      await writeStoredArtifact(storageRoot, "runs/other/report.pdf", "%PDF-1.4\n");
+      dbClient.db.insert(reports).values(reportFixture({
+        id: "report-other-workspace",
+        projectId: otherProject.json().id,
+        scanRunId: otherScan.json().id,
+        artifactKey: "runs/other/report.pdf"
+      })).run();
+
+      const response = await downloadReport(app, owner, "report-other-workspace");
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({ error: "Report not found" });
+    } finally {
+      await app.close();
+      dbClient.close();
+      await rm(storageRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("returns 404 for artifact downloads outside the current workspace", async () => {
+    const dbClient = createDb(":memory:");
+    const storageRoot = join(tmpdir(), "a11yaudit-artifact-cross-workspace");
+    const app = await buildServer({ dbClient, executeScans: false, storageRoot });
+
+    try {
+      const owner = await signup(app, "owner@example.com", "Owner Workspace");
+      const otherOwner = await signupWithPublicSignup(app, "other@example.com", "Other Workspace");
+      const project = await createProject(app, owner, "Project A", "https://artifact-current.example.com");
+      const otherProject = await createProject(app, otherOwner, "Project B", "https://artifact-other.example.com");
+      const scan = await startScan(app, owner, project.json().id, { url: "https://artifact-current.example.com" });
+      const otherScan = await startScan(app, otherOwner, otherProject.json().id, { url: "https://artifact-other.example.com" });
+      await writeStoredArtifact(storageRoot, "runs/other/screenshot.png", "png");
+      dbClient.db.insert(findings).values([
+        findingFixture({
+          id: "finding-malformed-evidence",
+          projectId: project.json().id,
+          scanRunId: scan.json().id,
+          evidence: "not-json"
+        }),
+        findingFixture({
+          id: "finding-other-artifact",
+          projectId: otherProject.json().id,
+          scanRunId: otherScan.json().id,
+          evidence: JSON.stringify([{ artifactKey: "runs/other/screenshot.png" }])
+        })
+      ]).run();
+
+      const response = await downloadArtifact(app, owner, "runs/other/screenshot.png");
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({ error: "Artifact not found" });
+    } finally {
+      await app.close();
+      dbClient.close();
+      await rm(storageRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("returns 404 for unreferenced and missing scoped artifacts", async () => {
+    const dbClient = createDb(":memory:");
+    const app = await buildServer({
+      dbClient,
+      executeScans: false,
+      storageRoot: join(tmpdir(), "a11yaudit-scoped-unreferenced-artifacts")
+    });
+
+    try {
+      const owner = await signup(app, "owner@example.com", "Owner Workspace");
+      const project = await createProject(app, owner, "Portal", "https://portal-artifacts.example.gov");
+      const scan = await startScan(app, owner, project.json().id, { url: "https://portal-artifacts.example.gov/start" });
+      dbClient.db.insert(findings).values(findingFixture({
+        id: "finding-missing-artifact",
+        projectId: project.json().id,
+        scanRunId: scan.json().id,
+        evidence: JSON.stringify([{ artifactKey: "missing/evidence.png" }])
+      })).run();
+
+      const unreferenced = await downloadArtifact(app, owner, "runs/run-1/screenshot/unreferenced.png");
+      const missing = await downloadArtifact(app, owner, "missing/evidence.png");
+
+      expect(unreferenced.statusCode).toBe(404);
+      expect(unreferenced.json()).toEqual({ error: "Artifact not found" });
+      expect(missing.statusCode).toBe(404);
+      expect(missing.json()).toEqual({ error: "Artifact not found" });
+    } finally {
+      await app.close();
+      dbClient.close();
+    }
+  });
+
   it("defaults malformed stored issue sample URLs to an empty array in list and detail", async () => {
     const dbClient = createDb(":memory:");
     const app = await buildServer({ dbClient, executeScans: false });
@@ -2942,10 +3296,8 @@ describe("server", () => {
     });
 
     try {
-      const response = await app.inject({
-        method: "GET",
-        url: `/api/artifacts/download?key=${encodeURIComponent("runs/run-1/screenshot/unreferenced.png")}`
-      });
+      const owner = await signup(app, "owner@example.com", "Owner Workspace");
+      const response = await downloadArtifact(app, owner, "runs/run-1/screenshot/unreferenced.png");
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toEqual({ error: "Artifact not found" });
@@ -2981,10 +3333,7 @@ describe("server", () => {
         createdAt: new Date().toISOString()
       }).run();
 
-      const response = await app.inject({
-        method: "GET",
-        url: "/api/reports/report-missing-artifact/download"
-      });
+      const response = await downloadReport(app, owner, "report-missing-artifact");
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toEqual({ error: "Report artifact not found" });
