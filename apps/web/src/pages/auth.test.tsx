@@ -6,9 +6,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App, parsePath } from "../app";
 import type { AuthSession } from "../api/client";
+import type { Project, ScanRun } from "../data";
 
 const api = vi.hoisted(() => ({
   acceptInvite: vi.fn(),
+  createProject: vi.fn(),
+  createScan: vi.fn(),
   fetchIssues: vi.fn(),
   getFindings: vi.fn(),
   getProjects: vi.fn(),
@@ -35,6 +38,34 @@ const multiWorkspaceSession: AuthSession = {
   ]
 };
 
+function project(overrides: Pick<Project, "id" | "name" | "url" | "domain">): Project {
+  return {
+    score: 100,
+    createdAt: "2026-06-02T00:00:00.000Z",
+    lastScan: null,
+    openFindings: 0,
+    reports: 0,
+    status: "active",
+    crawlLimit: 10,
+    viewports: "Desktop + mobile",
+    ...overrides
+  };
+}
+
+const acmeProject = project({
+  id: "project-acme",
+  name: "Acme Portal",
+  url: "https://acme.example.test/",
+  domain: "acme.example.test"
+});
+
+const betaProject = project({
+  id: "project-beta",
+  name: "Beta Portal",
+  url: "https://beta.example.test/",
+  domain: "beta.example.test"
+});
+
 function setPath(pathname: string) {
   window.history.replaceState(null, "", pathname);
 }
@@ -44,6 +75,27 @@ function mockSession(session: AuthSession | null) {
 }
 
 function setupQueryMocks() {
+  api.createProject.mockResolvedValue(null);
+  api.createScan.mockImplementation((workspaceSlug: string, input: Partial<ScanRun>) => Promise.resolve({
+    id: `scan-${workspaceSlug}`,
+    projectId: input.projectId ?? "project",
+    projectName: "Project",
+    url: input.url ?? "https://example.test/",
+    status: "queued",
+    mode: input.mode ?? "single_url",
+    maxPages: input.maxPages ?? 1,
+    maxDepth: input.maxDepth ?? 0,
+    viewports: "Desktop",
+    trigger: "Manual",
+    pagesQueued: 0,
+    pagesScanned: 0,
+    findingsTotal: 0,
+    score: null,
+    createdAt: "2026-06-02T00:00:00.000Z",
+    startedAt: null,
+    finishedAt: null,
+    errorMessage: null
+  }));
   api.fetchIssues.mockResolvedValue([]);
   api.getFindings.mockResolvedValue([]);
   api.getProjects.mockResolvedValue([]);
@@ -70,13 +122,13 @@ async function renderApp() {
   return { container, root };
 }
 
-async function waitFor(assertion: () => void) {
+async function waitFor(assertion: () => void | Promise<void>) {
   const timeoutAt = Date.now() + 1_000;
   let lastError: unknown;
 
   while (Date.now() < timeoutAt) {
     try {
-      assertion();
+      await assertion();
       return;
     } catch (error) {
       lastError = error;
@@ -102,6 +154,26 @@ async function fillInput(container: HTMLElement, label: string, value: string) {
   await act(async () => {
     input!.value = value;
     input!.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+async function inputValue(container: HTMLElement, label: string): Promise<string> {
+  let input: HTMLInputElement | null | undefined;
+
+  await waitFor(() => {
+    input = Array.from(container.querySelectorAll("label")).find((candidate) =>
+      candidate.textContent?.includes(label)
+    )?.querySelector("input");
+    expect(input).toBeTruthy();
+  });
+
+  return input!.value;
+}
+
+async function routeTo(pathname: string) {
+  await act(async () => {
+    window.history.pushState(null, "", pathname);
+    window.dispatchEvent(new PopStateEvent("popstate"));
   });
 }
 
@@ -149,6 +221,12 @@ describe("auth routes", () => {
       workspaceSlug: "acme"
     });
     expect(parsePath("/missing")).toEqual({ page: "login" });
+  });
+
+  it("falls back to login for malformed encoded paths", () => {
+    expect(parsePath("/invite/%E0%A4%A")).toEqual({ page: "login" });
+    expect(parsePath("/w/%E0%A4%A/projects")).toEqual({ page: "login" });
+    expect(parsePath("/w/acme/findings/%E0%A4%A")).toEqual({ page: "login" });
   });
 
   it("redirects a single-workspace session to workspace projects", async () => {
@@ -230,5 +308,31 @@ describe("auth routes", () => {
       password: "secret"
     }));
     await waitFor(() => expect(window.location.pathname).toBe("/w/acme/projects"));
+  });
+
+  it("does not retain new scan state when switching workspace routes", async () => {
+    setPath("/w/acme/new-scan");
+    mockSession(multiWorkspaceSession);
+    api.getProjects.mockImplementation((workspaceSlug: string) => Promise.resolve(
+      workspaceSlug === "beta" ? [betaProject] : [acmeProject]
+    ));
+    const rendered = await renderApp();
+    roots.push(rendered.root);
+
+    await waitFor(async () => expect(await inputValue(rendered.container, "Public URL")).toBe(acmeProject.url));
+
+    await routeTo("/w/beta/new-scan");
+
+    await waitFor(async () => expect(await inputValue(rendered.container, "Public URL")).toBe(betaProject.url));
+    await clickButton(rendered.container, "Start Scan");
+
+    await waitFor(() => expect(api.createScan).toHaveBeenCalledWith("beta", expect.objectContaining({
+      projectId: betaProject.id,
+      url: betaProject.url
+    })));
+    expect(api.createScan).not.toHaveBeenCalledWith("beta", expect.objectContaining({
+      projectId: acmeProject.id,
+      url: acmeProject.url
+    }));
   });
 });

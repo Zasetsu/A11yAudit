@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createProject, createScan } from "../api/client";
 import { Button, Field, Icon, PageHeader, Panel, SelectInput, TextInput, Toggle } from "../design/ui";
@@ -29,6 +29,20 @@ export function NewScanPage({ workspaceSlug, project, projects, navigate, onSele
   const [mobile, setMobile] = useState(true);
   const queryClient = useQueryClient();
   const selectedViewports = [desktop ? "desktop" : null, mobile ? "mobile" : null].filter(Boolean) as Array<"desktop" | "mobile">;
+  const projectsFingerprint = useMemo(
+    () => projects.map((candidate) => `${candidate.id}:${candidate.name}:${candidate.url}`).join("|"),
+    [projects]
+  );
+
+  useEffect(() => {
+    const nextProjectId = defaultProjectId(project, projects);
+    const nextSelected = projects.find((candidate) => candidate.id === nextProjectId) ?? project;
+
+    setProjectMode(defaultProjectMode(projects));
+    setProjectId(nextProjectId);
+    setUrl(nextSelected.url);
+    setProjectName(nextSelected.name);
+  }, [project.id, project.name, project.url, projectsFingerprint, workspaceSlug]);
 
   const mutation = useMutation({
     mutationFn: async () => {

@@ -84,25 +84,43 @@ function workspaceIsAllowed(session: AuthSession | null | undefined, workspaceSl
   return session?.workspaces.some((workspace) => workspace.slug === workspaceSlug) ?? false;
 }
 
+function safeDecodePathPart(value: string): string | null {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+}
+
 export function parsePath(pathname: string): AppRoute {
   if (pathname === "/login") return { page: "login" };
   if (pathname === "/signup") return { page: "signup" };
   if (pathname === "/workspaces") return { page: "workspaces" };
   const invite = pathname.match(/^\/invite\/([^/]+)$/);
-  if (invite) return { page: "invite", token: decodeURIComponent(invite[1]) };
+  if (invite) {
+    const token = safeDecodePathPart(invite[1]);
+    return token === null ? { page: "login" } : { page: "invite", token };
+  }
   const finding = pathname.match(/^\/w\/([^/]+)\/findings\/([^/]+)$/);
   if (finding) {
+    const workspaceSlug = safeDecodePathPart(finding[1]);
+    const findingId = safeDecodePathPart(finding[2]);
+    if (workspaceSlug === null || findingId === null) return { page: "login" };
+
     return {
       page: "finding-detail",
-      findingId: decodeURIComponent(finding[2]),
-      workspaceSlug: decodeURIComponent(finding[1])
+      findingId,
+      workspaceSlug
     };
   }
   const workspace = pathname.match(/^\/w\/([^/]+)\/([^/]+)$/);
   if (workspace && workspacePages.has(workspace[2] as Exclude<WorkspacePage, "finding-detail">)) {
+    const workspaceSlug = safeDecodePathPart(workspace[1]);
+    if (workspaceSlug === null) return { page: "login" };
+
     return {
       page: workspace[2] as Exclude<WorkspacePage, "finding-detail">,
-      workspaceSlug: decodeURIComponent(workspace[1])
+      workspaceSlug
     };
   }
   return { page: "login" };
