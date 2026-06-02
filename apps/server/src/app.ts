@@ -42,12 +42,23 @@ function shouldSkipCsrf(requestUrl: string): boolean {
     || /^\/api\/invitations\/[^/]+\/accept$/.test(pathname);
 }
 
+function readMaxConcurrentScans(): number {
+  const value = process.env.A11YAUDIT_MAX_CONCURRENT_SCANS;
+  if (value === undefined || !/^\d+$/.test(value)) {
+    return 1;
+  }
+
+  const parsed = Number(value);
+  return parsed > 0 ? parsed : 1;
+}
+
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: options.logger ?? false });
   const dbClient = options.dbClient ?? createDb(options.dbPath);
   const ownsDbClient = options.dbClient === undefined;
   const storage = new LocalStorageAdapter({ rootDir: options.storageRoot ?? ".a11yaudit/artifacts" });
   const runner = new LocalJobRunner<ScanJobPayload>({
+    maxConcurrentJobs: readMaxConcurrentScans(),
     execute: options.executeScans === false
       ? undefined
       : async (job) => {

@@ -1,12 +1,17 @@
-import { desc, eq } from "drizzle-orm";
-import type { FastifyInstance } from "fastify";
-import { nanoid } from "nanoid";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import { assertSafeUrl } from "@a11yaudit/crawler";
 import { DEFAULT_VIEWPORTS } from "@a11yaudit/core";
+import { requireAuth } from "../auth/session.js";
 import type { SqliteDatabase } from "../db/client.js";
-import { projects, scanRuns } from "../db/schema.js";
 import type { LocalJobRunner } from "../jobs/local-job-runner.js";
+import {
+  createScanForWorkspace,
+  hasActiveScanForProject,
+  listScansForWorkspace,
+  ScanProjectNotFoundError
+} from "../repositories/scans.js";
+import { getAuthorizedWorkspaceBySlug, type WorkspaceAuthContext } from "../repositories/workspaces.js";
 
 const scanPayloadSchema = z.object({
   projectId: z.string().trim().min(1),
@@ -15,6 +20,10 @@ const scanPayloadSchema = z.object({
   maxPages: z.number().int().min(1).max(250).default(10),
   maxDepth: z.number().int().min(0).max(5).default(1),
   viewports: z.array(z.enum(["desktop", "mobile"])).min(1).default(["desktop", "mobile"])
+});
+
+const workspaceParamsSchema = z.object({
+  workspaceSlug: z.string().trim().min(1)
 });
 
 export interface ScanJobPayload {
@@ -53,41 +62,55 @@ function resolveViewports(names: z.infer<typeof scanPayloadSchema>["viewports"])
   });
 }
 
+async function requireWorkspaceMembership(
+  db: SqliteDatabase,
+  userId: string,
+  workspaceSlug: string,
+  reply: FastifyReply
+): Promise<WorkspaceAuthContext | undefined> {
+  const context = await getAuthorizedWorkspaceBySlug(db, userId, workspaceSlug);
+  if (!context) {
+    await reply.code(404).send({ error: "Workspace not found" });
+    return undefined;
+  }
+
+  return context;
+}
+
 export async function registerScanRoutes(app: FastifyInstance, options: ScanRouteOptions): Promise<void> {
   const { db, runner } = options;
 
-  app.get("/api/scans", async () => ({
-    data: db
-      .select({
-        id: scanRuns.id,
-        projectId: scanRuns.projectId,
-        projectName: projects.name,
-        url: scanRuns.url,
-        status: scanRuns.status,
-        mode: scanRuns.mode,
-        maxPages: scanRuns.maxPages,
-        maxDepth: scanRuns.maxDepth,
-        viewports: scanRuns.viewports,
-        pagesQueued: scanRuns.pagesQueued,
-        pagesScanned: scanRuns.pagesScanned,
-        findingsTotal: scanRuns.findingsTotal,
-        score: scanRuns.score,
-        createdAt: scanRuns.createdAt,
-        startedAt: scanRuns.startedAt,
-        finishedAt: scanRuns.finishedAt,
-        errorMessage: scanRuns.errorMessage
-      })
-      .from(scanRuns)
-      .leftJoin(projects, eq(scanRuns.projectId, projects.id))
-      .orderBy(desc(scanRuns.createdAt))
-      .all()
-  }));
+  app.get("/api/workspaces/:workspaceSlug/scans", async (request, reply) => {
+    const user = await requireAuth(request, reply);
+    if (!user) return undefined;
 
-  app.post("/api/scans", async (request, reply) => {
+    const params = workspaceParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return reply.code(400).send({ error: "Invalid workspace parameters", issues: params.error.issues });
+    }
+
+    const context = await requireWorkspaceMembership(db, user.id, params.data.workspaceSlug, reply);
+    if (!context) return undefined;
+
+    return { data: await listScansForWorkspace(db, context.workspaceId) };
+  });
+
+  app.post("/api/workspaces/:workspaceSlug/scans", async (request, reply) => {
+    const user = await requireAuth(request, reply);
+    if (!user) return undefined;
+
+    const params = workspaceParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return reply.code(400).send({ error: "Invalid workspace parameters", issues: params.error.issues });
+    }
+
     const parsed = scanPayloadSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "Invalid scan payload", issues: parsed.error.issues });
     }
+
+    const context = await requireWorkspaceMembership(db, user.id, params.data.workspaceSlug, reply);
+    if (!context) return undefined;
 
     let url: string;
     try {
@@ -96,32 +119,28 @@ export async function registerScanRoutes(app: FastifyInstance, options: ScanRout
       return reply.code(400).send({ error: error instanceof Error ? error.message : "Invalid scan URL" });
     }
 
-    const project = db.select().from(projects).where(eq(projects.id, parsed.data.projectId)).get();
-    if (project === undefined) {
-      return reply.code(404).send({ error: "Project not found" });
+    if (await hasActiveScanForProject(db, context.workspaceId, parsed.data.projectId)) {
+      return reply.code(409).send({ error: "Project already has an active scan" });
     }
 
-    const now = new Date().toISOString();
-    const row = {
-      id: `run-${nanoid(10)}`,
-      projectId: parsed.data.projectId,
-      url,
-      status: "queued",
-      mode: parsed.data.mode,
-      maxPages: parsed.data.maxPages,
-      maxDepth: parsed.data.maxDepth,
-      viewports: parsed.data.viewports.join(","),
-      pagesQueued: 0,
-      pagesScanned: 0,
-      findingsTotal: 0,
-      score: null,
-      createdAt: now,
-      startedAt: null,
-      finishedAt: null,
-      errorMessage: null
-    };
+    let row: Awaited<ReturnType<typeof createScanForWorkspace>>;
+    try {
+      row = await createScanForWorkspace(db, context.workspaceId, {
+        projectId: parsed.data.projectId,
+        url,
+        mode: parsed.data.mode,
+        maxPages: parsed.data.maxPages,
+        maxDepth: parsed.data.maxDepth,
+        viewports: parsed.data.viewports
+      });
+    } catch (error) {
+      if (error instanceof ScanProjectNotFoundError) {
+        return reply.code(404).send({ error: "Project not found" });
+      }
 
-    db.insert(scanRuns).values(row).run();
+      throw error;
+    }
+
     runner.enqueue(row.id, {
       projectId: row.projectId,
       url: row.url,

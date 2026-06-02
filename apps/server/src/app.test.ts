@@ -7,7 +7,8 @@ import { csrfCookieName, sessionCookieName } from "./auth/cookies.js";
 import { createSession } from "./auth/session.js";
 import { hashToken } from "./auth/tokens.js";
 import { createDb, initializeDb } from "./db/client.js";
-import { findings, issues, projects, reports, scanRuns, sessions, users, workspaceInvitations } from "./db/schema.js";
+import { findings, issues, projects, reports, scanRuns, sessions, users, workspaceInvitations, workspaceMembers } from "./db/schema.js";
+import { LocalJobRunner } from "./jobs/local-job-runner.js";
 
 const { runScanMock } = vi.hoisted(() => ({
   runScanMock: vi.fn()
@@ -26,12 +27,17 @@ async function withTempDb<T>(run: (dbPath: string) => Promise<T>): Promise<T> {
   }
 }
 
-async function waitForCompletedScan(app: Awaited<ReturnType<typeof buildServer>>, scanId: string): Promise<void> {
+async function waitForCompletedScan(
+  app: Awaited<ReturnType<typeof buildServer>>,
+  signedIn: SignedInResponse,
+  scanId: string,
+  workspaceSlug = primaryWorkspaceSlug(signedIn)
+): Promise<void> {
   const deadline = Date.now() + 30_000;
   let lastStatus = "queued";
 
   while (Date.now() < deadline) {
-    const response = await app.inject({ method: "GET", url: "/api/scans" });
+    const response = await listScans(app, signedIn, workspaceSlug);
     const scan = response.json().data.find((row: { id: string }) => row.id === scanId);
     lastStatus = scan?.status ?? "missing";
 
@@ -48,14 +54,16 @@ async function waitForCompletedScan(app: Awaited<ReturnType<typeof buildServer>>
 
 async function waitForScan(
   app: Awaited<ReturnType<typeof buildServer>>,
+  signedIn: SignedInResponse,
   scanId: string,
-  terminalStatus: "completed" | "failed"
+  terminalStatus: "completed" | "failed",
+  workspaceSlug = primaryWorkspaceSlug(signedIn)
 ): Promise<Record<string, unknown>> {
   const deadline = Date.now() + 30_000;
   let lastScan: Record<string, unknown> | undefined;
 
   while (Date.now() < deadline) {
-    const response = await app.inject({ method: "GET", url: "/api/scans" });
+    const response = await listScans(app, signedIn, workspaceSlug);
     lastScan = response.json().data.find((row: { id: string }) => row.id === scanId);
 
     if (lastScan?.status === terminalStatus) return lastScan;
@@ -458,6 +466,46 @@ async function deleteProject(
   });
 }
 
+async function listScans(
+  app: Awaited<ReturnType<typeof buildServer>>,
+  signedIn: SignedInResponse,
+  workspaceSlug = primaryWorkspaceSlug(signedIn)
+) {
+  return app.inject({
+    method: "GET",
+    url: `/api/workspaces/${workspaceSlug}/scans`,
+    cookies: authCookies(signedIn)
+  });
+}
+
+async function startScan(
+  app: Awaited<ReturnType<typeof buildServer>>,
+  signedIn: SignedInResponse,
+  projectId: string,
+  payload: Partial<{
+    url: string;
+    mode: "single_url" | "same_domain_crawl";
+    maxPages: number;
+    maxDepth: number;
+    viewports: Array<"desktop" | "mobile">;
+  }> = {},
+  workspaceSlug = primaryWorkspaceSlug(signedIn)
+) {
+  const cookies = authCookies(signedIn);
+
+  return app.inject({
+    method: "POST",
+    url: `/api/workspaces/${workspaceSlug}/scans`,
+    headers: { "x-csrf-token": cookies[csrfCookieName] },
+    cookies,
+    payload: {
+      projectId,
+      url: "https://portal.example.test/",
+      ...payload
+    }
+  });
+}
+
 async function acceptWorkspaceInvite(
   app: Awaited<ReturnType<typeof buildServer>>,
   inviteResponse: { json: () => { data: { inviteUrl: string } } },
@@ -524,6 +572,39 @@ describe("server", () => {
         await app.close();
       }
     });
+  });
+
+  it("limits local worker concurrency", async () => {
+    let allowFirstToComplete!: () => void;
+    const firstMayComplete = new Promise<void>((resolve) => {
+      allowFirstToComplete = resolve;
+    });
+    const started: string[] = [];
+
+    const runner = new LocalJobRunner<{ label: string }>({
+      maxConcurrentJobs: 1,
+      execute: async (job) => {
+        started.push(job.id);
+        if (job.id === "job-1") {
+          await firstMayComplete;
+        }
+      }
+    });
+
+    runner.enqueue("job-1", { label: "first" });
+    runner.enqueue("job-2", { label: "second" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(started).toEqual(["job-1"]);
+    expect(runner.get("job-1")?.status).toBe("running");
+    expect(runner.get("job-2")?.status).toBe("queued");
+
+    allowFirstToComplete();
+    await runner.waitForIdle();
+
+    expect(started).toEqual(["job-1", "job-2"]);
+    expect(runner.get("job-1")?.status).toBe("completed");
+    expect(runner.get("job-2")?.status).toBe("completed");
   });
 
   it("allows the local web UI origin", async () => {
@@ -1730,28 +1811,18 @@ describe("server", () => {
         const owner = await signup(app, "owner@example.com", "Owner Workspace");
         const project = await createProject(app, owner, "Portal", "https://portal.example.gov");
 
-        const invalid = await app.inject({
-          method: "POST",
-          url: "/api/scans",
-          payload: {
-            projectId: project.json().id,
-            url: "ftp://portal.example.gov"
-          }
+        const invalid = await startScan(app, owner, project.json().id, {
+          url: "ftp://portal.example.gov"
         });
 
         expect(invalid.statusCode).toBe(400);
 
-        const created = await app.inject({
-          method: "POST",
-          url: "/api/scans",
-          payload: {
-            projectId: project.json().id,
-            url: "https://portal.example.gov/start",
-            mode: "same_domain_crawl",
-            maxPages: 75,
-            maxDepth: 3,
-            viewports: ["desktop"]
-          }
+        const created = await startScan(app, owner, project.json().id, {
+          url: "https://portal.example.gov/start",
+          mode: "same_domain_crawl",
+          maxPages: 75,
+          maxDepth: 3,
+          viewports: ["desktop"]
         });
 
         expect(created.statusCode).toBe(201);
@@ -1765,7 +1836,7 @@ describe("server", () => {
           viewports: "desktop"
         });
 
-        const listed = await app.inject({ method: "GET", url: "/api/scans" });
+        const listed = await listScans(app, owner);
         expect(listed.json().data).toHaveLength(1);
         expect(listed.json().data[0]).toMatchObject({
           projectName: "Portal",
@@ -1773,6 +1844,149 @@ describe("server", () => {
           maxDepth: 3,
           viewports: "desktop"
         });
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("rejects unauthenticated scoped scan list and create requests", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const list = await app.inject({ method: "GET", url: "/api/workspaces/acme/scans" });
+        const created = await app.inject({
+          method: "POST",
+          url: "/api/workspaces/acme/scans",
+          payload: {
+            projectId: "project-1",
+            url: "https://portal.example.test/"
+          }
+        });
+
+        expect(list.statusCode).toBe(401);
+        expect(created.statusCode).toBe(401);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("returns 404 for non-member scoped scan list and create requests", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const outsider = await signupWithPublicSignup(app, "outsider@example.com", "Other Workspace");
+        const project = await createProject(app, owner, "Owner Portal", "https://owner.example.test/");
+
+        const list = await listScans(app, outsider, "owner-workspace");
+        const created = await startScan(app, outsider, project.json().id, {}, "owner-workspace");
+
+        expect(list.statusCode).toBe(404);
+        expect(created.statusCode).toBe(404);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("allows workspace members to list and create scans", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const ownerCookies = authCookies(owner);
+        const project = await createProject(app, owner, "Owner Portal", "https://owner.example.test/");
+        const invite = await createWorkspaceInvite(app, ownerCookies, "owner-workspace", "member@example.com");
+        const member = await acceptWorkspaceInvite(app, invite, "member@example.com");
+
+        const created = await startScan(app, member, project.json().id, {}, "owner-workspace");
+        const listed = await listScans(app, member, "owner-workspace");
+
+        expect(created.statusCode).toBe(201);
+        expect(listed.statusCode).toBe(200);
+        expect(listed.json().data).toEqual(expect.arrayContaining([
+          expect.objectContaining({ id: created.json().id, projectName: "Owner Portal" })
+        ]));
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("allows workspace owners to list and create scans", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const project = await createProject(app, owner, "Owner Portal", "https://owner.example.test/");
+
+        const created = await startScan(app, owner, project.json().id);
+        const listed = await listScans(app, owner);
+
+        expect(created.statusCode).toBe(201);
+        expect(listed.statusCode).toBe(200);
+        expect(listed.json().data).toEqual(expect.arrayContaining([
+          expect.objectContaining({ id: created.json().id, projectName: "Owner Portal" })
+        ]));
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("returns 404 when creating a scan for a project outside the current workspace", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const acme = await signup(app, "acme@example.com", "Acme");
+        const beta = await signupWithPublicSignup(app, "beta@example.com", "Beta");
+        const betaProject = await createProject(app, beta, "Beta Portal", "https://beta.example.test/");
+
+        const created = await startScan(app, acme, betaProject.json().id);
+
+        expect(created.statusCode).toBe(404);
+        expect((await listScans(app, beta)).json().data).toHaveLength(0);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("returns 404 for old global scan list and create routes", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const listed = await app.inject({ method: "GET", url: "/api/scans" });
+        const created = await app.inject({
+          method: "POST",
+          url: "/api/scans",
+          payload: {
+            projectId: "project-1",
+            url: "https://global.example.test/"
+          }
+        });
+
+        expect(listed.statusCode).toBe(404);
+        expect(created.statusCode).toBe(404);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("rejects starting a second active scan for the same project", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const auth = await signup(app, "owner@example.com", "Owner Workspace");
+        const project = await createProject(app, auth, "Portal", "https://portal.example.test/");
+        const first = await startScan(app, auth, project.json().id);
+        expect(first.statusCode).toBe(201);
+
+        const second = await startScan(app, auth, project.json().id);
+        expect(second.statusCode).toBe(409);
       } finally {
         await app.close();
       }
@@ -1823,19 +2037,12 @@ describe("server", () => {
         ];
 
         for (const url of targets) {
-          const response = await app.inject({
-            method: "POST",
-            url: "/api/scans",
-            payload: {
-              projectId: project.json().id,
-              url
-            }
-          });
+          const response = await startScan(app, owner, project.json().id, { url });
 
           expect(response.statusCode).toBe(400);
         }
 
-        const listed = await app.inject({ method: "GET", url: "/api/scans" });
+        const listed = await listScans(app, owner);
         expect(listed.json().data).toHaveLength(0);
       } finally {
         await app.close();
@@ -1851,13 +2058,8 @@ describe("server", () => {
       const owner = await signup(app, "owner@example.com", "Owner Workspace");
       const project = await createProject(app, owner, "Portal", "https://portal.example.gov");
 
-      const scan = await app.inject({
-        method: "POST",
-        url: "/api/scans",
-        payload: {
-          projectId: project.json().id,
-          url: "https://portal.example.gov/start"
-        }
+      const scan = await startScan(app, owner, project.json().id, {
+        url: "https://portal.example.gov/start"
       });
 
       const now = new Date().toISOString();
@@ -1894,7 +2096,15 @@ describe("server", () => {
 
     const app = await buildServer({ dbClient, executeScans: false });
     try {
-      const response = await app.inject({ method: "GET", url: "/api/scans" });
+      const owner = await signup(app, "owner@example.com", "Owner Workspace");
+      dbClient.db.insert(workspaceMembers).values({
+        id: "member-default-workspace",
+        workspaceId: "default-workspace",
+        userId: owner.json().data.user.id,
+        role: "owner",
+        createdAt: new Date().toISOString()
+      }).run();
+      const response = await listScans(app, owner, "default-workspace");
 
       expect(response.json().data).toMatchObject([
         {
@@ -1953,20 +2163,15 @@ describe("server", () => {
 
         expect(project.statusCode).toBe(201);
 
-        const scan = await app.inject({
-          method: "POST",
-          url: "/api/scans",
-          payload: {
-            projectId: project.json().id,
-            url: "https://fixture.example.com",
-            mode: "single_url",
-            maxPages: 1,
-            viewports: ["desktop"]
-          }
+        const scan = await startScan(app, owner, project.json().id, {
+          url: "https://fixture.example.com",
+          mode: "single_url",
+          maxPages: 1,
+          viewports: ["desktop"]
         });
 
         expect(scan.statusCode).toBe(201);
-        await waitForCompletedScan(app, scan.json().id);
+        await waitForCompletedScan(app, owner, scan.json().id);
 
         const findingsResponse = await app.inject({
           method: "GET",
@@ -2017,19 +2222,14 @@ describe("server", () => {
       try {
         const owner = await signup(app, "owner@example.com", "Owner Workspace");
         const project = await createProject(app, owner, "Fixture", "https://fixture.example.com");
-        const scan = await app.inject({
-          method: "POST",
-          url: "/api/scans",
-          payload: {
-            projectId: project.json().id,
-            url: "https://fixture.example.com",
-            mode: "single_url",
-            maxPages: 1,
-            viewports: ["desktop"]
-          }
+        const scan = await startScan(app, owner, project.json().id, {
+          url: "https://fixture.example.com",
+          mode: "single_url",
+          maxPages: 1,
+          viewports: ["desktop"]
         });
 
-        const completedScan = await waitForScan(app, scan.json().id, "completed");
+        const completedScan = await waitForScan(app, owner, scan.json().id, "completed");
 
         expect(completedScan.errorMessage).toContain(
           "PDF report failed: page.pdf: Protocol error (Page.printToPDF): Printing failed"
@@ -2055,19 +2255,14 @@ describe("server", () => {
     try {
       const owner = await signup(app, "owner@example.com", "Owner Workspace");
       const project = await createProject(app, owner, "Grouped Fixture", "https://grouped.example.com");
-      const scan = await app.inject({
-        method: "POST",
-        url: "/api/scans",
-        payload: {
-          projectId: project.json().id,
-          url: "https://grouped.example.com/page",
-          mode: "single_url",
-          maxPages: 1,
-          viewports: ["desktop", "mobile"]
-        }
+      const scan = await startScan(app, owner, project.json().id, {
+        url: "https://grouped.example.com/page",
+        mode: "single_url",
+        maxPages: 1,
+        viewports: ["desktop", "mobile"]
       });
 
-      await waitForCompletedScan(app, scan.json().id);
+      await waitForCompletedScan(app, owner, scan.json().id);
 
       const issueRows = dbClient.sqlite
         .prepare("SELECT * FROM issues WHERE scan_run_id = ?")
@@ -2104,19 +2299,14 @@ describe("server", () => {
       try {
         const owner = await signup(app, "owner@example.com", "Owner Workspace");
         const project = await createProject(app, owner, "Fixture", "https://fixture.example.com");
-        const scan = await app.inject({
-          method: "POST",
-          url: "/api/scans",
-          payload: {
-            projectId: project.json().id,
-            url: "https://fixture.example.com",
-            mode: "single_url",
-            maxPages: 1,
-            viewports: ["desktop"]
-          }
+        const scan = await startScan(app, owner, project.json().id, {
+          url: "https://fixture.example.com",
+          mode: "single_url",
+          maxPages: 1,
+          viewports: ["desktop"]
         });
 
-        await waitForCompletedScan(app, scan.json().id);
+        await waitForCompletedScan(app, owner, scan.json().id);
 
         const response = await app.inject({
           method: "GET",
@@ -2162,21 +2352,11 @@ describe("server", () => {
       const owner = await signup(app, "owner@example.com", "Owner Workspace");
       const projectA = await createProject(app, owner, "Project A", "https://project-a.example.com");
       const projectB = await createProject(app, owner, "Project B", "https://project-b.example.com");
-      const scanA = await app.inject({
-        method: "POST",
-        url: "/api/scans",
-        payload: {
-          projectId: projectA.json().id,
-          url: "https://project-a.example.com"
-        }
+      const scanA = await startScan(app, owner, projectA.json().id, {
+        url: "https://project-a.example.com"
       });
-      const scanB = await app.inject({
-        method: "POST",
-        url: "/api/scans",
-        payload: {
-          projectId: projectB.json().id,
-          url: "https://project-b.example.com"
-        }
+      const scanB = await startScan(app, owner, projectB.json().id, {
+        url: "https://project-b.example.com"
       });
 
       dbClient.db.insert(issues).values([
@@ -2221,13 +2401,8 @@ describe("server", () => {
       const owner = await signup(app, "owner@example.com", "Owner Workspace");
       const projectA = await createProject(app, owner, "Project A", "https://project-a.example.com");
       const projectB = await createProject(app, owner, "Project B", "https://project-b.example.com");
-      const scanB = await app.inject({
-        method: "POST",
-        url: "/api/scans",
-        payload: {
-          projectId: projectB.json().id,
-          url: "https://project-b.example.com"
-        }
+      const scanB = await startScan(app, owner, projectB.json().id, {
+        url: "https://project-b.example.com"
       });
 
       dbClient.db.insert(issues).values(issueFixture({
@@ -2258,13 +2433,8 @@ describe("server", () => {
     try {
       const owner = await signup(app, "owner@example.com", "Owner Workspace");
       const project = await createProject(app, owner, "Malformed Fixture", "https://malformed.example.com");
-      const scan = await app.inject({
-        method: "POST",
-        url: "/api/scans",
-        payload: {
-          projectId: project.json().id,
-          url: "https://malformed.example.com"
-        }
+      const scan = await startScan(app, owner, project.json().id, {
+        url: "https://malformed.example.com"
       });
 
       dbClient.db.insert(issues).values(issueFixture({
@@ -2303,21 +2473,16 @@ describe("server", () => {
       try {
         const owner = await signup(app, "owner@example.com", "Owner Workspace");
         const project = await createProject(app, owner, "Large Fixture", "https://large.example.com");
-        const scan = await app.inject({
-          method: "POST",
-          url: "/api/scans",
-          payload: {
-            projectId: project.json().id,
-            url: "https://large.example.com",
-            mode: "same_domain_crawl",
-            maxPages: 250,
-            viewports: ["desktop", "mobile"]
-          }
+        const scan = await startScan(app, owner, project.json().id, {
+          url: "https://large.example.com",
+          mode: "same_domain_crawl",
+          maxPages: 250,
+          viewports: ["desktop", "mobile"]
         });
 
-        await waitForCompletedScan(app, scan.json().id);
+        await waitForCompletedScan(app, owner, scan.json().id);
 
-        const listed = await app.inject({ method: "GET", url: "/api/scans" });
+        const listed = await listScans(app, owner);
         const completed = listed.json().data.find((row: { id: string }) => row.id === scan.json().id);
         expect(completed).toMatchObject({
           status: "completed",
@@ -2363,13 +2528,8 @@ describe("server", () => {
     try {
       const owner = await signup(app, "owner@example.com", "Owner Workspace");
       const project = await createProject(app, owner, "Portal", "https://portal.example.gov");
-      const scan = await app.inject({
-        method: "POST",
-        url: "/api/scans",
-        payload: {
-          projectId: project.json().id,
-          url: "https://portal.example.gov/start"
-        }
+      const scan = await startScan(app, owner, project.json().id, {
+        url: "https://portal.example.gov/start"
       });
 
       dbClient.db.insert(reports).values({
@@ -2415,19 +2575,14 @@ describe("server", () => {
 
       const owner = await signup(app, "owner@example.com", "Owner Workspace");
       const project = await createProject(app, owner, "Fixture", "https://fixture.example.com");
-      const scan = await app.inject({
-        method: "POST",
-        url: "/api/scans",
-        payload: {
-          projectId: project.json().id,
-          url: "https://fixture.example.com",
-          mode: "single_url",
-          maxPages: 1,
-          viewports: ["desktop"]
-        }
+      const scan = await startScan(app, owner, project.json().id, {
+        url: "https://fixture.example.com",
+        mode: "single_url",
+        maxPages: 1,
+        viewports: ["desktop"]
       });
 
-      const failedScan = await waitForScan(app, scan.json().id, "failed");
+      const failedScan = await waitForScan(app, owner, scan.json().id, "failed");
 
       expect(failedScan.errorMessage).toContain("report insert failed");
       expect(dbClient.db.select().from(findings).all()).toHaveLength(0);
