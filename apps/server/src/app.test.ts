@@ -2538,6 +2538,51 @@ describe("server", () => {
     }
   });
 
+  it("allows workspace members to read scoped issues and findings", async () => {
+    const dbClient = createDb(":memory:");
+    const app = await buildServer({ dbClient, executeScans: false });
+
+    try {
+      const owner = await signup(app, "owner@example.com", "Owner Workspace");
+      const workspaceSlug = primaryWorkspaceSlug(owner);
+      const project = await createProject(app, owner, "Member Fixture", "https://member.example.com", workspaceSlug);
+      const scan = await startScan(app, owner, project.json().id, { url: "https://member.example.com" }, workspaceSlug);
+      const invite = await createWorkspaceInvite(app, authCookies(owner), workspaceSlug, "member@example.com");
+      const member = await acceptWorkspaceInvite(app, invite, "member@example.com");
+
+      dbClient.db.insert(issues).values(issueFixture({
+        id: "issue-member-readable",
+        projectId: project.json().id,
+        scanRunId: scan.json().id,
+        representativeUrl: "https://member.example.com",
+        sampleUrls: JSON.stringify(["https://member.example.com"])
+      })).run();
+      dbClient.db.insert(findings).values(findingFixture({
+        id: "finding-member-readable",
+        projectId: project.json().id,
+        scanRunId: scan.json().id,
+        issueId: "issue-member-readable",
+        pageUrl: "https://member.example.com"
+      })).run();
+
+      const issuesList = await listIssues(app, member, "", workspaceSlug);
+      const issueDetail = await getIssue(app, member, "issue-member-readable", workspaceSlug);
+      const findingsList = await listFindings(app, member, "", workspaceSlug);
+
+      expect(issuesList.statusCode).toBe(200);
+      expect(issuesList.json().data).toHaveLength(1);
+      expect(issuesList.json().data[0]).toMatchObject({ id: "issue-member-readable" });
+      expect(issueDetail.statusCode).toBe(200);
+      expect(issueDetail.json()).toMatchObject({ id: "issue-member-readable", sampleUrls: ["https://member.example.com"] });
+      expect(findingsList.statusCode).toBe(200);
+      expect(findingsList.json().data).toHaveLength(1);
+      expect(findingsList.json().data[0]).toMatchObject({ id: "finding-member-readable" });
+    } finally {
+      await app.close();
+      dbClient.close();
+    }
+  });
+
   it("applies project filters for grouped issues inside a workspace", async () => {
     const dbClient = createDb(":memory:");
     const app = await buildServer({ dbClient, executeScans: false });
