@@ -38,6 +38,11 @@ const multiWorkspaceSession: AuthSession = {
   ]
 };
 
+const memberSession: AuthSession = {
+  ...acmeSession,
+  workspaces: [{ id: "workspace-1", name: "Acme", slug: "acme", role: "member" }]
+};
+
 function project(overrides: Pick<Project, "id" | "name" | "url" | "domain">): Project {
   return {
     score: 100,
@@ -192,6 +197,21 @@ async function clickButton(container: HTMLElement, label: string) {
   });
 }
 
+async function clickButtonContaining(container: HTMLElement, label: string) {
+  let button: HTMLButtonElement | undefined;
+
+  await waitFor(() => {
+    button = Array.from(container.querySelectorAll("button")).find((candidate) =>
+      candidate.textContent?.includes(label)
+    );
+    expect(button).toBeTruthy();
+  });
+
+  await act(async () => {
+    button!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+}
+
 describe("auth routes", () => {
   let roots: Root[] = [];
 
@@ -334,5 +354,51 @@ describe("auth routes", () => {
       projectId: acmeProject.id,
       url: acmeProject.url
     }));
+  });
+
+  it("members can start scans but cannot create projects", async () => {
+    setPath("/w/acme/projects");
+    mockSession(memberSession);
+    api.getProjects.mockResolvedValue([acmeProject]);
+    const rendered = await renderApp();
+    roots.push(rendered.root);
+
+    await waitFor(() => {
+      expect(rendered.container.querySelector(".content")?.textContent).toContain("Projects");
+    });
+
+    const buttons = Array.from(rendered.container.querySelectorAll("button"));
+    expect(buttons.some((button) => /new project/i.test(button.textContent ?? ""))).toBe(false);
+    const newScanButton = buttons.find((button) => /new scan/i.test(button.textContent ?? ""));
+    expect(newScanButton).toBeTruthy();
+    expect(newScanButton?.disabled).toBe(false);
+
+    await routeTo("/w/acme/new-scan");
+
+    await waitFor(() => {
+      const projectActionLabel = Array.from(rendered.container.querySelectorAll("label")).find((candidate) =>
+        candidate.textContent?.includes("Project action")
+      );
+      const actionSelect = projectActionLabel?.querySelector("select");
+      expect(actionSelect?.value).toBe("existing");
+      expect(Array.from(actionSelect?.querySelectorAll("option") ?? []).some((option) => option.value === "new")).toBe(false);
+    });
+  });
+
+  it("switches workspaces from the top bar and scopes API calls to the selected workspace", async () => {
+    setPath("/w/acme/projects");
+    mockSession(multiWorkspaceSession);
+    api.getProjects.mockImplementation((workspaceSlug: string) => Promise.resolve(
+      workspaceSlug === "beta" ? [betaProject] : [acmeProject]
+    ));
+    const rendered = await renderApp();
+    roots.push(rendered.root);
+
+    await waitFor(() => expect(api.getProjects).toHaveBeenCalledWith("acme"));
+    await clickButtonContaining(rendered.container, "/acme");
+    await clickButtonContaining(rendered.container, "/beta");
+
+    await waitFor(() => expect(window.location.pathname).toBe("/w/beta/projects"));
+    await waitFor(() => expect(api.getProjects).toHaveBeenCalledWith("beta"));
   });
 });

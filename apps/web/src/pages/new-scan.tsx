@@ -8,16 +8,17 @@ import type { PageProps } from "./page-props";
 type ScanMode = "single_url" | "same_domain_crawl";
 type ProjectMode = "existing" | "new";
 
-function defaultProjectMode(projects: Project[]): ProjectMode {
-  return projects.length === 0 ? "new" : "existing";
+function defaultProjectMode(projects: Project[], canCreateProject: boolean): ProjectMode {
+  return canCreateProject && projects.length === 0 ? "new" : "existing";
 }
 
 function defaultProjectId(project: Project, projects: Project[]): string {
   return projects.some((candidate) => candidate.id === project.id) ? project.id : projects[0]?.id ?? "";
 }
 
-export function NewScanPage({ workspaceSlug, project, projects, navigate, onSelectProject }: PageProps & { onSelectProject: (project: Project) => void }) {
-  const [projectMode, setProjectMode] = useState<ProjectMode>(() => defaultProjectMode(projects));
+export function NewScanPage({ workspaceSlug, workspaceRole, project, projects, navigate, onSelectProject }: PageProps & { onSelectProject: (project: Project) => void }) {
+  const canCreateProject = workspaceRole === "owner";
+  const [projectMode, setProjectMode] = useState<ProjectMode>(() => defaultProjectMode(projects, canCreateProject));
   const [projectId, setProjectId] = useState(() => defaultProjectId(project, projects));
   const selected = projects.find((candidate) => candidate.id === projectId) ?? project;
   const [url, setUrl] = useState(selected.url);
@@ -38,15 +39,17 @@ export function NewScanPage({ workspaceSlug, project, projects, navigate, onSele
     const nextProjectId = defaultProjectId(project, projects);
     const nextSelected = projects.find((candidate) => candidate.id === nextProjectId) ?? project;
 
-    setProjectMode(defaultProjectMode(projects));
+    setProjectMode(defaultProjectMode(projects, canCreateProject));
     setProjectId(nextProjectId);
     setUrl(nextSelected.url);
     setProjectName(nextSelected.name);
-  }, [project.id, project.name, project.url, projectsFingerprint, workspaceSlug]);
+  }, [canCreateProject, project.id, project.name, project.url, projectsFingerprint, workspaceSlug]);
 
   const mutation = useMutation({
     mutationFn: async () => {
       if (selectedViewports.length === 0) return null;
+
+      if (projectMode === "new" && !canCreateProject) return null;
 
       const scanProject = projectMode === "new"
         ? await createProject(workspaceSlug, { name: projectName.trim() === "" ? undefined : projectName, url })
@@ -102,7 +105,7 @@ export function NewScanPage({ workspaceSlug, project, projects, navigate, onSele
                 value={projectMode}
               >
                 <option value="existing" disabled={projects.length === 0}>Use existing project</option>
-                <option value="new">Create new project</option>
+                {canCreateProject ? <option value="new">Create new project</option> : null}
               </SelectInput>
             </Field>
             {projectMode === "existing" ? (

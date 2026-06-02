@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { activeProject, type Project } from "../data";
 import { Button, Icon, type IconName } from "./ui";
 import type { Navigate, Route } from "../app";
+import type { AuthSession } from "../api/client";
 
 type TopLevelPage = Exclude<Route["page"], "finding-detail">;
 
@@ -110,10 +111,78 @@ function ProjectSelector({ project, projects, onSelect }: { project: Project; pr
   );
 }
 
+function WorkspaceSelector({
+  currentWorkspaceSlug,
+  workspaces,
+  onSelect
+}: {
+  currentWorkspaceSlug: string;
+  workspaces: AuthSession["workspaces"];
+  onSelect: (workspaceSlug: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const currentWorkspace = workspaces.find((workspace) => workspace.slug === currentWorkspaceSlug) ?? workspaces[0];
+
+  useEffect(() => {
+    function close(event: MouseEvent) {
+      if (ref.current !== null && !ref.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, []);
+
+  if (currentWorkspace === undefined) return null;
+
+  return (
+    <div className="project-select-wrap" ref={ref}>
+      <button aria-expanded={open} aria-haspopup="listbox" className="project-select" onClick={() => setOpen((value) => !value)} type="button">
+        <span className="project-logo">{currentWorkspace.name.slice(0, 1)}</span>
+        <span className="project-text">
+          <span>{currentWorkspace.name}</span>
+          <small className="mono">/{currentWorkspace.slug} · {currentWorkspace.role}</small>
+        </span>
+        <Icon name="chevron-down" size={14} />
+      </button>
+      {open ? (
+        <div className="project-menu" role="listbox">
+          <div className="menu-label">Switch workspace</div>
+          {workspaces.map((workspace) => (
+            <button
+              aria-selected={workspace.slug === currentWorkspace.slug}
+              className={workspace.slug === currentWorkspace.slug ? "selected" : ""}
+              key={workspace.id}
+              onClick={() => {
+                onSelect(workspace.slug);
+                setOpen(false);
+              }}
+              role="option"
+              type="button"
+            >
+              <span className="project-logo">{workspace.name.slice(0, 1)}</span>
+              <span className="project-text">
+                <span>{workspace.name}</span>
+                <small className="mono">/{workspace.slug} · {workspace.role}</small>
+              </span>
+              {workspace.slug === currentWorkspace.slug ? <Icon name="check" size={14} /> : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function TopBar({
   project,
   projects,
   onSelectProject,
+  currentWorkspaceSlug,
+  workspaces,
+  onSelectWorkspace,
   navigate,
   theme,
   toggleTheme
@@ -121,6 +190,9 @@ export function TopBar({
   project: Project;
   projects: Project[];
   onSelectProject: (project: Project) => void;
+  currentWorkspaceSlug: string;
+  workspaces: AuthSession["workspaces"];
+  onSelectWorkspace: (workspaceSlug: string) => void;
   navigate: Navigate;
   theme: "light" | "dark";
   toggleTheme: () => void;
@@ -129,6 +201,7 @@ export function TopBar({
 
   return (
     <header className="topbar">
+      <WorkspaceSelector currentWorkspaceSlug={currentWorkspaceSlug} onSelect={onSelectWorkspace} workspaces={workspaces} />
       <ProjectSelector onSelect={onSelectProject} project={selectedProject} projects={projects} />
       <Button className="topbar-scan" icon="scan-search" onClick={() => navigate({ page: "new-scan" })} variant="primary">New Scan</Button>
       <label className="global-search">

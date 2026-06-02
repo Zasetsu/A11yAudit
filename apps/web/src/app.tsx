@@ -84,6 +84,14 @@ function workspaceIsAllowed(session: AuthSession | null | undefined, workspaceSl
   return session?.workspaces.some((workspace) => workspace.slug === workspaceSlug) ?? false;
 }
 
+function requireWorkspaceSlug(workspaceSlug: string | null): string {
+  if (workspaceSlug === null) {
+    throw new Error("Dashboard data queries require a workspace route.");
+  }
+
+  return workspaceSlug;
+}
+
 function safeDecodePathPart(value: string): string | null {
   try {
     return decodeURIComponent(value);
@@ -178,23 +186,24 @@ export function App() {
   const session: AuthSession | null = authenticatedSession ?? sessionQuery.data ?? null;
   const sessionLoaded = !sessionQuery.isLoading;
   const currentWorkspaceSlug = isWorkspaceRoute(appRoute) ? appRoute.workspaceSlug : null;
+  const currentWorkspace = session?.workspaces.find((workspace) => workspace.slug === currentWorkspaceSlug) ?? null;
   const hasWorkspaceAccess = currentWorkspaceSlug !== null && workspaceIsAllowed(session, currentWorkspaceSlug);
   const dashboardQueriesEnabled = sessionLoaded && session !== null && hasWorkspaceAccess && currentWorkspaceSlug !== null;
 
   const projectsQuery = useQuery({
     queryKey: ["projects", currentWorkspaceSlug],
-    queryFn: () => getProjects(currentWorkspaceSlug ?? ""),
+    queryFn: () => getProjects(requireWorkspaceSlug(currentWorkspaceSlug)),
     enabled: dashboardQueriesEnabled
   });
   const scansQuery = useQuery({
     queryKey: ["scans", currentWorkspaceSlug],
-    queryFn: () => getScans(currentWorkspaceSlug ?? ""),
+    queryFn: () => getScans(requireWorkspaceSlug(currentWorkspaceSlug)),
     enabled: dashboardQueriesEnabled,
     refetchInterval: (query) => (hasActiveScans(query.state.data) ? 2_000 : false)
   });
   const findingsQuery = useQuery({
     queryKey: ["findings", currentWorkspaceSlug],
-    queryFn: () => getFindings(currentWorkspaceSlug ?? ""),
+    queryFn: () => getFindings(requireWorkspaceSlug(currentWorkspaceSlug)),
     enabled: dashboardQueriesEnabled
   });
   const projects = projectsQuery.data ?? [activeProject()];
@@ -207,7 +216,7 @@ export function App() {
   const issuesQuery = useQuery({
     queryKey: ["issues", currentWorkspaceSlug, selectedProject.id, selectedScan?.id ?? null],
     queryFn: () => fetchIssues(
-      currentWorkspaceSlug ?? "",
+      requireWorkspaceSlug(currentWorkspaceSlug),
       selectedScan === undefined
         ? { projectId: selectedProject.id }
         : { projectId: selectedProject.id, scanRunId: selectedScan.id }
@@ -217,7 +226,7 @@ export function App() {
   });
   const reportsQuery = useQuery({
     queryKey: ["reports", currentWorkspaceSlug],
-    queryFn: () => getReports(currentWorkspaceSlug ?? ""),
+    queryFn: () => getReports(requireWorkspaceSlug(currentWorkspaceSlug)),
     enabled: dashboardQueriesEnabled,
     refetchInterval: hasActiveScans(scansQuery.data) ? 2_000 : false
   });
@@ -327,7 +336,7 @@ export function App() {
     return <WorkspacesPage onSelectWorkspace={(slug) => setBrowserRoute({ page: "projects", workspaceSlug: slug })} session={session} />;
   }
 
-  if (session === null || currentWorkspaceSlug === null || !hasWorkspaceAccess) {
+  if (session === null || currentWorkspaceSlug === null || currentWorkspace === null || !hasWorkspaceAccess) {
     return null;
   }
 
@@ -335,6 +344,7 @@ export function App() {
 
   const common = {
     workspaceSlug: currentWorkspaceSlug,
+    workspaceRole: currentWorkspace.role,
     project: selectedProject,
     projects,
     scans: scansQuery.data ?? [],
@@ -382,8 +392,11 @@ export function App() {
         <TopBar
           navigate={navigate}
           onSelectProject={onSelectProject}
+          onSelectWorkspace={(workspaceSlug) => setBrowserRoute({ page: "projects", workspaceSlug })}
           project={selectedProject}
           projects={projects}
+          currentWorkspaceSlug={currentWorkspaceSlug}
+          workspaces={session.workspaces}
           theme={theme}
           toggleTheme={() => setTheme((value) => (value === "light" ? "dark" : "light"))}
         />
