@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { StorageAdapter } from "@a11yaudit/storage";
 import { requireAuth } from "../auth/session.js";
 import type { SqliteDatabase } from "../db/client.js";
-import { isArtifactAuthorizedForWorkspace } from "../repositories/artifacts.js";
+import { getAuthorizedArtifactForWorkspace } from "../repositories/artifacts.js";
 import { getAuthorizedWorkspaceBySlug, type WorkspaceAuthContext } from "../repositories/workspaces.js";
 
 const artifactQuerySchema = z.object({
@@ -55,7 +55,8 @@ export async function registerArtifactRoutes(app: FastifyInstance, options: Arti
     if (!context) return undefined;
 
     const key = parsed.data.key;
-    if (!await isArtifactAuthorizedForWorkspace(db, context.workspaceId, key)) {
+    const artifact = await getAuthorizedArtifactForWorkspace(db, context.workspaceId, key);
+    if (!artifact) {
       return reply.code(404).send({ error: "Artifact not found" });
     }
 
@@ -66,9 +67,8 @@ export async function registerArtifactRoutes(app: FastifyInstance, options: Arti
       return reply.code(404).send({ error: "Artifact not found" });
     }
 
-    const mimeType = key.endsWith(".png") ? "image/png" : key.endsWith(".txt") ? "text/plain; charset=utf-8" : "application/octet-stream";
     return reply
-      .header("content-type", mimeType)
+      .header("content-type", artifact.mimeType)
       .header("content-length", body.byteLength)
       .send(body);
   });

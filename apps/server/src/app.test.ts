@@ -3082,6 +3082,7 @@ describe("server", () => {
       await writeStoredArtifact(storageRoot, "runs/readable/report.pdf", "%PDF-1.4\n");
       await writeStoredArtifact(storageRoot, "runs/readable/screenshot.png", "png");
       await writeStoredArtifact(storageRoot, "runs/readable/snippet.txt", "snippet");
+      await writeStoredArtifact(storageRoot, "runs/readable/blob", "html");
       dbClient.db.insert(reports).values(reportFixture({
         id: "report-readable",
         projectId: project.json().id,
@@ -3095,15 +3096,18 @@ describe("server", () => {
         scanRunId: scan.json().id,
         evidence: JSON.stringify([
           { kind: "page_screenshot", artifactKey: "runs/readable/screenshot.png", mimeType: "image/png" },
-          { kind: "html_snippet", artifactKey: "runs/readable/snippet.txt", mimeType: "text/plain" }
+          { kind: "html_snippet", artifactKey: "runs/readable/snippet.txt", mimeType: "text/plain" },
+          { kind: "html_snippet", artifactKey: "runs/readable/blob", mimeType: "text/html" }
         ])
       })).run();
 
       const ownerList = await listReports(app, owner, "", workspaceSlug);
       const memberList = await listReports(app, member, "", workspaceSlug);
       const reportDownload = await downloadReport(app, member, "report-readable", workspaceSlug);
+      const reportArtifactDownload = await downloadArtifact(app, member, "runs/readable/report.pdf", workspaceSlug);
       const screenshotDownload = await downloadArtifact(app, member, "runs/readable/screenshot.png", workspaceSlug);
       const snippetDownload = await downloadArtifact(app, owner, "runs/readable/snippet.txt", workspaceSlug);
+      const htmlBlobDownload = await downloadArtifact(app, owner, "runs/readable/blob", workspaceSlug);
 
       expect(ownerList.statusCode).toBe(200);
       expect(ownerList.json().data).toHaveLength(1);
@@ -3111,10 +3115,14 @@ describe("server", () => {
       expect(memberList.json().data).toHaveLength(1);
       expect(reportDownload.statusCode).toBe(200);
       expect(reportDownload.headers["content-type"]).toContain("application/pdf");
+      expect(reportArtifactDownload.statusCode).toBe(200);
+      expect(reportArtifactDownload.headers["content-type"]).toContain("application/pdf");
       expect(screenshotDownload.statusCode).toBe(200);
       expect(screenshotDownload.headers["content-type"]).toContain("image/png");
       expect(snippetDownload.statusCode).toBe(200);
       expect(snippetDownload.headers["content-type"]).toContain("text/plain");
+      expect(htmlBlobDownload.statusCode).toBe(200);
+      expect(htmlBlobDownload.headers["content-type"]).toContain("text/html");
     } finally {
       await app.close();
       dbClient.close();
