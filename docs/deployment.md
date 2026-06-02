@@ -25,6 +25,7 @@ A11YAUDIT_MAX_CONCURRENT_SCANS=1
 A11YAUDIT_DB_PATH=.a11yaudit/a11yaudit.db
 A11YAUDIT_SERVER_URL=https://your-api-origin.example
 A11YAUDIT_WEB_ORIGIN=https://your-web-origin.example
+A11YAUDIT_COOKIE_DOMAIN=.example.com
 PORT=7842
 NODE_ENV=production
 ```
@@ -36,9 +37,20 @@ Notes:
 - `A11YAUDIT_DB_PATH` is the current SQLite database path variable used by the server startup. The default is `.a11yaudit/a11yaudit.db`.
 - `A11YAUDIT_SERVER_URL` is the public API origin used by the web app. Set it to the browser-reachable server origin. The default development origin is `http://localhost:7842`.
 - `A11YAUDIT_WEB_ORIGIN` controls the trusted browser origin used for CORS and CSRF origin checks. Set it to the deployed web app origin. The default is `http://localhost:5173`.
+- `A11YAUDIT_COOKIE_DOMAIN` is optional. Leave it unset for same-origin or reverse-proxied deployments. For same-site split deployments such as `app.example.com` and `api.example.com`, set it to the shared cookie domain, for example `.example.com`.
 - `DATABASE_URL` is not the current server database setting.
 - `PORT` defaults to `7842`.
 - `NODE_ENV=production` makes auth cookies secure, so deploy behind HTTPS.
+
+For a split same-site deployment, set:
+
+```text
+A11YAUDIT_SERVER_URL=https://api.example.com
+A11YAUDIT_WEB_ORIGIN=https://app.example.com
+A11YAUDIT_COOKIE_DOMAIN=.example.com
+```
+
+This lets the browser read the CSRF cookie on the web origin and send session cookies to the API. Split deployments on different registrable domains are not supported by the current cookie-based CSRF and session model. Same-origin or reverse-proxied deployments can leave `A11YAUDIT_COOKIE_DOMAIN` unset.
 
 The web app also reads:
 

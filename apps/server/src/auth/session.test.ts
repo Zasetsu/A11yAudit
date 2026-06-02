@@ -2,7 +2,12 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { createDb, initializeDb, type DbClient } from "../db/client.js";
 import { sessions, users } from "../db/schema.js";
-import { csrfCookieName, sessionCookieName } from "./cookies.js";
+import {
+  csrfCookieName,
+  serializeCsrfCookie,
+  serializeSessionCookie,
+  sessionCookieName
+} from "./cookies.js";
 import {
   createSession,
   readAuthFromRequest,
@@ -13,6 +18,7 @@ import {
 import { hashToken } from "./tokens.js";
 
 let dbClient: DbClient | undefined;
+const originalCookieDomain = process.env.A11YAUDIT_COOKIE_DOMAIN;
 
 function setupDb(): DbClient {
   dbClient = createDb(":memory:");
@@ -54,6 +60,33 @@ function seedUser(client: DbClient): void {
 afterEach(() => {
   dbClient?.close();
   dbClient = undefined;
+
+  if (originalCookieDomain === undefined) {
+    delete process.env.A11YAUDIT_COOKIE_DOMAIN;
+  } else {
+    process.env.A11YAUDIT_COOKIE_DOMAIN = originalCookieDomain;
+  }
+});
+
+describe("auth cookies", () => {
+  it("omits a cookie domain by default and when configured empty", () => {
+    delete process.env.A11YAUDIT_COOKIE_DOMAIN;
+
+    expect(serializeSessionCookie("session-token")).not.toContain("Domain=");
+    expect(serializeCsrfCookie("csrf-token")).not.toContain("Domain=");
+
+    process.env.A11YAUDIT_COOKIE_DOMAIN = "";
+
+    expect(serializeSessionCookie("session-token")).not.toContain("Domain=");
+    expect(serializeCsrfCookie("csrf-token")).not.toContain("Domain=");
+  });
+
+  it("includes the configured shared cookie domain on session and CSRF cookies", () => {
+    process.env.A11YAUDIT_COOKIE_DOMAIN = ".example.com";
+
+    expect(serializeSessionCookie("session-token")).toContain("Domain=.example.com");
+    expect(serializeCsrfCookie("csrf-token")).toContain("Domain=.example.com");
+  });
 });
 
 describe("sessions", () => {

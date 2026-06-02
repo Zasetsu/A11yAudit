@@ -9,12 +9,22 @@ export interface CookieOptions {
   secure?: boolean;
 }
 
+function configuredCookieDomain(): string | undefined {
+  const domain = process.env.A11YAUDIT_COOKIE_DOMAIN?.trim();
+  return domain ? domain : undefined;
+}
+
 export function serializeCookie(name: string, value: string, options: CookieOptions = {}): string {
   const parts = [
     `${encodeURIComponent(name)}=${encodeURIComponent(value)}`,
     `Path=${options.path ?? "/"}`,
     `SameSite=${options.sameSite ?? "Lax"}`
   ];
+  const domain = configuredCookieDomain();
+
+  if (domain) {
+    parts.push(`Domain=${domain}`);
+  }
 
   if (options.maxAgeSeconds !== undefined) {
     parts.push(`Max-Age=${options.maxAgeSeconds}`);

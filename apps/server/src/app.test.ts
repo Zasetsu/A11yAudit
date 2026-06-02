@@ -992,6 +992,34 @@ describe("server", () => {
         expect(response.json().data.workspaces[0]).toMatchObject({ slug: "ada-workspace", role: "owner" });
         expect(cookieValue(response, sessionCookieName)).not.toBe("");
         expect(cookieValue(response, csrfCookieName)).not.toBe("");
+        expect(setCookieHeaders(response).find((cookie) => cookie.startsWith(`${sessionCookieName}=`))).not.toContain("Domain=");
+        expect(setCookieHeaders(response).find((cookie) => cookie.startsWith(`${csrfCookieName}=`))).not.toContain("Domain=");
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("sets the configured shared cookie domain on login auth cookies", async () => {
+    vi.stubEnv("A11YAUDIT_COOKIE_DOMAIN", ".example.com");
+
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        await signup(app, "ada@example.com", "Ada Workspace", "correct horse battery staple");
+
+        const response = await app.inject({
+          method: "POST",
+          url: "/api/auth/login",
+          payload: {
+            email: "ada@example.com",
+            password: "correct horse battery staple"
+          }
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(setCookieHeaders(response).find((cookie) => cookie.startsWith(`${sessionCookieName}=`))).toContain("Domain=.example.com");
+        expect(setCookieHeaders(response).find((cookie) => cookie.startsWith(`${csrfCookieName}=`))).toContain("Domain=.example.com");
       } finally {
         await app.close();
       }
@@ -1057,6 +1085,8 @@ describe("server", () => {
   });
 
   it("logs out with CSRF, revokes the session, and clears cookies", async () => {
+    vi.stubEnv("A11YAUDIT_COOKIE_DOMAIN", ".example.com");
+
     await withTempDb(async (dbPath) => {
       const app = await buildServer({ dbPath, executeScans: false });
       try {
@@ -1078,6 +1108,8 @@ describe("server", () => {
         expect(response.json()).toEqual({ data: { ok: true } });
         expect(setCookieHeaders(response).find((cookie) => cookie.startsWith(`${sessionCookieName}=`))).toContain("Max-Age=0");
         expect(setCookieHeaders(response).find((cookie) => cookie.startsWith(`${csrfCookieName}=`))).toContain("Max-Age=0");
+        expect(setCookieHeaders(response).find((cookie) => cookie.startsWith(`${sessionCookieName}=`))).toContain("Domain=.example.com");
+        expect(setCookieHeaders(response).find((cookie) => cookie.startsWith(`${csrfCookieName}=`))).toContain("Domain=.example.com");
 
       } finally {
         await app.close();
