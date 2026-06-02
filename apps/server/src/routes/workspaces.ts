@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, gt, isNull } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -55,6 +55,12 @@ type SessionUser = {
   fullName: string;
   email: string;
 };
+
+class InvitationClaimFailedError extends Error {
+  constructor() {
+    super("Invitation is no longer valid");
+  }
+}
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -323,43 +329,60 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, options: Wor
       };
     }
 
-    db.transaction((tx) => {
-      if (!existingUser) {
-        if (!newUserPasswordHash) {
-          throw new Error("Missing password hash for invited user");
+    try {
+      db.transaction((tx) => {
+        const claim = tx.update(workspaceInvitations)
+          .set({ acceptedAt: now.toISOString() })
+          .where(and(
+            eq(workspaceInvitations.id, invitation.id),
+            isNull(workspaceInvitations.acceptedAt),
+            isNull(workspaceInvitations.revokedAt),
+            gt(workspaceInvitations.expiresAt, now.toISOString())
+          ))
+          .run();
+
+        if (claim.changes !== 1) {
+          throw new InvitationClaimFailedError();
         }
 
-        tx.insert(users).values({
-          ...sessionUser,
-          passwordHash: newUserPasswordHash,
-          createdAt: now.toISOString()
-        }).run();
+        if (!existingUser) {
+          if (!newUserPasswordHash) {
+            throw new Error("Missing password hash for invited user");
+          }
+
+          tx.insert(users).values({
+            ...sessionUser,
+            passwordHash: newUserPasswordHash,
+            createdAt: now.toISOString()
+          }).run();
+        }
+
+        const existingMembership = tx
+          .select({ id: workspaceMembers.id })
+          .from(workspaceMembers)
+          .where(and(
+            eq(workspaceMembers.workspaceId, invitation.workspaceId),
+            eq(workspaceMembers.userId, sessionUser.id)
+          ))
+          .get();
+
+        if (!existingMembership) {
+          tx.insert(workspaceMembers).values({
+            id: `wmem-${nanoid(16)}`,
+            workspaceId: invitation.workspaceId,
+            userId: sessionUser.id,
+            role: "member",
+            createdAt: now.toISOString()
+          }).run();
+        }
+      });
+    } catch (error) {
+      if (error instanceof InvitationClaimFailedError) {
+        return reply.code(410).send({ error: "Invitation is no longer valid" });
       }
 
-      const existingMembership = tx
-        .select({ id: workspaceMembers.id })
-        .from(workspaceMembers)
-        .where(and(
-          eq(workspaceMembers.workspaceId, invitation.workspaceId),
-          eq(workspaceMembers.userId, sessionUser.id)
-        ))
-        .get();
-
-      if (!existingMembership) {
-        tx.insert(workspaceMembers).values({
-          id: `wmem-${nanoid(16)}`,
-          workspaceId: invitation.workspaceId,
-          userId: sessionUser.id,
-          role: "member",
-          createdAt: now.toISOString()
-        }).run();
-      }
-
-      tx.update(workspaceInvitations)
-        .set({ acceptedAt: now.toISOString() })
-        .where(eq(workspaceInvitations.id, invitation.id))
-        .run();
-    });
+      throw error;
+    }
 
     const session = createSession(db, sessionUser.id, now);
     setSessionCookies(reply, session);

@@ -1255,6 +1255,60 @@ describe("server", () => {
     });
   });
 
+  it("allows only one concurrent accept for the same invitation token", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        await signupWithPublicSignup(app, "existing@example.com", "Existing Workspace", "correct horse battery staple");
+        const ownerCookies = authCookies(owner);
+        const invite = await createWorkspaceInvite(app, ownerCookies, "owner-workspace", "existing@example.com");
+        const token = invite.json().data.inviteUrl.replace("/invite/", "");
+
+        const responses = await Promise.all([
+          app.inject({
+            method: "POST",
+            url: `/api/invitations/${token}/accept`,
+            payload: {
+              fullName: "Existing User",
+              email: "existing@example.com",
+              password: "correct horse battery staple"
+            }
+          }),
+          app.inject({
+            method: "POST",
+            url: `/api/invitations/${token}/accept`,
+            payload: {
+              fullName: "Existing User",
+              email: "existing@example.com",
+              password: "correct horse battery staple"
+            }
+          })
+        ]);
+
+        expect(responses.map((response) => response.statusCode).sort((left, right) => left - right)).toEqual([200, 410]);
+
+        const dbClient = createDb(dbPath);
+        try {
+          const row = dbClient.sqlite
+            .prepare(`
+              select count(*) as membership_count
+              from users
+              inner join workspace_members on workspace_members.user_id = users.id
+              inner join workspaces on workspaces.id = workspace_members.workspace_id
+              where users.email = ? and workspaces.slug = ?
+            `)
+            .get("existing@example.com", "owner-workspace") as { membership_count: number };
+          expect(row.membership_count).toBe(1);
+        } finally {
+          dbClient.close();
+        }
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
   it("accepts an invite for an existing workspace member without duplicating membership", async () => {
     await withTempDb(async (dbPath) => {
       const app = await buildServer({ dbPath, executeScans: false });
