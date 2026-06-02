@@ -72,7 +72,10 @@ export function App() {
   });
   const contentRef = useRef<HTMLElement>(null);
 
-  const projectsQuery = useQuery({ queryKey: ["projects"], queryFn: getProjects });
+  const projectsQuery = useQuery({
+    queryKey: ["projects", currentWorkspaceSlug],
+    queryFn: () => getProjects(currentWorkspaceSlug)
+  });
   const scansQuery = useQuery({
     queryKey: ["scans", currentWorkspaceSlug],
     queryFn: () => getScans(currentWorkspaceSlug),

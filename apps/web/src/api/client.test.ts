@@ -54,6 +54,18 @@ describe("api client", () => {
     await expect(getFindings()).resolves.toEqual([]);
   });
 
+  it("requests projects from the current workspace route", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getProjects } = await importClient("https://api.example.test/", "owner-workspace");
+
+    await expect(getProjects()).resolves.toEqual([]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.test/api/workspaces/owner-workspace/projects",
+      expect.objectContaining({ headers: { Accept: "application/json" } })
+    );
+  });
+
   it("requests scans from the current workspace route", async () => {
     const fetchMock = vi.fn(async () => jsonResponse([]));
     vi.stubGlobal("fetch", fetchMock);
@@ -190,7 +202,7 @@ describe("api client", () => {
       )
     );
     vi.stubGlobal("fetch", fetchMock);
-    const { createProject } = await importClient("https://api.example.test/");
+    const { createProject } = await importClient("https://api.example.test/", "owner-workspace");
 
     await expect(createProject({ name: "Municipal Portal", url: "https://municipal.example.gov/" })).resolves.toMatchObject({
       id: "project-1",
@@ -198,7 +210,7 @@ describe("api client", () => {
       domain: "municipal.example.gov"
     });
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://api.example.test/api/projects",
+      "https://api.example.test/api/workspaces/owner-workspace/projects",
       expect.objectContaining({
         body: JSON.stringify({ name: "Municipal Portal", url: "https://municipal.example.gov/" }),
         method: "POST"

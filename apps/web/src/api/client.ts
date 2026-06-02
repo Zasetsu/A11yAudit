@@ -120,6 +120,10 @@ function workspaceScansPath(workspaceSlug = currentWorkspaceSlug): string {
   return `/api/workspaces/${encodeURIComponent(workspaceSlug)}/scans`;
 }
 
+function workspaceProjectsPath(workspaceSlug = currentWorkspaceSlug): string {
+  return `/api/workspaces/${encodeURIComponent(workspaceSlug)}/projects`;
+}
+
 async function fetchList<T>(path: string): Promise<ApiListResult<T>> {
   const url = apiUrl(path);
   if (url === null) {
@@ -278,8 +282,8 @@ function mapIssue(row: ServerIssue): Issue {
   };
 }
 
-export async function getProjects(): Promise<Project[]> {
-  const result = await fetchList<ServerProject>("/api/projects");
+export async function getProjects(workspaceSlug = currentWorkspaceSlug): Promise<Project[]> {
+  const result = await fetchList<ServerProject>(workspaceProjectsPath(workspaceSlug));
   if (result.status === "not_configured") {
     return demoProjects;
   }
@@ -404,8 +408,8 @@ export function getArtifactDownloadUrl(artifactKey: string): string | null {
   return apiUrl(`/api/artifacts/download?key=${encoded}`);
 }
 
-export async function createProject(payload: { name?: string; url: string }): Promise<Project | null> {
-  const url = apiUrl("/api/projects");
+export async function createProject(payload: { name?: string; url: string }, workspaceSlug = currentWorkspaceSlug): Promise<Project | null> {
+  const url = apiUrl(workspaceProjectsPath(workspaceSlug));
   if (url === null) {
     return null;
   }

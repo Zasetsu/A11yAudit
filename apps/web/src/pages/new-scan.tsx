@@ -35,7 +35,7 @@ export function NewScanPage({ project, projects, navigate, onSelectProject }: Pa
       if (selectedViewports.length === 0) return null;
 
       const scanProject = projectMode === "new"
-        ? await createProject({ name: projectName.trim() === "" ? undefined : projectName, url })
+        ? await createProject({ name: projectName.trim() === "" ? undefined : projectName, url }, currentWorkspaceSlug)
         : selected;
 
       if (scanProject === null || scanProject.id === "") return null;
@@ -57,7 +57,7 @@ export function NewScanPage({ project, projects, navigate, onSelectProject }: Pa
       }
 
       onSelectProject(scan.project);
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      void queryClient.invalidateQueries({ queryKey: ["projects", currentWorkspaceSlug] });
       void queryClient.invalidateQueries({ queryKey: ["scans", currentWorkspaceSlug] });
       void queryClient.invalidateQueries({ queryKey: ["findings"] });
       void queryClient.invalidateQueries({ queryKey: ["reports"] });
