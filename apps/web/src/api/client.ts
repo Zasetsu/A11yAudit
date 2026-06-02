@@ -128,6 +128,14 @@ function workspaceReportsPath(workspaceSlug = currentWorkspaceSlug): string {
   return `/api/workspaces/${encodeURIComponent(workspaceSlug)}/reports`;
 }
 
+function workspaceFindingsPath(workspaceSlug = currentWorkspaceSlug): string {
+  return `/api/workspaces/${encodeURIComponent(workspaceSlug)}/findings`;
+}
+
+function workspaceIssuesPath(workspaceSlug = currentWorkspaceSlug): string {
+  return `/api/workspaces/${encodeURIComponent(workspaceSlug)}/issues`;
+}
+
 function workspaceReportDownloadPath(reportId: string, workspaceSlug = currentWorkspaceSlug): string {
   return `${workspaceReportsPath(workspaceSlug)}/${encodeURIComponent(reportId)}/download`;
 }
@@ -347,8 +355,8 @@ export async function getScans(workspaceSlug = currentWorkspaceSlug): Promise<Sc
   }));
 }
 
-export async function getFindings(): Promise<Finding[]> {
-  const result = await fetchList<ServerFinding>("/api/findings");
+export async function getFindings(workspaceSlug = currentWorkspaceSlug): Promise<Finding[]> {
+  const result = await fetchList<ServerFinding>(workspaceFindingsPath(workspaceSlug));
   if (result.status === "not_configured") {
     return demoFindings;
   }
@@ -376,13 +384,16 @@ export async function getFindings(): Promise<Finding[]> {
   }));
 }
 
-export async function fetchIssues(params: { projectId?: string; scanRunId?: string } = {}): Promise<Issue[]> {
+export async function fetchIssues(
+  params: { projectId?: string; scanRunId?: string } = {},
+  workspaceSlug = currentWorkspaceSlug
+): Promise<Issue[]> {
   const search = new URLSearchParams();
   if (params.projectId !== undefined) search.set("projectId", params.projectId);
   if (params.scanRunId !== undefined) search.set("scanRunId", params.scanRunId);
 
   const query = search.toString();
-  const result = await fetchList<ServerIssue>(`/api/issues${query === "" ? "" : `?${query}`}`);
+  const result = await fetchList<ServerIssue>(`${workspaceIssuesPath(workspaceSlug)}${query === "" ? "" : `?${query}`}`);
   if (result.status === "not_configured") {
     return demoIssues;
   }

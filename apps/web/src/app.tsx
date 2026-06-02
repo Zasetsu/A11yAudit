@@ -81,7 +81,10 @@ export function App() {
     queryFn: () => getScans(currentWorkspaceSlug),
     refetchInterval: (query) => (hasActiveScans(query.state.data) ? 2_000 : false)
   });
-  const findingsQuery = useQuery({ queryKey: ["findings"], queryFn: getFindings });
+  const findingsQuery = useQuery({
+    queryKey: ["findings", currentWorkspaceSlug],
+    queryFn: () => getFindings(currentWorkspaceSlug)
+  });
   const projects = projectsQuery.data ?? [activeProject()];
   const [selectedProjectId, setSelectedProjectId] = useState<string>(activeProject().id);
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? projects[0] ?? emptyProject();
@@ -90,11 +93,12 @@ export function App() {
     [scansQuery.data, selectedProject.id]
   );
   const issuesQuery = useQuery({
-    queryKey: ["issues", selectedProject.id, selectedScan?.id ?? null],
+    queryKey: ["issues", currentWorkspaceSlug, selectedProject.id, selectedScan?.id ?? null],
     queryFn: () => fetchIssues(
       selectedScan === undefined
         ? { projectId: selectedProject.id }
-        : { projectId: selectedProject.id, scanRunId: selectedScan.id }
+        : { projectId: selectedProject.id, scanRunId: selectedScan.id },
+      currentWorkspaceSlug
     ),
     refetchInterval: hasActiveScans(scansQuery.data) ? 3_000 : false
   });

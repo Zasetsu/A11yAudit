@@ -59,8 +59,9 @@ export function NewScanPage({ project, projects, navigate, onSelectProject }: Pa
       onSelectProject(scan.project);
       void queryClient.invalidateQueries({ queryKey: ["projects", currentWorkspaceSlug] });
       void queryClient.invalidateQueries({ queryKey: ["scans", currentWorkspaceSlug] });
-      void queryClient.invalidateQueries({ queryKey: ["findings"] });
-      void queryClient.invalidateQueries({ queryKey: ["reports"] });
+      void queryClient.invalidateQueries({ queryKey: ["findings", currentWorkspaceSlug] });
+      void queryClient.invalidateQueries({ queryKey: ["issues", currentWorkspaceSlug] });
+      void queryClient.invalidateQueries({ queryKey: ["reports", currentWorkspaceSlug] });
       navigate({ page: "scan-runs" });
     }
   });

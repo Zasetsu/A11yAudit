@@ -149,7 +149,7 @@ describe("api client", () => {
       ])
     );
     vi.stubGlobal("fetch", fetchMock);
-    const { fetchIssues } = await importClient("https://api.example.test/");
+    const { fetchIssues } = await importClient("https://api.example.test/", "owner-workspace");
 
     await expect(fetchIssues({ projectId: "project-1" })).resolves.toMatchObject([
       {
@@ -160,7 +160,7 @@ describe("api client", () => {
       }
     ]);
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://api.example.test/api/issues?projectId=project-1",
+      "https://api.example.test/api/workspaces/owner-workspace/issues?projectId=project-1",
       expect.objectContaining({ headers: { Accept: "application/json" } })
     );
   });
@@ -168,11 +168,11 @@ describe("api client", () => {
   it("requests grouped issues with project and scan filters", async () => {
     const fetchMock = vi.fn(async () => jsonResponse([]));
     vi.stubGlobal("fetch", fetchMock);
-    const { fetchIssues } = await importClient("https://api.example.test/");
+    const { fetchIssues } = await importClient("https://api.example.test/", "owner-workspace");
 
     await expect(fetchIssues({ projectId: "project-1", scanRunId: "run-1" })).resolves.toEqual([]);
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://api.example.test/api/issues?projectId=project-1&scanRunId=run-1",
+      "https://api.example.test/api/workspaces/owner-workspace/issues?projectId=project-1&scanRunId=run-1",
       expect.objectContaining({ headers: { Accept: "application/json" } })
     );
   });
@@ -180,18 +180,18 @@ describe("api client", () => {
   it("requests grouped issues with scan filters", async () => {
     const fetchMock = vi.fn(async () => jsonResponse([]));
     vi.stubGlobal("fetch", fetchMock);
-    const { fetchIssues } = await importClient("https://api.example.test/");
+    const { fetchIssues } = await importClient("https://api.example.test/", "owner-workspace");
 
     await expect(fetchIssues({ scanRunId: "run-1" })).resolves.toEqual([]);
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://api.example.test/api/issues?scanRunId=run-1",
+      "https://api.example.test/api/workspaces/owner-workspace/issues?scanRunId=run-1",
       expect.objectContaining({ headers: { Accept: "application/json" } })
     );
   });
 
   it("does not fabricate required grouped issue fields for malformed API rows", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => jsonResponse([{}])));
-    const { fetchIssues } = await importClient("https://api.example.test/");
+    const { fetchIssues } = await importClient("https://api.example.test/", "owner-workspace");
 
     await expect(fetchIssues({ projectId: "project-1" })).resolves.toEqual([]);
   });
@@ -284,9 +284,7 @@ describe("api client", () => {
   });
 
   it("maps finding evidence artifacts and exposes artifact download URLs", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
+    const fetchMock = vi.fn(async () =>
         jsonResponse([
           {
             id: "finding-1",
@@ -308,8 +306,8 @@ describe("api client", () => {
             ])
           }
         ])
-      )
     );
+    vi.stubGlobal("fetch", fetchMock);
     const { getArtifactDownloadUrl, getFindings } = await importClient("https://api.example.test/", "owner-workspace");
 
     await expect(getFindings()).resolves.toMatchObject([
@@ -325,6 +323,10 @@ describe("api client", () => {
         ]
       }
     ]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.test/api/workspaces/owner-workspace/findings",
+      expect.objectContaining({ headers: { Accept: "application/json" } })
+    );
     expect(getArtifactDownloadUrl("runs/run-1/screenshot/page.png")).toBe(
       "https://api.example.test/api/workspaces/owner-workspace/artifacts/download?key=runs%2Frun-1%2Fscreenshot%2Fpage.png"
     );
