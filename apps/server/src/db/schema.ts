@@ -1,12 +1,64 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey(),
+  fullName: text("full_name").notNull(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  createdAt: text("created_at").notNull()
+});
+
+export const workspaces = sqliteTable("workspaces", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  createdAt: text("created_at").notNull()
+});
+
+export const workspaceMembers = sqliteTable("workspace_members", {
+  id: text("id").primaryKey(),
+  workspaceId: text("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: text("role", { enum: ["owner", "member"] }).notNull(),
+  createdAt: text("created_at").notNull()
+}, (table) => ({
+  workspaceUserUnique: uniqueIndex("workspace_members_workspace_user_unique").on(table.workspaceId, table.userId)
+}));
+
+export const workspaceInvitations = sqliteTable("workspace_invitations", {
+  id: text("id").primaryKey(),
+  workspaceId: text("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  role: text("role", { enum: ["member"] }).notNull().default("member"),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: text("expires_at").notNull(),
+  acceptedAt: text("accepted_at"),
+  revokedAt: text("revoked_at"),
+  invitedByUserId: text("invited_by_user_id").notNull().references(() => users.id),
+  createdAt: text("created_at").notNull()
+});
+
+export const sessions = sqliteTable("sessions", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  csrfTokenHash: text("csrf_token_hash").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  createdAt: text("created_at").notNull(),
+  lastSeenAt: text("last_seen_at").notNull(),
+  revokedAt: text("revoked_at")
+});
 
 export const projects = sqliteTable("projects", {
   id: text("id").primaryKey(),
+  workspaceId: text("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   url: text("url").notNull(),
   domain: text("domain").notNull(),
   createdAt: text("created_at").notNull()
-});
+}, (table) => ({
+  workspaceDomainUnique: uniqueIndex("projects_workspace_domain_unique").on(table.workspaceId, table.domain)
+}));
 
 export const scanRuns = sqliteTable("scan_runs", {
   id: text("id").primaryKey(),

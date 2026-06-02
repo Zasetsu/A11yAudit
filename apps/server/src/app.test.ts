@@ -372,6 +372,21 @@ describe("server", () => {
     });
   });
 
+  it("initializes SaaS auth and workspace tables", async () => {
+    await withTempDb(async (dbPath) => {
+      const dbClient = createDb(dbPath);
+      initializeDb(dbClient.sqlite);
+      const rows = dbClient.sqlite.prepare("select name from sqlite_master where type = 'table'").all() as Array<{ name: string }>;
+      const names = rows.map((row) => row.name);
+      expect(names).toContain("users");
+      expect(names).toContain("workspaces");
+      expect(names).toContain("workspace_members");
+      expect(names).toContain("workspace_invitations");
+      expect(names).toContain("sessions");
+      dbClient.close();
+    });
+  });
+
   it("persists created projects and returns them in list order", async () => {
     await withTempDb(async (dbPath) => {
       const app = await buildServer({ dbPath, executeScans: false });
@@ -621,6 +636,7 @@ describe("server", () => {
     const now = new Date().toISOString();
     dbClient.db.insert(projects).values({
       id: "project-interrupted",
+      workspaceId: "default-workspace",
       name: "Interrupted",
       url: "https://interrupted.example.gov",
       domain: "interrupted.example.gov",

@@ -6,6 +6,8 @@ import { assertSafeUrl } from "@a11yaudit/crawler";
 import type { SqliteDatabase } from "../db/client.js";
 import { issues, projects, reports, scanRuns } from "../db/schema.js";
 
+const DEFAULT_WORKSPACE_ID = "default-workspace";
+
 const projectPayloadSchema = z
   .object({
     name: z.string().trim().min(1).optional(),
@@ -115,6 +117,7 @@ export async function registerProjectRoutes(app: FastifyInstance, options: Proje
     const now = new Date().toISOString();
     const row = {
       id: `proj-${nanoid(10)}`,
+      workspaceId: DEFAULT_WORKSPACE_ID,
       name: parsed.data.name ?? target.domain,
       url: target.url,
       domain: target.domain,
