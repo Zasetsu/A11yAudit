@@ -173,7 +173,9 @@ async function apiFetch(path: string, options: RequestInit = {}): Promise<Respon
   }
 
   const csrfToken = readCookie("a11yaudit_csrf");
-  if (csrfToken !== null && csrfToken !== "") {
+  const method = (options.method ?? "GET").toUpperCase();
+  const isUnsafeMethod = method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE";
+  if (isUnsafeMethod && csrfToken !== null && csrfToken !== "") {
     headers.set("X-CSRF-Token", csrfToken);
   }
 

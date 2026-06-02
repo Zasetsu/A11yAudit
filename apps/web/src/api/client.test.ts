@@ -76,6 +76,7 @@ describe("api client", () => {
   });
 
   it("getSession maps a valid session and fetches with credentials", async () => {
+    vi.stubGlobal("document", { cookie: "a11yaudit_csrf=csrf-token" });
     const fetchMock = vi.fn(async () => jsonDataResponse(sessionPayload()));
     vi.stubGlobal("fetch", fetchMock);
     const { getSession } = await importClient("https://api.example.test/");
@@ -86,6 +87,7 @@ describe("api client", () => {
       expect.objectContaining({ credentials: "include" })
     );
     expect(requestHeaders(fetchMock).get("Accept")).toBe("application/json");
+    expect(requestHeaders(fetchMock).get("X-CSRF-Token")).toBeNull();
   });
 
   it("signup, login, and acceptInvite POST JSON to auth endpoints with credentials", async () => {
