@@ -41,10 +41,18 @@ export type CsrfValidationResult =
   | { valid: true }
   | { valid: false; statusCode: 403; error: string };
 
+export interface CsrfValidationOptions {
+  trustedBrowserOrigin?: string;
+}
+
 declare module "fastify" {
   interface FastifyRequest {
     auth?: RequestAuth;
   }
+}
+
+export function getTrustedBrowserOrigin(): string {
+  return process.env.A11YAUDIT_WEB_ORIGIN ?? "http://localhost:5173";
 }
 
 function anonymousAuth(csrfToken: string | null = null): RequestAuth {
@@ -194,20 +202,34 @@ function requestOrigin(request: RequestLike): string | null {
   return `${protocol}://${host}`;
 }
 
-function hasSameOrigin(request: RequestLike): boolean {
-  const expectedOrigin = requestOrigin(request);
-  if (!expectedOrigin) return true;
+function normalizeOrigin(origin: string | null | undefined): string | null {
+  if (!origin) return null;
+
+  try {
+    return new URL(origin).origin;
+  } catch {
+    return null;
+  }
+}
+
+function hasTrustedOrigin(request: RequestLike, trustedBrowserOrigin: string): boolean {
+  const acceptedOrigins = new Set(
+    [requestOrigin(request), normalizeOrigin(trustedBrowserOrigin)].filter((origin): origin is string => origin !== null)
+  );
+
+  if (acceptedOrigins.size === 0) return true;
 
   const originHeader = firstHeaderValue(request.headers.origin);
   if (originHeader) {
-    return originHeader === expectedOrigin;
+    const origin = normalizeOrigin(originHeader);
+    return origin !== null && acceptedOrigins.has(origin);
   }
 
   const refererHeader = firstHeaderValue(request.headers.referer ?? request.headers.referrer);
   if (!refererHeader) return true;
 
   try {
-    return new URL(refererHeader).origin === expectedOrigin;
+    return acceptedOrigins.has(new URL(refererHeader).origin);
   } catch {
     return false;
   }
@@ -217,7 +239,7 @@ function getCsrfHeader(request: RequestLike): string | undefined {
   return firstHeaderValue(request.headers["x-csrf-token"] ?? request.headers["X-CSRF-Token"]);
 }
 
-export function validateCsrf(db: SqliteDatabase, request: RequestLike): CsrfValidationResult {
+export function validateCsrf(db: SqliteDatabase, request: RequestLike, options: CsrfValidationOptions = {}): CsrfValidationResult {
   if (!isUnsafeMethod(request.method)) {
     return { valid: true };
   }
@@ -227,7 +249,7 @@ export function validateCsrf(db: SqliteDatabase, request: RequestLike): CsrfVali
     return { valid: true };
   }
 
-  if (!hasSameOrigin(request)) {
+  if (!hasTrustedOrigin(request, options.trustedBrowserOrigin ?? getTrustedBrowserOrigin())) {
     return { valid: false, statusCode: 403, error: "Invalid CSRF origin" };
   }
 

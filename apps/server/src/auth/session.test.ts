@@ -128,6 +128,25 @@ describe("sessions", () => {
     expect(validateCsrf(client.db, request)).toEqual({ valid: true });
   });
 
+  it("accepts CSRF from the trusted browser origin when posting to the API origin", () => {
+    const client = setupDb();
+    seedUser(client);
+    const session = createSession(client.db, "user-1", new Date("2026-06-02T00:00:00.000Z"));
+    const request = createRequest({
+      cookie: `${sessionCookieName}=${session.sessionToken}; ${csrfCookieName}=${session.csrfToken}`,
+      headers: {
+        "x-csrf-token": session.csrfToken,
+        origin: "http://localhost:5173",
+        host: "localhost:7842"
+      },
+      method: "POST"
+    });
+
+    request.auth = readAuthFromRequest(client.db, request, new Date("2026-06-03T00:00:00.000Z"));
+
+    expect(validateCsrf(client.db, request)).toEqual({ valid: true });
+  });
+
   it("rejects CSRF when an authenticated unsafe request omits the header", () => {
     const client = setupDb();
     seedUser(client);

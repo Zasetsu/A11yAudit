@@ -5,7 +5,7 @@ import { LocalStorageAdapter } from "@a11yaudit/storage";
 import { eq, inArray } from "drizzle-orm";
 import Fastify, { type FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
-import { readAuthFromRequest, validateCsrf } from "./auth/session.js";
+import { getTrustedBrowserOrigin, readAuthFromRequest, validateCsrf } from "./auth/session.js";
 import { createDb, initializeDb, type DbClient } from "./db/client.js";
 import { findings, issues, reports, scanRuns } from "./db/schema.js";
 import { LocalJobRunner } from "./jobs/local-job-runner.js";
@@ -201,8 +201,10 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
 
   initializeDb(dbClient.sqlite);
   markInterruptedScansFailed(dbClient);
+  const trustedBrowserOrigin = getTrustedBrowserOrigin();
+
   app.addHook("onRequest", async (request, reply) => {
-    reply.header("Access-Control-Allow-Origin", "http://localhost:5173");
+    reply.header("Access-Control-Allow-Origin", trustedBrowserOrigin);
     reply.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
     reply.header("Access-Control-Allow-Headers", "Content-Type,Accept,X-CSRF-Token");
     reply.header("Access-Control-Allow-Credentials", "true");
@@ -213,7 +215,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
       return;
     }
 
-    const csrf = validateCsrf(dbClient.db, request);
+    const csrf = validateCsrf(dbClient.db, request, { trustedBrowserOrigin });
     if (!csrf.valid) {
       await reply.code(csrf.statusCode).send({ error: csrf.error });
     }

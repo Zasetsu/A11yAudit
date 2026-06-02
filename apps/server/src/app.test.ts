@@ -406,6 +406,13 @@ describe("server", () => {
       } finally {
         await app.close();
       }
+
+      const verificationDbClient = createDb(dbPath);
+      try {
+        expect(verificationDbClient.db.select().from(projects).all()).toHaveLength(0);
+      } finally {
+        verificationDbClient.close();
+      }
     });
   });
 
