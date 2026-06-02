@@ -70,7 +70,7 @@ export function initializeDb(sqlite: Database.Database): void {
       id TEXT PRIMARY KEY,
       workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      role TEXT NOT NULL CHECK (role IN ('owner', 'member')),
+      role TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
 
@@ -78,7 +78,7 @@ export function initializeDb(sqlite: Database.Database): void {
       id TEXT PRIMARY KEY,
       workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
       email TEXT NOT NULL,
-      role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('member')),
+      role TEXT NOT NULL DEFAULT 'member',
       token_hash TEXT NOT NULL UNIQUE,
       expires_at TEXT NOT NULL,
       accepted_at TEXT,

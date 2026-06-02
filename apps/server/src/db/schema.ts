@@ -51,7 +51,7 @@ export const sessions = sqliteTable("sessions", {
 
 export const projects = sqliteTable("projects", {
   id: text("id").primaryKey(),
-  workspaceId: text("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  workspaceId: text("workspace_id").notNull().default("default-workspace").references(() => workspaces.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   url: text("url").notNull(),
   domain: text("domain").notNull(),

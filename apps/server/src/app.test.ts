@@ -383,6 +383,27 @@ describe("server", () => {
       expect(names).toContain("workspace_members");
       expect(names).toContain("workspace_invitations");
       expect(names).toContain("sessions");
+      expect(dbClient.sqlite.prepare("select id, name, slug from workspaces where id = ?").get("default-workspace")).toMatchObject({
+        id: "default-workspace",
+        name: "Default Workspace",
+        slug: "default-workspace"
+      });
+
+      dbClient.sqlite
+        .prepare("insert into projects (id, name, url, domain, created_at) values (?, ?, ?, ?, ?)")
+        .run("project-default-workspace", "Defaulted Project", "https://default.example.com", "default.example.com", "2026-06-02T00:00:00.000Z");
+      expect(dbClient.sqlite.prepare("select workspace_id from projects where id = ?").get("project-default-workspace")).toMatchObject({
+        workspace_id: "default-workspace"
+      });
+
+      expect(() => dbClient.sqlite
+        .prepare("insert into projects (id, workspace_id, name, url, domain, created_at) values (?, ?, ?, ?, ?, ?)")
+        .run("project-missing-workspace", "missing-workspace", "Missing Workspace", "https://missing.example.com", "missing.example.com", "2026-06-02T00:00:00.000Z"))
+        .toThrow(/FOREIGN KEY constraint failed/);
+      expect(() => dbClient.sqlite
+        .prepare("insert into projects (id, name, url, domain, created_at) values (?, ?, ?, ?, ?)")
+        .run("project-duplicate-domain", "Duplicate Domain", "https://default.example.com", "default.example.com", "2026-06-02T00:00:00.000Z"))
+        .toThrow(/UNIQUE constraint failed/);
       dbClient.close();
     });
   });
