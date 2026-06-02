@@ -40,6 +40,10 @@ type SessionUser = {
   email: string;
 };
 
+class DuplicateEmailError extends Error {}
+
+class PublicSignupDisabledError extends Error {}
+
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
@@ -54,6 +58,10 @@ function userCount(db: SqliteDatabase): number {
 
 function uniqueConstraintFailed(error: unknown): boolean {
   return error instanceof Error && /UNIQUE constraint failed/i.test(error.message);
+}
+
+function emailUniqueConstraintFailed(error: unknown): boolean {
+  return error instanceof Error && /UNIQUE constraint failed: users\.email/i.test(error.message);
 }
 
 function setSessionCookies(reply: FastifyReply, session: { sessionToken: string; csrfToken: string }): void {
@@ -151,6 +159,15 @@ export async function registerAuthRoutes(app: FastifyInstance, options: AuthRout
 
     try {
       db.transaction((tx) => {
+        const duplicateUser = tx.select({ id: users.id }).from(users).where(eq(users.email, email)).get();
+        if (duplicateUser) {
+          throw new DuplicateEmailError();
+        }
+
+        if (userCount(tx) > 0 && !publicSignupsEnabled()) {
+          throw new PublicSignupDisabledError();
+        }
+
         const workspace = {
           id: `wrk-${nanoid(16)}`,
           name: parsed.data.workspaceName,
@@ -173,8 +190,14 @@ export async function registerAuthRoutes(app: FastifyInstance, options: AuthRout
         }).run();
       });
     } catch (error) {
-      if (uniqueConstraintFailed(error)) {
+      if (error instanceof DuplicateEmailError || emailUniqueConstraintFailed(error)) {
         return reply.code(409).send({ error: "Email already exists" });
+      }
+      if (error instanceof PublicSignupDisabledError) {
+        return reply.code(403).send({ error: "Public signup is disabled" });
+      }
+      if (uniqueConstraintFailed(error)) {
+        return reply.code(409).send({ error: "Signup conflict" });
       }
       throw error;
     }

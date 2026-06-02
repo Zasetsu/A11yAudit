@@ -511,6 +511,37 @@ describe("server", () => {
     });
   });
 
+  it("allows only one concurrent first-user signup when public signup is disabled", async () => {
+    await withTempDb(async (dbPath) => {
+      const originalPublicSignups = process.env.A11YAUDIT_PUBLIC_SIGNUPS;
+      delete process.env.A11YAUDIT_PUBLIC_SIGNUPS;
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const responses = await Promise.all([
+          signup(app, "owner-a@example.com", "Owner A Workspace"),
+          signup(app, "owner-b@example.com", "Owner B Workspace")
+        ]);
+        const statusCodes = responses.map((response) => response.statusCode).sort((left, right) => left - right);
+
+        expect(statusCodes).toEqual([201, 403]);
+      } finally {
+        if (originalPublicSignups === undefined) {
+          delete process.env.A11YAUDIT_PUBLIC_SIGNUPS;
+        } else {
+          process.env.A11YAUDIT_PUBLIC_SIGNUPS = originalPublicSignups;
+        }
+        await app.close();
+      }
+
+      const dbClient = createDb(dbPath);
+      try {
+        expect(dbClient.db.select().from(users).all()).toHaveLength(1);
+      } finally {
+        dbClient.close();
+      }
+    });
+  });
+
   it("closes normal signup after first user when public signup is disabled", async () => {
     await withTempDb(async (dbPath) => {
       const app = await buildServer({ dbPath, executeScans: false });
