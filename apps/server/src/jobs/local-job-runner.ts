@@ -21,8 +21,8 @@ export class LocalJobRunner<TPayload> {
 
   constructor(private readonly options: LocalJobRunnerOptions<TPayload> = {}) {
     const requestedConcurrency = options.maxConcurrentJobs ?? 1;
-    this.maxConcurrentJobs = Number.isFinite(requestedConcurrency) && requestedConcurrency > 0
-      ? Math.floor(requestedConcurrency)
+    this.maxConcurrentJobs = Number.isInteger(requestedConcurrency) && requestedConcurrency > 0
+      ? requestedConcurrency
       : 1;
   }
 

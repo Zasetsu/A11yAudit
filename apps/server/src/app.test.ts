@@ -607,6 +607,22 @@ describe("server", () => {
     expect(runner.get("job-2")?.status).toBe("completed");
   });
 
+  it("normalizes fractional local worker concurrency below one", async () => {
+    const started: string[] = [];
+    const runner = new LocalJobRunner<{ label: string }>({
+      maxConcurrentJobs: 0.5,
+      execute: (job) => {
+        started.push(job.id);
+      }
+    });
+
+    runner.enqueue("job-1", { label: "fractional" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(started).toEqual(["job-1"]);
+    expect(runner.get("job-1")?.status).toBe("completed");
+  });
+
   it("allows the local web UI origin", async () => {
     await withTempDb(async (dbPath) => {
       const app = await buildServer({ dbPath, executeScans: false });
@@ -691,6 +707,18 @@ describe("server", () => {
       expect(dbClient.sqlite.prepare("select workspace_id from projects where id = ?").get("project-default-workspace")).toMatchObject({
         workspace_id: "default-workspace"
       });
+      const insertScan = dbClient.sqlite.prepare(`
+        insert into scan_runs (
+          id, project_id, url, status, mode, max_pages, max_depth, viewports,
+          pages_queued, pages_scanned, findings_total, created_at
+        )
+        values (?, 'project-default-workspace', 'https://default.example.com', ?, 'single_url', 1, 0, 'desktop', 0, 0, 0, ?)
+      `);
+      insertScan.run("run-active-1", "queued", "2026-06-02T00:00:00.000Z");
+      expect(() => insertScan.run("run-active-2", "crawling", "2026-06-02T00:00:01.000Z"))
+        .toThrow(/UNIQUE constraint failed/);
+      dbClient.sqlite.prepare("update scan_runs set status = ? where id = ?").run("completed", "run-active-1");
+      expect(() => insertScan.run("run-active-3", "queued", "2026-06-02T00:00:02.000Z")).not.toThrow();
 
       expect(() => dbClient.sqlite
         .prepare("insert into projects (id, workspace_id, name, url, domain, created_at) values (?, ?, ?, ?, ?, ?)")
@@ -1988,6 +2016,47 @@ describe("server", () => {
         const second = await startScan(app, auth, project.json().id);
         expect(second.statusCode).toBe(409);
       } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("atomically rejects concurrent active scans for the same project", async () => {
+    await withTempDb(async (dbPath) => {
+      let releaseScan!: () => void;
+      const scanMayComplete = new Promise<void>((resolve) => {
+        releaseScan = resolve;
+      });
+      runScanMock.mockImplementation(async () => {
+        await scanMayComplete;
+        return {
+          runId: "unused",
+          projectId: null,
+          targetUrl: "https://portal.example.test/",
+          mode: "single_url",
+          pages: [],
+          findings: [],
+          reports: [],
+          score: 100,
+          startedAt: new Date().toISOString(),
+          finishedAt: new Date().toISOString()
+        };
+      });
+      const app = await buildServer({ dbPath });
+      try {
+        const auth = await signup(app, "owner@example.com", "Owner Workspace");
+        const project = await createProject(app, auth, "Portal", "https://portal.example.test/");
+
+        const responses = await Promise.all([
+          startScan(app, auth, project.json().id),
+          startScan(app, auth, project.json().id)
+        ]);
+        const statusCodes = responses.map((response) => response.statusCode).sort((left, right) => left - right);
+
+        expect(statusCodes).toEqual([201, 409]);
+        expect((await listScans(app, auth)).json().data).toHaveLength(1);
+      } finally {
+        releaseScan();
         await app.close();
       }
     });

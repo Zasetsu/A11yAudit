@@ -182,6 +182,9 @@ export function initializeDb(sqlite: Database.Database): void {
     CREATE UNIQUE INDEX IF NOT EXISTS projects_workspace_domain_unique ON projects(workspace_id, domain);
     CREATE UNIQUE INDEX IF NOT EXISTS workspace_members_workspace_user_unique ON workspace_members(workspace_id, user_id);
     CREATE INDEX IF NOT EXISTS idx_scan_runs_project_created ON scan_runs(project_id, created_at);
+    CREATE UNIQUE INDEX IF NOT EXISTS scan_runs_active_project_unique
+      ON scan_runs(project_id)
+      WHERE status IN ('queued', 'crawling', 'auditing', 'reporting');
     CREATE INDEX IF NOT EXISTS idx_issues_scan_severity ON issues(scan_run_id, severity);
     CREATE INDEX IF NOT EXISTS idx_issues_project_created ON issues(project_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_findings_scan_status ON findings(scan_run_id, status);

@@ -39,6 +39,20 @@ export class ScanProjectNotFoundError extends Error {
   }
 }
 
+export class ActiveScanAlreadyExistsError extends Error {
+  constructor() {
+    super("Project already has an active scan");
+  }
+}
+
+function isActiveScanUniqueError(error: unknown): boolean {
+  return error instanceof Error
+    && (
+      error.message.includes("scan_runs.project_id")
+      || error.message.includes("scan_runs_active_project_unique")
+    );
+}
+
 const scanSummarySelection = {
   id: scanRuns.id,
   projectId: scanRuns.projectId,
@@ -110,7 +124,15 @@ export async function createScanForWorkspace(
     errorMessage: null
   };
 
-  db.insert(scanRuns).values(row).run();
+  try {
+    db.insert(scanRuns).values(row).run();
+  } catch (error) {
+    if (isActiveScanUniqueError(error)) {
+      throw new ActiveScanAlreadyExistsError();
+    }
+
+    throw error;
+  }
 
   return {
     ...row,

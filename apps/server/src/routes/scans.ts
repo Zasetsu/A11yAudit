@@ -6,8 +6,8 @@ import { requireAuth } from "../auth/session.js";
 import type { SqliteDatabase } from "../db/client.js";
 import type { LocalJobRunner } from "../jobs/local-job-runner.js";
 import {
+  ActiveScanAlreadyExistsError,
   createScanForWorkspace,
-  hasActiveScanForProject,
   listScansForWorkspace,
   ScanProjectNotFoundError
 } from "../repositories/scans.js";
@@ -119,10 +119,6 @@ export async function registerScanRoutes(app: FastifyInstance, options: ScanRout
       return reply.code(400).send({ error: error instanceof Error ? error.message : "Invalid scan URL" });
     }
 
-    if (await hasActiveScanForProject(db, context.workspaceId, parsed.data.projectId)) {
-      return reply.code(409).send({ error: "Project already has an active scan" });
-    }
-
     let row: Awaited<ReturnType<typeof createScanForWorkspace>>;
     try {
       row = await createScanForWorkspace(db, context.workspaceId, {
@@ -136,6 +132,9 @@ export async function registerScanRoutes(app: FastifyInstance, options: ScanRout
     } catch (error) {
       if (error instanceof ScanProjectNotFoundError) {
         return reply.code(404).send({ error: "Project not found" });
+      }
+      if (error instanceof ActiveScanAlreadyExistsError) {
+        return reply.code(409).send({ error: "Project already has an active scan" });
       }
 
       throw error;
