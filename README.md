@@ -35,7 +35,7 @@ A11yAudit focuses on automated, technical verification of WCAG-related failures.
 
 ## What A11yAudit Does
 
-A11yAudit provides a local audit workflow for teams that need repeatable accessibility checks without sending target data to a hosted SaaS.
+A11yAudit provides a self-hosted audit workflow for teams that need repeatable accessibility checks without sending target data to a third-party hosted service. The web app now uses accounts and workspace-scoped project data, while the CLI remains an offline, account-free scanner.
 
 Current capabilities:
 
@@ -76,7 +76,7 @@ A11yAudit has three operator surfaces:
 
 - **Web UI**: project management, scan creation, scan monitoring, findings, evidence, and report downloads.
 - **CLI**: local scan execution for automation, CI, and direct technical use.
-- **Server API**: local API for projects, scans, findings, reports, and artifacts.
+- **Server API**: authenticated self-hosted API for workspace-scoped projects, scans, findings, issues, reports, and artifacts.
 
 The web UI and CLI support the same core scan profile:
 
@@ -163,6 +163,17 @@ Health check:
 curl http://localhost:7842/health
 ```
 
+### Bootstrap a Workspace
+
+A fresh web deployment assumes an empty SQLite database for the current SaaS schema.
+
+1. Start the server with an empty SQLite database.
+2. Open `/signup`.
+3. The first account creates the first workspace and becomes its owner.
+4. After that, set `A11YAUDIT_PUBLIC_SIGNUPS=true` if open signup is intended, or invite users from an existing workspace.
+
+By default, public signup is closed after the first user. See [Deployment Notes](docs/deployment.md) for environment variables and operational boundaries.
+
 ## Run with Docker Compose
 
 ```bash
@@ -221,6 +232,8 @@ CLI output includes:
 - PDF report
 - Screenshot evidence
 - HTML snippet evidence
+
+CLI scans remain local, offline, and account-free. They do not require web sign-in, workspace membership, or a SaaS account.
 
 ## Scan Modes
 
@@ -285,18 +298,25 @@ A11yAudit combines axe-core checks with custom Playwright interaction rules. axe
 
 ## API Overview
 
-Main local endpoints:
+The old global web API endpoints such as `/api/projects` and `/api/scans` have been replaced by authenticated, workspace-scoped endpoints. Main local endpoints:
 
 ```text
 GET  /health
-GET  /api/projects
-POST /api/projects
-GET  /api/scans
-POST /api/scans
-GET  /api/findings
-GET  /api/reports
-GET  /api/reports/:id/download
-GET  /api/artifacts/download?key=...
+POST /api/auth/signup
+POST /api/auth/login
+POST /api/auth/logout
+GET  /api/auth/session
+GET  /api/workspaces
+GET  /api/workspaces/:workspaceSlug
+GET  /api/workspaces/:workspaceSlug/projects
+POST /api/workspaces/:workspaceSlug/projects
+GET  /api/workspaces/:workspaceSlug/scans
+POST /api/workspaces/:workspaceSlug/scans
+GET  /api/workspaces/:workspaceSlug/findings
+GET  /api/workspaces/:workspaceSlug/issues
+GET  /api/workspaces/:workspaceSlug/reports
+GET  /api/workspaces/:workspaceSlug/reports/:reportId/download
+GET  /api/workspaces/:workspaceSlug/artifacts/download?key=...
 ```
 
 Example scan payload:

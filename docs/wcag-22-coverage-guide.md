@@ -2,7 +2,7 @@
 
 Last verified: 2026-06-02
 
-This document maps the full WCAG 2.2 success criterion set to the current A11yAudit automation surface.
+This document maps the full WCAG 2.2 success criterion set to the current A11yAudit automation surface. In the web app, these results are now organized in workspace-scoped projects, scans, issues, findings, and reports; that reporting context does not change the rule coverage claims below.
 
 Sources:
 
@@ -205,3 +205,4 @@ Recommended wording:
 
 > A11yAudit performs automated technical checks mapped to WCAG 2.2 success criteria. Some findings are automatic violations, some are heuristic interaction signals, and many WCAG 2.2 requirements require manual review.
 
+Workspace-scoped web reports should keep the same boundary language. A workspace report can identify technical findings for that workspace's project, but workspace membership and SaaS-style reporting do not make the report a certification or expand automated WCAG coverage.
