@@ -15,6 +15,7 @@ import {
   getWorkspaceMember,
   listMemberships,
   listWorkspaceMembers,
+  removeMember,
   type SessionUser,
   updateMemberRole,
   type WorkspaceRole
@@ -186,6 +187,37 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, options: Wor
     }
 
     updateMemberRole(db, context.workspaceId, params.data.userId, parsed.data.role);
+
+    return { data: { ok: true } };
+  });
+
+  app.delete("/api/workspaces/:workspaceSlug/members/:userId", async (request, reply) => {
+    const user = await requireAuth(request, reply);
+    if (!user) return undefined;
+
+    const params = memberParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return reply.code(400).send({ error: "Invalid member parameters", issues: params.error.issues });
+    }
+
+    const context = await requireWorkspaceMembership(db, user.id, params.data.workspaceSlug, reply);
+    if (!context) return undefined;
+    if (!requireWorkspaceOwner(context, reply)) return undefined;
+
+    if (params.data.userId === user.id) {
+      return reply.code(400).send({ error: "You cannot remove yourself" });
+    }
+
+    const member = getWorkspaceMember(db, context.workspaceId, params.data.userId);
+    if (!member) {
+      return reply.code(404).send({ error: "Member not found" });
+    }
+
+    if (member.role === "owner" && countWorkspaceOwners(db, context.workspaceId) === 1) {
+      return reply.code(409).send({ error: "Workspace must keep at least one owner" });
+    }
+
+    removeMember(db, context.workspaceId, params.data.userId);
 
     return { data: { ok: true } };
   });

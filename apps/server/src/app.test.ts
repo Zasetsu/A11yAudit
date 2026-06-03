@@ -3621,5 +3621,76 @@ describe("server", () => {
       }
     });
   });
+
+  it("lets an owner remove a member", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const ownerCookies = authCookies(owner);
+        const member = await addWorkspaceMember(app, ownerCookies, "owner-workspace", "member@example.com");
+
+        const response = await app.inject({
+          method: "DELETE",
+          url: `/api/workspaces/owner-workspace/members/${member.userId}`,
+          headers: { "x-csrf-token": ownerCookies[csrfCookieName] },
+          cookies: ownerCookies
+        });
+
+        expect(response.statusCode).toBe(200);
+        const list = await app.inject({
+          method: "GET",
+          url: "/api/workspaces/owner-workspace/members",
+          cookies: ownerCookies
+        });
+        expect(list.json().data.members).toHaveLength(1);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("rejects an owner removing themselves", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const ownerCookies = authCookies(owner);
+        const ownerUserId = owner.json().data.user.id;
+
+        const response = await app.inject({
+          method: "DELETE",
+          url: `/api/workspaces/owner-workspace/members/${ownerUserId}`,
+          headers: { "x-csrf-token": ownerCookies[csrfCookieName] },
+          cookies: ownerCookies
+        });
+
+        expect(response.statusCode).toBe(400);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("returns 404 when removing a user who is not a member", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const ownerCookies = authCookies(owner);
+
+        const response = await app.inject({
+          method: "DELETE",
+          url: "/api/workspaces/owner-workspace/members/user-does-not-exist",
+          headers: { "x-csrf-token": ownerCookies[csrfCookieName] },
+          cookies: ownerCookies
+        });
+
+        expect(response.statusCode).toBe(404);
+      } finally {
+        await app.close();
+      }
+    });
+  });
   });
 });

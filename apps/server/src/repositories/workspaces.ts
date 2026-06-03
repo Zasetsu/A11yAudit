@@ -137,3 +137,9 @@ export function updateMemberRole(db: SqliteDatabase, workspaceId: string, userId
     .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)))
     .run();
 }
+
+export function removeMember(db: SqliteDatabase, workspaceId: string, userId: string): void {
+  db.delete(workspaceMembers)
+    .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)))
+    .run();
+}
