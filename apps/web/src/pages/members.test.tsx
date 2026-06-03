@@ -71,6 +71,35 @@ async function waitFor(assertion: () => void) {
   throw lastError;
 }
 
+function fillInput(container: HTMLElement, label: string, value: string) {
+  const labelEl = Array.from(container.querySelectorAll("label")).find(
+    (l) => (l.textContent?.trim() === label || l.querySelector("span")?.textContent?.trim() === label)
+  );
+  if (!labelEl) throw new Error(`Label "${label}" not found`);
+  // Try for= attribute first, then input inside the label element
+  const input = (labelEl.htmlFor
+    ? container.querySelector<HTMLInputElement>(`#${labelEl.htmlFor}`)
+    : null) ?? labelEl.querySelector<HTMLInputElement>("input");
+  if (!input) throw new Error(`Input for label "${label}" not found`);
+  // Use the native input value setter so React's synthetic onChange fires correctly
+  const nativeInputValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+  if (nativeInputValueSetter) {
+    nativeInputValueSetter.call(input, value);
+  } else {
+    input.value = value;
+  }
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function clickButton(container: HTMLElement, label: string) {
+  const btn = Array.from(container.querySelectorAll("button")).find(
+    (b) => b.textContent?.includes(label)
+  );
+  if (!btn) throw new Error(`Button "${label}" not found`);
+  btn.click();
+}
+
 describe("members page", () => {
   let roots: Root[] = [];
 
@@ -118,5 +147,108 @@ describe("members page", () => {
     const navButtons = Array.from(rendered.container.querySelectorAll(".sidebar button"))
       .map((button) => button.textContent ?? "");
     expect(navButtons.some((label) => label.includes("Members"))).toBe(false);
+  });
+
+  it("creates an invite and shows the returned link", async () => {
+    api.getSession.mockResolvedValue(ownerSession);
+    api.createInvite.mockResolvedValue({
+      invitation: { id: "winv-1", email: "new@example.test", role: "member", expiresAt: "2026-06-10T00:00:00.000Z", createdAt: "2026-06-03T00:00:00.000Z" },
+      inviteUrl: "/invite/tok-123"
+    });
+    const rendered = await renderApp();
+    roots.push(rendered.root);
+
+    await waitFor(() => expect(rendered.container.textContent).toContain("Invite a member"));
+    await act(async () => { fillInput(rendered.container, "Email", "new@example.test"); });
+    await act(async () => { clickButton(rendered.container, "Send invite"); });
+
+    await waitFor(() => expect(api.createInvite).toHaveBeenCalledWith("acme", "new@example.test"));
+    await waitFor(() => expect(rendered.container.textContent).toContain("/invite/tok-123"));
+  });
+
+  it("changes a member role", async () => {
+    api.getSession.mockResolvedValue(ownerSession);
+    api.listMembers.mockResolvedValue([
+      { userId: "user-1", fullName: "Ada Lovelace", email: "ada@example.test", role: "owner", joinedAt: "2026-06-02T00:00:00.000Z" },
+      { userId: "user-2", fullName: "Bob", email: "bob@example.test", role: "member", joinedAt: "2026-06-02T00:00:00.000Z" }
+    ]);
+    api.updateMemberRole.mockResolvedValue({ ok: true });
+    const rendered = await renderApp();
+    roots.push(rendered.root);
+
+    let select: HTMLSelectElement | null = null;
+    await waitFor(() => {
+      select = rendered.container.querySelector<HTMLSelectElement>("select[aria-label='Role for bob@example.test']");
+      expect(select).toBeTruthy();
+    });
+    await act(async () => {
+      select!.value = "owner";
+      select!.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    await waitFor(() => expect(api.updateMemberRole).toHaveBeenCalledWith("acme", "user-2", "owner"));
+  });
+
+  it("removes a member", async () => {
+    api.getSession.mockResolvedValue(ownerSession);
+    api.listMembers.mockResolvedValue([
+      { userId: "user-1", fullName: "Ada Lovelace", email: "ada@example.test", role: "owner", joinedAt: "2026-06-02T00:00:00.000Z" },
+      { userId: "user-2", fullName: "Bob", email: "bob@example.test", role: "member", joinedAt: "2026-06-02T00:00:00.000Z" }
+    ]);
+    api.removeMember.mockResolvedValue({ ok: true });
+    const rendered = await renderApp();
+    roots.push(rendered.root);
+
+    let bobRow: HTMLElement | null = null;
+    await waitFor(() => {
+      bobRow = Array.from(rendered.container.querySelectorAll("tr")).find(
+        (tr) => tr.textContent?.includes("bob@example.test")
+      ) ?? null;
+      expect(bobRow).toBeTruthy();
+    });
+    await act(async () => { clickButton(bobRow!, "Remove"); });
+
+    await waitFor(() => expect(api.removeMember).toHaveBeenCalledWith("acme", "user-2"));
+  });
+
+  it("revokes and regenerates a pending invitation", async () => {
+    api.getSession.mockResolvedValue(ownerSession);
+    api.listInvitations.mockResolvedValue([
+      { id: "winv-1", email: "pending@example.test", role: "member", expiresAt: "2026-06-10T00:00:00.000Z", createdAt: "2026-06-03T00:00:00.000Z" }
+    ]);
+    api.regenerateInvitation.mockResolvedValue({ inviteUrl: "/invite/fresh-456" });
+    api.revokeInvitation.mockResolvedValue({ ok: true });
+    const rendered = await renderApp();
+    roots.push(rendered.root);
+
+    await waitFor(() => expect(rendered.container.textContent).toContain("pending@example.test"));
+    await act(async () => { clickButton(rendered.container, "Regenerate link"); });
+    await waitFor(() => expect(api.regenerateInvitation).toHaveBeenCalledWith("acme", "winv-1"));
+    await waitFor(() => expect(rendered.container.textContent).toContain("/invite/fresh-456"));
+
+    await act(async () => { clickButton(rendered.container, "Revoke"); });
+    await waitFor(() => expect(api.revokeInvitation).toHaveBeenCalledWith("acme", "winv-1"));
+  });
+
+  it("shows the error banner when a mutation fails", async () => {
+    api.getSession.mockResolvedValue(ownerSession);
+    api.listMembers.mockResolvedValue([
+      { userId: "user-1", fullName: "Ada Lovelace", email: "ada@example.test", role: "owner", joinedAt: "2026-06-02T00:00:00.000Z" },
+      { userId: "user-2", fullName: "Bob", email: "bob@example.test", role: "member", joinedAt: "2026-06-02T00:00:00.000Z" }
+    ]);
+    api.removeMember.mockResolvedValue({ error: "Workspace must keep at least one owner" });
+    const rendered = await renderApp();
+    roots.push(rendered.root);
+
+    let bobRow2: HTMLElement | null = null;
+    await waitFor(() => {
+      bobRow2 = Array.from(rendered.container.querySelectorAll("tr")).find(
+        (tr) => tr.textContent?.includes("bob@example.test")
+      ) ?? null;
+      expect(bobRow2).toBeTruthy();
+    });
+    await act(async () => { clickButton(bobRow2!, "Remove"); });
+
+    await waitFor(() => expect(rendered.container.textContent).toContain("Workspace must keep at least one owner"));
   });
 });
