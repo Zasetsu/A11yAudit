@@ -2,26 +2,81 @@ import { describe, expect, it } from "vitest";
 import { buildAuditReportModel, renderReportHtml } from "./index.js";
 
 describe("renderReportHtml", () => {
-  it("renders report sections and disclaimer", () => {
+  it("renders a Turkish report with score band, severity colors, and the honest disclaimer", () => {
     const html = renderReportHtml({
-      projectName: "Example Portal",
-      domain: "example.gov",
-      score: 74,
-      pagesAudited: 248,
-      findingsTotal: 613,
+      projectName: "admelektrik.com.tr",
+      domain: "admelektrik.com.tr",
+      score: 62,
+      pagesAudited: 12,
+      findingsTotal: 0,
       uniqueIssues: 0,
       totalOccurrences: 0,
-      generatedAt: "2026-05-31T09:14:00.000Z",
+      generatedAt: "2026-06-03T09:14:00.000Z",
       findings: [],
       issues: [],
       pages: [],
-      targetUrl: "https://example.gov",
-      mode: "same_domain_crawl"
+      targetUrl: "https://admelektrik.com.tr",
+      mode: "same_domain_crawl",
+      locale: "tr",
+      problems: []
     });
+    expect(html).toContain("Erişilebilirlik Denetim Raporu");
+    expect(html).toContain("Geliştirilmeli");            // 62 -> Needs Work (tr)
+    expect(html).toContain("#c0392b");                   // critical color in styles/legend
+    expect(html).toContain("Yasal uyumluluğu belgelemez.");
+    expect(html).not.toMatch(/certif(y|ies) .{0,20}complian/i);
+  });
 
+  it("renders English strings when locale is en", () => {
+    const html = renderReportHtml({
+      projectName: "x", domain: "x", score: 95, pagesAudited: 1, findingsTotal: 0,
+      uniqueIssues: 0, totalOccurrences: 0, generatedAt: "2026-06-03T09:14:00.000Z",
+      findings: [], issues: [], pages: [], targetUrl: "https://x", mode: "single_url",
+      locale: "en", problems: []
+    });
     expect(html).toContain("Accessibility Audit Report");
-    expect(html).toContain("Example Portal");
     expect(html).toContain("does not certify legal compliance");
+    expect(html).toContain("Good"); // 95 band
+  });
+
+  it("renders a grouped problem card with WCAG content and element detail", () => {
+    const html = renderReportHtml({
+      projectName: "x", domain: "x", score: 50, pagesAudited: 1, findingsTotal: 1,
+      uniqueIssues: 1, totalOccurrences: 1, generatedAt: "2026-06-03T09:14:00.000Z",
+      findings: [], issues: [], pages: [], targetUrl: "https://x", mode: "single_url",
+      locale: "tr",
+      problems: [{
+        ruleId: "button-name",
+        title: "Buttons must have discernible text",
+        severity: "critical",
+        wcagCriteria: ["4.1.2"],
+        criterion: {
+          id: "4.1.2", name: "Ad, Rol, Değer (Name, Role, Value)", level: "A",
+          w3cUrl: "https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html",
+          content: {
+            name: "Ad, Rol, Değer (Name, Role, Value)",
+            userImpact: "Ekran okuyucu kullanıcılar bu kontrolün ne işe yaradığını anlayamaz.",
+            howToFix: "Her butona görünür metin veya aria-label ekleyin.",
+            w3cUrl: "https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html"
+          }
+        },
+        elements: [{
+          htmlSnippet: "<button class=\"nav-toggle\"></button>",
+          selector: "button.nav-toggle", pageUrl: "https://x/", viewport: "desktop",
+          screenshotDataUri: "data:image/png;base64,AAA"
+        }],
+        affectedPages: 1, occurrences: 1
+      }]
+    });
+    expect(html).toContain("Buttons must have discernible text");
+    expect(html).toContain("4.1.2");
+    expect(html).toContain("Ad, Rol, Değer");
+    expect(html).toContain("name-role-value.html");          // W3C link
+    expect(html).toContain("Ekran okuyucu kullanıcılar");    // userImpact (what it means)
+    expect(html).toContain("aria-label ekleyin");            // howToFix (distinct from title)
+    expect(html).toContain("button.nav-toggle");             // selector
+    expect(html).toContain("&lt;button class=&quot;nav-toggle&quot;&gt;"); // escaped snippet
+    expect(html).toContain("data:image/png;base64,AAA");     // embedded screenshot
   });
 });
 

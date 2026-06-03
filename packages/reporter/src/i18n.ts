@@ -99,7 +99,7 @@ export function scoreBand(score: number, locale: ReportLocale): ScoreBand {
   if (score >= 90) {
     return { label: locale === "tr" ? "İyi" : "Good", color: "#1a7f37" };
   }
-  if (score >= 70) {
+  if (score >= 60) {
     return { label: locale === "tr" ? "Geliştirilmeli" : "Needs Work", color: "#c97a00" };
   }
   return { label: locale === "tr" ? "Zayıf" : "Poor", color: "#c0392b" };
