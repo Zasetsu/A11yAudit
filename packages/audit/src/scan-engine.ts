@@ -16,11 +16,13 @@ import {
 import { buildAuditReportModel, renderPdfFromHtml, renderReportHtml } from "@a11yaudit/reporter";
 import { auditPage } from "@a11yaudit/rules";
 import { createArtifactKey, type StorageAdapter } from "@a11yaudit/storage";
-import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import { chromium, type Browser, type BrowserContext, type ElementHandle, type Page } from "playwright";
 import { calculateScore } from "./score.js";
 
 const PDF_DETAILED_FINDING_LIMIT = 500;
 const PDF_EVIDENCE_ROW_LIMIT = 500;
+const MAX_ELEMENT_CROPS_PER_PAGE = 30;
+const CROP_CONTEXT_PADDING = 24;
 
 export async function collectScreenshotDataUris(
   findings: ScanFinding[],
@@ -114,12 +116,30 @@ export async function runScan(input: RunScanInput): Promise<CompletedScanResult>
             })
             : null;
 
+          let cropsThisPage = 0;
           for (const finding of auditResult.findings) {
+            let elementCrop: EvidenceArtifact | null = null;
+            if (finding.selector && cropsThisPage < MAX_ELEMENT_CROPS_PER_PAGE) {
+              const handle = await page.$(finding.selector).catch(() => null);
+              if (handle) {
+                elementCrop = await captureElementCropEvidence({
+                  runId: input.request.runId,
+                  page,
+                  element: handle,
+                  fingerprint: finding.fingerprint,
+                  storage: input.storage
+                });
+                await handle.dispose().catch(() => undefined);
+                if (elementCrop) cropsThisPage += 1;
+              }
+            }
             const snippet = await captureSnippetEvidence(input.request.runId, finding, input.storage);
-            findings.push({
-              ...finding,
-              evidence: pageScreenshot ? [pageScreenshot, ...snippet] : snippet
-            });
+            const evidence = [
+              ...(elementCrop ? [elementCrop] : []),
+              ...(pageScreenshot ? [pageScreenshot] : []),
+              ...snippet
+            ];
+            findings.push({ ...finding, evidence });
           }
         } catch (error) {
           pages.push(createFailedPage(url, viewport.name, error));
@@ -299,6 +319,62 @@ async function captureSnippetEvidence(
       sizeBytes: storedSnippet.sizeBytes
     }
   ];
+}
+
+export async function captureElementCropEvidence(input: {
+  runId: string;
+  page: Page;
+  element: ElementHandle<Element>;
+  fingerprint: string;
+  storage: StorageAdapter;
+}): Promise<EvidenceArtifact | null> {
+  try {
+    await input.element.evaluate((node) => {
+      const el = node as HTMLElement;
+      el.dataset.aaPrevOutline = el.style.outline;
+      el.dataset.aaPrevOutlineOffset = el.style.outlineOffset;
+      el.style.outline = "3px solid #e11d48";
+      el.style.outlineOffset = "2px";
+    });
+
+    const box = await input.element.boundingBox();
+    if (!box) {
+      await clearCropHighlight(input.element);
+      return null;
+    }
+
+    const viewport = input.page.viewportSize() ?? { width: box.x + box.width, height: box.y + box.height };
+    const clip = {
+      x: Math.max(0, box.x - CROP_CONTEXT_PADDING),
+      y: Math.max(0, box.y - CROP_CONTEXT_PADDING),
+      width: Math.min(viewport.width, box.width + CROP_CONTEXT_PADDING * 2),
+      height: Math.min(viewport.height, box.height + CROP_CONTEXT_PADDING * 2)
+    };
+    const png = await input.page.screenshot({ type: "png", clip });
+    await clearCropHighlight(input.element);
+
+    const key = createArtifactKey({
+      runId: input.runId,
+      kind: "screenshot",
+      name: `${input.fingerprint}:crop`,
+      extension: "png"
+    });
+    const stored = await input.storage.put(key, Buffer.from(png), "image/png");
+    return { kind: "element_screenshot", artifactKey: stored.key, mimeType: stored.mimeType, sizeBytes: stored.sizeBytes };
+  } catch {
+    await clearCropHighlight(input.element).catch(() => undefined);
+    return null;
+  }
+}
+
+async function clearCropHighlight(element: ElementHandle<Element>): Promise<void> {
+  await element.evaluate((node) => {
+    const el = node as HTMLElement;
+    el.style.outline = el.dataset.aaPrevOutline ?? "";
+    el.style.outlineOffset = el.dataset.aaPrevOutlineOffset ?? "";
+    delete el.dataset.aaPrevOutline;
+    delete el.dataset.aaPrevOutlineOffset;
+  });
 }
 
 async function validateFinalNavigation(requestedUrl: string, finalUrl: string): Promise<void> {
