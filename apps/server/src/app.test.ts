@@ -3689,5 +3689,58 @@ describe("server", () => {
       }
     });
   });
+
+  it("lists only pending invitations for owners", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const ownerCookies = authCookies(owner);
+        const pending = await createWorkspaceInvite(app, ownerCookies, "owner-workspace", "pending@example.com");
+        const revoked = await createWorkspaceInvite(app, ownerCookies, "owner-workspace", "revoked@example.com");
+        await app.inject({
+          method: "DELETE",
+          url: `/api/workspaces/owner-workspace/invitations/${revoked.json().data.invitation.id}`,
+          headers: { "x-csrf-token": ownerCookies[csrfCookieName] },
+          cookies: ownerCookies
+        });
+
+        const response = await app.inject({
+          method: "GET",
+          url: "/api/workspaces/owner-workspace/invitations",
+          cookies: ownerCookies
+        });
+
+        expect(response.statusCode).toBe(200);
+        const invitations = response.json().data.invitations as Array<{ id: string; email: string }>;
+        expect(invitations).toHaveLength(1);
+        expect(invitations[0].email).toBe("pending@example.com");
+        expect(invitations[0].id).toBe(pending.json().data.invitation.id);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("rejects invitation listing by non-owners", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const ownerCookies = authCookies(owner);
+        const member = await addWorkspaceMember(app, ownerCookies, "owner-workspace", "member@example.com");
+
+        const response = await app.inject({
+          method: "GET",
+          url: "/api/workspaces/owner-workspace/invitations",
+          cookies: member.cookies
+        });
+
+        expect(response.statusCode).toBe(403);
+      } finally {
+        await app.close();
+      }
+    });
+  });
   });
 });

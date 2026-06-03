@@ -175,3 +175,31 @@ export function pendingInvitationExists(
 
   return row !== undefined;
 }
+
+export interface PendingInvitationRow {
+  id: string;
+  email: string;
+  role: WorkspaceRole;
+  expiresAt: string;
+  createdAt: string;
+}
+
+export function listPendingInvitations(db: SqliteDatabase, workspaceId: string, now: string): PendingInvitationRow[] {
+  return db
+    .select({
+      id: workspaceInvitations.id,
+      email: workspaceInvitations.email,
+      role: workspaceInvitations.role,
+      expiresAt: workspaceInvitations.expiresAt,
+      createdAt: workspaceInvitations.createdAt
+    })
+    .from(workspaceInvitations)
+    .where(and(
+      eq(workspaceInvitations.workspaceId, workspaceId),
+      isNull(workspaceInvitations.acceptedAt),
+      isNull(workspaceInvitations.revokedAt),
+      gt(workspaceInvitations.expiresAt, now)
+    ))
+    .orderBy(asc(workspaceInvitations.createdAt))
+    .all();
+}

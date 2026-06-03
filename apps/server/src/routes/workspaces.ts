@@ -15,6 +15,7 @@ import {
   emailIsWorkspaceMember,
   getWorkspaceMember,
   listMemberships,
+  listPendingInvitations,
   listWorkspaceMembers,
   pendingInvitationExists,
   removeMember,
@@ -309,6 +310,24 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, options: Wor
       .run();
 
     return { data: { ok: true } };
+  });
+
+  app.get("/api/workspaces/:workspaceSlug/invitations", async (request, reply) => {
+    const user = await requireAuth(request, reply);
+    if (!user) return undefined;
+
+    const params = parseWorkspaceParams(request.params);
+    if (!params) {
+      return reply.code(400).send({ error: "Invalid workspace parameters" });
+    }
+
+    const context = await requireWorkspaceMembership(db, user.id, params.workspaceSlug, reply);
+    if (!context) return undefined;
+    if (!requireWorkspaceOwner(context, reply)) return undefined;
+
+    return {
+      data: { invitations: listPendingInvitations(db, context.workspaceId, new Date().toISOString()) }
+    };
   });
 
   app.post("/api/invitations/:token/accept", async (request, reply) => {
