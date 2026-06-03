@@ -3515,5 +3515,111 @@ describe("server", () => {
         }
       });
     });
+
+  it("lets an owner promote a member to owner", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const ownerCookies = authCookies(owner);
+        const member = await addWorkspaceMember(app, ownerCookies, "owner-workspace", "member@example.com");
+
+        const response = await app.inject({
+          method: "PATCH",
+          url: `/api/workspaces/owner-workspace/members/${member.userId}`,
+          headers: { "x-csrf-token": ownerCookies[csrfCookieName] },
+          cookies: ownerCookies,
+          payload: { role: "owner" }
+        });
+
+        expect(response.statusCode).toBe(200);
+        const list = await app.inject({
+          method: "GET",
+          url: "/api/workspaces/owner-workspace/members",
+          cookies: ownerCookies
+        });
+        const promoted = list.json().data.members.find((m: { email: string }) => m.email === "member@example.com");
+        expect(promoted.role).toBe("owner");
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("rejects an owner changing their own role", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const ownerCookies = authCookies(owner);
+        const ownerUserId = owner.json().data.user.id;
+
+        const response = await app.inject({
+          method: "PATCH",
+          url: `/api/workspaces/owner-workspace/members/${ownerUserId}`,
+          headers: { "x-csrf-token": ownerCookies[csrfCookieName] },
+          cookies: ownerCookies,
+          payload: { role: "member" }
+        });
+
+        expect(response.statusCode).toBe(400);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("lets an owner demote a second owner back to member when others remain", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const ownerCookies = authCookies(owner);
+        const second = await addWorkspaceMember(app, ownerCookies, "owner-workspace", "second@example.com");
+
+        await app.inject({
+          method: "PATCH",
+          url: `/api/workspaces/owner-workspace/members/${second.userId}`,
+          headers: { "x-csrf-token": ownerCookies[csrfCookieName] },
+          cookies: ownerCookies,
+          payload: { role: "owner" }
+        });
+
+        const response = await app.inject({
+          method: "PATCH",
+          url: `/api/workspaces/owner-workspace/members/${second.userId}`,
+          headers: { "x-csrf-token": ownerCookies[csrfCookieName] },
+          cookies: ownerCookies,
+          payload: { role: "member" }
+        });
+
+        expect(response.statusCode).toBe(200);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("returns 404 when changing the role of a non-member", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const ownerCookies = authCookies(owner);
+
+        const response = await app.inject({
+          method: "PATCH",
+          url: "/api/workspaces/owner-workspace/members/user-not-a-member",
+          headers: { "x-csrf-token": ownerCookies[csrfCookieName] },
+          cookies: ownerCookies,
+          payload: { role: "owner" }
+        });
+
+        expect(response.statusCode).toBe(404);
+      } finally {
+        await app.close();
+      }
+    });
+  });
   });
 });

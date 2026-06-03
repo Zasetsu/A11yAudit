@@ -11,9 +11,12 @@ import type { SqliteDatabase } from "../db/client.js";
 import { users, workspaceInvitations, workspaceMembers, workspaces } from "../db/schema.js";
 import {
   buildSessionPayload,
+  countWorkspaceOwners,
+  getWorkspaceMember,
   listMemberships,
   listWorkspaceMembers,
   type SessionUser,
+  updateMemberRole,
   type WorkspaceRole
 } from "../repositories/workspaces.js";
 import {
@@ -26,6 +29,14 @@ const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const invitationParamsSchema = workspaceParamsSchema.extend({
   invitationId: z.string().trim().min(1)
+});
+
+const memberParamsSchema = workspaceParamsSchema.extend({
+  userId: z.string().trim().min(1)
+});
+
+const updateMemberPayloadSchema = z.object({
+  role: z.enum(["owner", "member"])
 });
 
 const acceptParamsSchema = z.object({
@@ -137,6 +148,46 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, options: Wor
     if (!requireWorkspaceOwner(context, reply)) return undefined;
 
     return { data: { members: await listWorkspaceMembers(db, context.workspaceId) } };
+  });
+
+  app.patch("/api/workspaces/:workspaceSlug/members/:userId", async (request, reply) => {
+    const user = await requireAuth(request, reply);
+    if (!user) return undefined;
+
+    const params = memberParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return reply.code(400).send({ error: "Invalid member parameters", issues: params.error.issues });
+    }
+
+    const parsed = updateMemberPayloadSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "Invalid member payload", issues: parsed.error.issues });
+    }
+
+    const context = await requireWorkspaceMembership(db, user.id, params.data.workspaceSlug, reply);
+    if (!context) return undefined;
+    if (!requireWorkspaceOwner(context, reply)) return undefined;
+
+    if (params.data.userId === user.id) {
+      return reply.code(400).send({ error: "You cannot change your own role" });
+    }
+
+    const member = getWorkspaceMember(db, context.workspaceId, params.data.userId);
+    if (!member) {
+      return reply.code(404).send({ error: "Member not found" });
+    }
+
+    if (
+      member.role === "owner" &&
+      parsed.data.role === "member" &&
+      countWorkspaceOwners(db, context.workspaceId) === 1
+    ) {
+      return reply.code(409).send({ error: "Workspace must keep at least one owner" });
+    }
+
+    updateMemberRole(db, context.workspaceId, params.data.userId, parsed.data.role);
+
+    return { data: { ok: true } };
   });
 
   app.post("/api/workspaces/:workspaceSlug/invitations", async (request, reply) => {

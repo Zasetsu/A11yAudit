@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 
 import type { SqliteDatabase } from "../db/client.js";
 import { users, workspaceMembers, workspaces } from "../db/schema.js";
@@ -107,4 +107,33 @@ export async function listWorkspaceMembers(db: SqliteDatabase, workspaceId: stri
     .where(eq(workspaceMembers.workspaceId, workspaceId))
     .orderBy(asc(workspaceMembers.createdAt))
     .all();
+}
+
+export function countWorkspaceOwners(db: SqliteDatabase, workspaceId: string): number {
+  return db
+    .select({ count: sql<number>`count(*)` })
+    .from(workspaceMembers)
+    .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.role, "owner")))
+    .get()?.count ?? 0;
+}
+
+export function getWorkspaceMember(
+  db: SqliteDatabase,
+  workspaceId: string,
+  userId: string
+): { id: string; role: WorkspaceRole } | null {
+  const row = db
+    .select({ id: workspaceMembers.id, role: workspaceMembers.role })
+    .from(workspaceMembers)
+    .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)))
+    .get();
+
+  return row ?? null;
+}
+
+export function updateMemberRole(db: SqliteDatabase, workspaceId: string, userId: string, role: WorkspaceRole): void {
+  db.update(workspaceMembers)
+    .set({ role })
+    .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)))
+    .run();
 }
