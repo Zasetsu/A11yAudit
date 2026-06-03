@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyReply } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { assertSafeUrl } from "@a11yaudit/crawler";
 import { DEFAULT_VIEWPORTS } from "@a11yaudit/core";
@@ -11,7 +11,7 @@ import {
   listScansForWorkspace,
   ScanProjectNotFoundError
 } from "../repositories/scans.js";
-import { getAuthorizedWorkspaceBySlug, type WorkspaceAuthContext } from "../repositories/workspaces.js";
+import { requireWorkspaceMembership, workspaceParamsSchema } from "./workspace-access.js";
 
 const scanPayloadSchema = z.object({
   projectId: z.string().trim().min(1),
@@ -20,10 +20,6 @@ const scanPayloadSchema = z.object({
   maxPages: z.number().int().min(1).max(250).default(10),
   maxDepth: z.number().int().min(0).max(5).default(1),
   viewports: z.array(z.enum(["desktop", "mobile"])).min(1).default(["desktop", "mobile"])
-});
-
-const workspaceParamsSchema = z.object({
-  workspaceSlug: z.string().trim().min(1)
 });
 
 export interface ScanJobPayload {
@@ -60,21 +56,6 @@ function resolveViewports(names: z.infer<typeof scanPayloadSchema>["viewports"])
 
     return viewport;
   });
-}
-
-async function requireWorkspaceMembership(
-  db: SqliteDatabase,
-  userId: string,
-  workspaceSlug: string,
-  reply: FastifyReply
-): Promise<WorkspaceAuthContext | undefined> {
-  const context = await getAuthorizedWorkspaceBySlug(db, userId, workspaceSlug);
-  if (!context) {
-    await reply.code(404).send({ error: "Workspace not found" });
-    return undefined;
-  }
-
-  return context;
 }
 
 export async function registerScanRoutes(app: FastifyInstance, options: ScanRouteOptions): Promise<void> {

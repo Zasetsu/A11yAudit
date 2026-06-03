@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyReply } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { assertSafeUrl } from "@a11yaudit/crawler";
 import { requireAuth } from "../auth/session.js";
@@ -10,11 +10,10 @@ import {
   listProjectsForWorkspace
 } from "../repositories/projects.js";
 import {
-  getAuthorizedWorkspaceBySlug,
-  requireWorkspaceRole,
-  WorkspaceRoleError,
-  type WorkspaceAuthContext
-} from "../repositories/workspaces.js";
+  requireWorkspaceMembership,
+  requireWorkspaceOwner,
+  workspaceParamsSchema
+} from "./workspace-access.js";
 
 const projectPayloadSchema = z
   .object({
@@ -25,10 +24,6 @@ const projectPayloadSchema = z
   .refine((payload) => payload.url !== undefined || payload.domain !== undefined, {
     message: "url or domain is required"
   });
-
-const workspaceParamsSchema = z.object({
-  workspaceSlug: z.string().trim().min(1)
-});
 
 const projectParamsSchema = workspaceParamsSchema.extend({
   projectId: z.string().trim().min(1)
@@ -58,35 +53,6 @@ function parseProjectTarget(payload: z.infer<typeof projectPayloadSchema>): { ur
 
 export interface ProjectRouteOptions {
   db: SqliteDatabase;
-}
-
-async function requireWorkspaceMembership(
-  db: SqliteDatabase,
-  userId: string,
-  workspaceSlug: string,
-  reply: FastifyReply
-): Promise<WorkspaceAuthContext | undefined> {
-  const context = await getAuthorizedWorkspaceBySlug(db, userId, workspaceSlug);
-  if (!context) {
-    await reply.code(404).send({ error: "Workspace not found" });
-    return undefined;
-  }
-
-  return context;
-}
-
-function requireWorkspaceOwner(context: WorkspaceAuthContext, reply: FastifyReply): boolean {
-  try {
-    requireWorkspaceRole(context, ["owner"]);
-    return true;
-  } catch (error) {
-    if (error instanceof WorkspaceRoleError) {
-      reply.code(403).send({ error: "Workspace owner role required" });
-      return false;
-    }
-
-    throw error;
-  }
 }
 
 export async function registerProjectRoutes(app: FastifyInstance, options: ProjectRouteOptions): Promise<void> {

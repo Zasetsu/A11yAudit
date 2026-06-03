@@ -4,7 +4,13 @@ import { nanoid } from "nanoid";
 
 import type { SqliteDatabase } from "../db/client.js";
 import { sessions, users } from "../db/schema.js";
-import { csrfCookieName, sessionCookieName } from "./cookies.js";
+import {
+  csrfCookieName,
+  serializeCookie,
+  serializeCsrfCookie,
+  serializeSessionCookie,
+  sessionCookieName
+} from "./cookies.js";
 import { createPlainToken, hashToken } from "./tokens.js";
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -126,6 +132,27 @@ export function createSession(db: SqliteDatabase, userId: string, now = new Date
     csrfToken,
     expiresAt
   };
+}
+
+export function setSessionCookies(reply: FastifyReply, session: { sessionToken: string; csrfToken: string }): void {
+  reply.header("Set-Cookie", [
+    serializeSessionCookie(session.sessionToken),
+    serializeCsrfCookie(session.csrfToken)
+  ]);
+}
+
+export function setClearedAuthCookies(reply: FastifyReply): void {
+  reply.header("Set-Cookie", [
+    serializeCookie(sessionCookieName, "", {
+      httpOnly: true,
+      maxAgeSeconds: 0,
+      secure: process.env.NODE_ENV === "production"
+    }),
+    serializeCookie(csrfCookieName, "", {
+      maxAgeSeconds: 0,
+      secure: process.env.NODE_ENV === "production"
+    })
+  ]);
 }
 
 export function revokeSession(db: SqliteDatabase, sessionId: string, now = new Date()): void {

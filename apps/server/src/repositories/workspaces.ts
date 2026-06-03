@@ -18,6 +18,17 @@ export interface WorkspaceAuthContext {
   role: WorkspaceRole;
 }
 
+export interface SessionUser {
+  id: string;
+  fullName: string;
+  email: string;
+}
+
+export interface SessionPayload {
+  user: SessionUser;
+  workspaces: WorkspaceMembership[];
+}
+
 export class WorkspaceRoleError extends Error {
   constructor() {
     super("Insufficient workspace role");
@@ -65,4 +76,11 @@ export function requireWorkspaceRole(context: WorkspaceAuthContext, roles: Works
   if (!roles.includes(context.role)) {
     throw new WorkspaceRoleError();
   }
+}
+
+export async function buildSessionPayload(db: SqliteDatabase, user: SessionUser): Promise<SessionPayload> {
+  return {
+    user,
+    workspaces: await listMemberships(db, user.id)
+  };
 }

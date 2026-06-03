@@ -1,31 +1,27 @@
 import { and, eq, gt, isNull } from "drizzle-orm";
-import type { FastifyInstance, FastifyReply } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 
-import {
-  serializeCsrfCookie,
-  serializeSessionCookie
-} from "../auth/cookies.js";
+import { normalizeEmail } from "../auth/email.js";
 import { hashPassword, verifyPassword } from "../auth/password.js";
-import { createSession, requireAuth } from "../auth/session.js";
+import { createSession, requireAuth, setSessionCookies } from "../auth/session.js";
 import { createPlainToken, hashToken } from "../auth/tokens.js";
 import type { SqliteDatabase } from "../db/client.js";
 import { users, workspaceInvitations, workspaceMembers, workspaces } from "../db/schema.js";
 import {
-  getAuthorizedWorkspaceBySlug,
+  buildSessionPayload,
   listMemberships,
-  requireWorkspaceRole,
-  WorkspaceRoleError,
-  type WorkspaceAuthContext,
+  type SessionUser,
   type WorkspaceRole
 } from "../repositories/workspaces.js";
+import {
+  requireWorkspaceMembership,
+  requireWorkspaceOwner,
+  workspaceParamsSchema
+} from "./workspace-access.js";
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-
-const workspaceParamsSchema = z.object({
-  workspaceSlug: z.string().trim().min(1)
-});
 
 const invitationParamsSchema = workspaceParamsSchema.extend({
   invitationId: z.string().trim().min(1)
@@ -50,65 +46,9 @@ export interface WorkspaceRouteOptions {
   db: SqliteDatabase;
 }
 
-type SessionUser = {
-  id: string;
-  fullName: string;
-  email: string;
-};
-
 class InvitationClaimFailedError extends Error {
   constructor() {
     super("Invitation is no longer valid");
-  }
-}
-
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
-}
-
-function setSessionCookies(reply: FastifyReply, session: { sessionToken: string; csrfToken: string }): void {
-  reply.header("Set-Cookie", [
-    serializeSessionCookie(session.sessionToken),
-    serializeCsrfCookie(session.csrfToken)
-  ]);
-}
-
-async function sessionPayload(db: SqliteDatabase, user: SessionUser): Promise<{
-  user: SessionUser;
-  workspaces: Awaited<ReturnType<typeof listMemberships>>;
-}> {
-  return {
-    user,
-    workspaces: await listMemberships(db, user.id)
-  };
-}
-
-async function requireWorkspaceMembership(
-  db: SqliteDatabase,
-  userId: string,
-  slug: string,
-  reply: FastifyReply
-): Promise<WorkspaceAuthContext | undefined> {
-  const context = await getAuthorizedWorkspaceBySlug(db, userId, slug);
-  if (!context) {
-    await reply.code(404).send({ error: "Workspace not found" });
-    return undefined;
-  }
-
-  return context;
-}
-
-function requireWorkspaceOwner(context: WorkspaceAuthContext, reply: FastifyReply): boolean {
-  try {
-    requireWorkspaceRole(context, ["owner"]);
-    return true;
-  } catch (error) {
-    if (error instanceof WorkspaceRoleError) {
-      reply.code(403).send({ error: "Workspace owner role required" });
-      return false;
-    }
-
-    throw error;
   }
 }
 
@@ -387,6 +327,6 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, options: Wor
     const session = createSession(db, sessionUser.id, now);
     setSessionCookies(reply, session);
 
-    return { data: await sessionPayload(db, sessionUser) };
+    return { data: await buildSessionPayload(db, sessionUser) };
   });
 }

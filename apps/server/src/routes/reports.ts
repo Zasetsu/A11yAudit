@@ -1,18 +1,14 @@
-import type { FastifyInstance, FastifyReply } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { StorageAdapter } from "@a11yaudit/storage";
 import { requireAuth } from "../auth/session.js";
 import type { SqliteDatabase } from "../db/client.js";
 import { getReportForWorkspace, listReportsForWorkspace } from "../repositories/reports.js";
-import { getAuthorizedWorkspaceBySlug, type WorkspaceAuthContext } from "../repositories/workspaces.js";
+import { requireWorkspaceMembership, workspaceParamsSchema } from "./workspace-access.js";
 
 const reportQuerySchema = z.object({
   projectId: z.string().optional(),
   scanRunId: z.string().optional()
-});
-
-const workspaceParamsSchema = z.object({
-  workspaceSlug: z.string().trim().min(1)
 });
 
 const reportParamsSchema = workspaceParamsSchema.extend({
@@ -22,21 +18,6 @@ const reportParamsSchema = workspaceParamsSchema.extend({
 export interface ReportRouteOptions {
   db: SqliteDatabase;
   storage: StorageAdapter;
-}
-
-async function requireWorkspaceMembership(
-  db: SqliteDatabase,
-  userId: string,
-  workspaceSlug: string,
-  reply: FastifyReply
-): Promise<WorkspaceAuthContext | undefined> {
-  const context = await getAuthorizedWorkspaceBySlug(db, userId, workspaceSlug);
-  if (!context) {
-    await reply.code(404).send({ error: "Workspace not found" });
-    return undefined;
-  }
-
-  return context;
 }
 
 export async function registerReportRoutes(app: FastifyInstance, options: ReportRouteOptions): Promise<void> {
