@@ -97,10 +97,10 @@ export function renderReportHtml(report: AuditReportModel, options: RenderReport
       <div class="value">${report.score}</div>
       <div class="score-band" style="color:${band.color}">${escapeHtml(band.label)}</div>
     </div>
-    <div class="card"><div>Unique Issues</div><div class="value">${uniqueIssues}</div></div>
-    <div class="card"><div>Affected Pages</div><div class="value">${affectedPages}</div></div>
-    <div class="card"><div>Total Occurrences</div><div class="value">${totalOccurrences}</div></div>
-    <div class="card"><div>Pages Audited</div><div class="value">${report.pagesAudited}</div></div>
+    <div class="card"><div>${escapeHtml(strings.uniqueIssues)}</div><div class="value">${uniqueIssues}</div></div>
+    <div class="card"><div>${escapeHtml(strings.affectedPages)}</div><div class="value">${affectedPages}</div></div>
+    <div class="card"><div>${escapeHtml(strings.occurrences)}</div><div class="value">${totalOccurrences}</div></div>
+    <div class="card"><div>${escapeHtml(strings.pagesAudited)}</div><div class="value">${report.pagesAudited}</div></div>
   </div>
 
   <!-- AT A GLANCE -->

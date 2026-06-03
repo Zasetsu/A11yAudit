@@ -2,7 +2,6 @@ import type { ReportLocale, Severity } from "@a11yaudit/core";
 
 export interface ReportStrings {
   reportTitle: string;
-  executiveSummary: string;
   atAGlance: string;
   fixFirst: string;
   allIssues: string;
@@ -26,7 +25,6 @@ export interface ReportStrings {
 const STRINGS: Record<ReportLocale, ReportStrings> = {
   tr: {
     reportTitle: "Erişilebilirlik Denetim Raporu",
-    executiveSummary: "Yönetici Özeti",
     atAGlance: "Genel bakış",
     fixFirst: "Önce bunları düzeltin",
     allIssues: "Tüm sorunlar",
@@ -48,7 +46,6 @@ const STRINGS: Record<ReportLocale, ReportStrings> = {
   },
   en: {
     reportTitle: "Accessibility Audit Report",
-    executiveSummary: "Executive Summary",
     atAGlance: "At a glance",
     fixFirst: "Fix these first",
     allIssues: "All issues",

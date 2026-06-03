@@ -25,6 +25,7 @@ describe("renderReportHtml", () => {
     expect(html).toContain("#c0392b");                   // critical color in styles/legend
     expect(html).toContain("Yasal uyumluluğu belgelemez.");
     expect(html).not.toMatch(/certif(y|ies) .{0,20}complian/i);
+    expect(html).toContain("benzersiz sorun");           // cover stat label localized (tr)
   });
 
   it("renders English strings when locale is en", () => {
@@ -188,9 +189,9 @@ describe("real report rendering", () => {
 
     const html = renderReportHtml(report);
 
-    expect(html).toContain("Unique Issues");
-    expect(html).toContain("Affected Pages");
-    expect(html).toContain("Total Occurrences");
+    expect(html).toContain("unique issues");
+    expect(html).toContain("affected pages");
+    expect(html).toContain("occurrences");
     expect(html).toContain("Buttons must have discernible text");
     expect(html).toContain("Technical appendix");
     // problem card appears before the technical appendix
