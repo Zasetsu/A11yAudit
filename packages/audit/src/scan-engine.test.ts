@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { DEFAULT_VIEWPORTS, type ScanRequest } from "@a11yaudit/core";
 import { LocalStorageAdapter } from "@a11yaudit/storage";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { runScan } from "./scan-engine.js";
+import { collectScreenshotDataUris, runScan } from "./scan-engine.js";
 
 const crawlerSafety = vi.hoisted(() => ({
   assertSafeResolvedUrl: vi.fn(),
@@ -360,4 +360,17 @@ describe("runScan", () => {
     );
     expect(new Set(screenshotKeys)).toHaveLength(1);
   }, 60_000);
+
+  it("collects screenshot artifacts as data uris", async () => {
+    const storage = {
+      get: async (key: string) => Buffer.from(`bytes-${key}`),
+      put: async () => ({ key: "", mimeType: "", sizeBytes: 0 }),
+      delete: async () => undefined
+    };
+    const findings = [{
+      evidence: [{ kind: "page_screenshot", artifactKey: "k1", mimeType: "image/png", sizeBytes: 1 }]
+    }] as any;
+    const map = await collectScreenshotDataUris(findings, storage as any);
+    expect(map.get("k1")).toBe(`data:image/png;base64,${Buffer.from("bytes-k1").toString("base64")}`);
+  });
 });

@@ -22,6 +22,31 @@ import { calculateScore } from "./score.js";
 const PDF_DETAILED_FINDING_LIMIT = 500;
 const PDF_EVIDENCE_ROW_LIMIT = 500;
 
+export async function collectScreenshotDataUris(
+  findings: ScanFinding[],
+  storage: StorageAdapter
+): Promise<Map<string, string>> {
+  const keys = new Map<string, string>(); // artifactKey -> mimeType
+  for (const finding of findings) {
+    for (const evidence of finding.evidence) {
+      if (evidence.kind === "page_screenshot" || evidence.kind === "element_screenshot") {
+        keys.set(evidence.artifactKey, evidence.mimeType);
+      }
+    }
+  }
+
+  const result = new Map<string, string>();
+  for (const [key, mimeType] of keys) {
+    try {
+      const bytes = await storage.get(key);
+      result.set(key, `data:${mimeType};base64,${bytes.toString("base64")}`);
+    } catch {
+      // missing artifact -> skip; the report renders that element without an image
+    }
+  }
+  return result;
+}
+
 export interface ScanProgressEvent {
   status: "crawling" | "auditing" | "reporting";
   pagesQueued: number;
@@ -295,12 +320,15 @@ async function storeReports(
   reportInput: { score: number; pages: AuditedPage[]; findings: ScanFinding[] }
 ): Promise<{ reports: CompletedScanResult["reports"]; reportWarnings: string[] }> {
   const generatedAt = new Date().toISOString();
+  const screenshotDataUris = await collectScreenshotDataUris(reportInput.findings, input.storage);
   const report = buildAuditReportModel({
     request: input.request,
     pages: reportInput.pages,
     findings: reportInput.findings,
     score: reportInput.score,
-    generatedAt
+    generatedAt,
+    locale: "tr",
+    screenshotDataUris
   });
   const html = renderReportHtml(report);
   const htmlArtifact = await input.storage.put(
