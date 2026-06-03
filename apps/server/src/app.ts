@@ -7,7 +7,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
 import { getTrustedBrowserOrigin, readAuthFromRequest, validateCsrf } from "./auth/session.js";
 import { createDb, initializeDb, type DbClient } from "./db/client.js";
-import { findings, issues, reports, scanRuns } from "./db/schema.js";
+import { evidenceArtifacts, findings, issues, reports, scanRuns } from "./db/schema.js";
 import { LocalJobRunner } from "./jobs/local-job-runner.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerFindingRoutes } from "./routes/findings.js";
@@ -169,6 +169,25 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
 
               for (const chunk of chunkArray(findingRows, 200)) {
                 tx.insert(findings).values(chunk).run();
+              }
+
+              const evidenceRows = result.findings.flatMap((finding) =>
+                (finding.evidence ?? [])
+                  .filter((artifact) => typeof artifact.artifactKey === "string")
+                  .map((artifact) => ({
+                    id: `evart-${nanoid(12)}`,
+                    artifactKey: artifact.artifactKey,
+                    findingId: `${result.runId}-${finding.id}`,
+                    projectId,
+                    scanRunId: result.runId,
+                    mimeType: artifact.mimeType,
+                    sizeBytes: artifact.sizeBytes,
+                    createdAt: completedAt
+                  }))
+              );
+
+              for (const chunk of chunkArray(evidenceRows, 200)) {
+                tx.insert(evidenceArtifacts).values(chunk).run();
               }
             }
 
