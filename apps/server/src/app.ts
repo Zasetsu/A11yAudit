@@ -4,6 +4,7 @@ import { aggregateScanIssues } from "@a11yaudit/core";
 import { LocalStorageAdapter } from "@a11yaudit/storage";
 import { eq, inArray } from "drizzle-orm";
 import Fastify, { type FastifyInstance } from "fastify";
+import rateLimit from "@fastify/rate-limit";
 import { nanoid } from "nanoid";
 import { getTrustedBrowserOrigin, readAuthFromRequest, validateCsrf } from "./auth/session.js";
 import { createDb, initializeDb, type DbClient } from "./db/client.js";
@@ -24,6 +25,7 @@ export interface BuildServerOptions {
   logger?: boolean;
   storageRoot?: string;
   executeScans?: boolean;
+  rateLimit?: boolean;
 }
 
 function chunkArray<T>(items: T[], chunkSize: number): T[][] {
@@ -258,6 +260,18 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
       await reply.code(csrf.statusCode).send({ error: csrf.error });
     }
   });
+
+  if (options.rateLimit !== false) {
+    await app.register(rateLimit, {
+      global: true,
+      max: 1000,
+      timeWindow: "1 minute",
+      keyGenerator: (request) => request.auth?.user?.id ?? request.ip,
+      errorResponseBuilder: (_request, context) => {
+        return { statusCode: 429, error: "Too many requests", retryAfter: context.after };
+      }
+    });
+  }
 
   app.options("/*", async (_request, reply) => reply.code(204).send());
 

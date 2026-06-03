@@ -3929,3 +3929,53 @@ describe("server", () => {
     });
   });
 });
+
+describe("rate limiting", () => {
+  it("returns 429 after exceeding the login attempt limit", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        await signup(app, "owner@example.com", "Owner Workspace");
+
+        let limited = false;
+        let retryAfter: string | undefined;
+        for (let attempt = 0; attempt < 12; attempt += 1) {
+          const response = await app.inject({
+            method: "POST",
+            url: "/api/auth/login",
+            payload: { email: "owner@example.com", password: "wrong-password" }
+          });
+          if (response.statusCode === 429) {
+            limited = true;
+            retryAfter = response.headers["retry-after"] as string | undefined;
+            break;
+          }
+        }
+
+        expect(limited).toBe(true);
+        expect(retryAfter).toBeDefined();
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("does not rate limit when the build option is disabled", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false, rateLimit: false });
+      try {
+        await signup(app, "owner@example.com", "Owner Workspace");
+        for (let attempt = 0; attempt < 15; attempt += 1) {
+          const response = await app.inject({
+            method: "POST",
+            url: "/api/auth/login",
+            payload: { email: "owner@example.com", password: "wrong-password" }
+          });
+          expect(response.statusCode).toBe(401);
+        }
+      } finally {
+        await app.close();
+      }
+    });
+  });
+});

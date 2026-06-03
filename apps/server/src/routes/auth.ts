@@ -80,7 +80,7 @@ function nextWorkspaceSlug(db: SqliteDatabase, workspaceName: string): string {
 export async function registerAuthRoutes(app: FastifyInstance, options: AuthRouteOptions): Promise<void> {
   const { db } = options;
 
-  app.post("/api/auth/signup", async (request, reply) => {
+  app.post("/api/auth/signup", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request, reply) => {
     const parsed = signupPayloadSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "Invalid signup payload", issues: parsed.error.issues });
@@ -155,7 +155,7 @@ export async function registerAuthRoutes(app: FastifyInstance, options: AuthRout
     return reply.code(201).send({ data: await buildSessionPayload(db, user) });
   });
 
-  app.post("/api/auth/login", async (request, reply) => {
+  app.post("/api/auth/login", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request, reply) => {
     const parsed = loginPayloadSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "Invalid login payload", issues: parsed.error.issues });
