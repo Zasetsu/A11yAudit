@@ -12,9 +12,11 @@ import { users, workspaceInvitations, workspaceMembers, workspaces } from "../db
 import {
   buildSessionPayload,
   countWorkspaceOwners,
+  emailIsWorkspaceMember,
   getWorkspaceMember,
   listMemberships,
   listWorkspaceMembers,
+  pendingInvitationExists,
   removeMember,
   type SessionUser,
   updateMemberRole,
@@ -240,12 +242,22 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, options: Wor
     if (!context) return undefined;
     if (!requireWorkspaceOwner(context, reply)) return undefined;
 
-    const token = createPlainToken();
+    const inviteEmail = normalizeEmail(parsed.data.email);
     const now = new Date();
+
+    if (emailIsWorkspaceMember(db, context.workspaceId, inviteEmail)) {
+      return reply.code(409).send({ error: "User is already a workspace member" });
+    }
+
+    if (pendingInvitationExists(db, context.workspaceId, inviteEmail, now.toISOString())) {
+      return reply.code(409).send({ error: "A pending invitation already exists for this email" });
+    }
+
+    const token = createPlainToken();
     const invitation = {
       id: `winv-${nanoid(16)}`,
       workspaceId: context.workspaceId,
-      email: normalizeEmail(parsed.data.email),
+      email: inviteEmail,
       role: parsed.data.role,
       tokenHash: hashToken(token),
       expiresAt: new Date(now.getTime() + INVITATION_TTL_MS).toISOString(),

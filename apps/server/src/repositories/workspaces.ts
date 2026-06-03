@@ -1,7 +1,7 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, gt, isNull, sql } from "drizzle-orm";
 
 import type { SqliteDatabase } from "../db/client.js";
-import { users, workspaceMembers, workspaces } from "../db/schema.js";
+import { users, workspaceInvitations, workspaceMembers, workspaces } from "../db/schema.js";
 
 export type WorkspaceRole = "owner" | "member";
 
@@ -142,4 +142,36 @@ export function removeMember(db: SqliteDatabase, workspaceId: string, userId: st
   db.delete(workspaceMembers)
     .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)))
     .run();
+}
+
+export function emailIsWorkspaceMember(db: SqliteDatabase, workspaceId: string, email: string): boolean {
+  const row = db
+    .select({ id: workspaceMembers.id })
+    .from(workspaceMembers)
+    .innerJoin(users, eq(users.id, workspaceMembers.userId))
+    .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(users.email, email)))
+    .get();
+
+  return row !== undefined;
+}
+
+export function pendingInvitationExists(
+  db: SqliteDatabase,
+  workspaceId: string,
+  email: string,
+  now: string
+): boolean {
+  const row = db
+    .select({ id: workspaceInvitations.id })
+    .from(workspaceInvitations)
+    .where(and(
+      eq(workspaceInvitations.workspaceId, workspaceId),
+      eq(workspaceInvitations.email, email),
+      isNull(workspaceInvitations.acceptedAt),
+      isNull(workspaceInvitations.revokedAt),
+      gt(workspaceInvitations.expiresAt, now)
+    ))
+    .get();
+
+  return row !== undefined;
 }
