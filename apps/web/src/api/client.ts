@@ -54,6 +54,22 @@ export interface CreateScanInput {
   viewports: Array<"desktop" | "mobile">;
 }
 
+export interface WorkspaceMember {
+  userId: string;
+  fullName: string;
+  email: string;
+  role: "owner" | "member";
+  joinedAt: string;
+}
+
+export interface WorkspaceInvitation {
+  id: string;
+  email: string;
+  role: "member";
+  expiresAt: string;
+  createdAt: string;
+}
+
 type ApiListResult<T> =
   | { status: "not_configured" }
   | { status: "unavailable" }
@@ -191,6 +207,14 @@ function workspaceScansPath(workspaceSlug: string): string {
 
 function workspaceProjectsPath(workspaceSlug: string): string {
   return `/api/workspaces/${encodeURIComponent(workspaceSlug)}/projects`;
+}
+
+function workspaceMembersPath(workspaceSlug: string): string {
+  return `/api/workspaces/${encodeURIComponent(workspaceSlug)}/members`;
+}
+
+function workspaceInvitationsPath(workspaceSlug: string): string {
+  return `/api/workspaces/${encodeURIComponent(workspaceSlug)}/invitations`;
 }
 
 function workspaceReportsPath(workspaceSlug: string): string {
@@ -610,6 +634,18 @@ export async function createProject(workspaceSlug: string, payload: { name?: str
   }
 }
 
+async function readMutationResult(response: Response | null): Promise<{ ok: true } | { error: string }> {
+  if (response === null) return { error: "API is unavailable" };
+  if (response.ok) return { ok: true };
+
+  try {
+    const payload = (await response.json()) as { error?: string };
+    return { error: payload.error ?? "Request failed" };
+  } catch {
+    return { error: "Request failed" };
+  }
+}
+
 export async function createScan(workspaceSlug: string, payload: CreateScanInput): Promise<ScanRun | null> {
   const response = await apiFetch(workspaceScansPath(workspaceSlug), {
     body: JSON.stringify(payload),
@@ -648,5 +684,103 @@ export async function createScan(workspaceSlug: string, payload: CreateScanInput
     };
   } catch {
     return null;
+  }
+}
+
+export async function listMembers(workspaceSlug: string): Promise<WorkspaceMember[]> {
+  const response = await apiFetch(workspaceMembersPath(workspaceSlug));
+  if (response === null || !response.ok) return [];
+
+  try {
+    const payload = (await response.json()) as { data?: { members?: WorkspaceMember[] } };
+    return Array.isArray(payload.data?.members) ? payload.data!.members! : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function updateMemberRole(
+  workspaceSlug: string,
+  userId: string,
+  role: "owner" | "member"
+): Promise<{ ok: true } | { error: string }> {
+  const response = await apiFetch(`${workspaceMembersPath(workspaceSlug)}/${encodeURIComponent(userId)}`, {
+    body: JSON.stringify({ role }),
+    method: "PATCH"
+  });
+  return readMutationResult(response);
+}
+
+export async function removeMember(
+  workspaceSlug: string,
+  userId: string
+): Promise<{ ok: true } | { error: string }> {
+  const response = await apiFetch(`${workspaceMembersPath(workspaceSlug)}/${encodeURIComponent(userId)}`, {
+    method: "DELETE"
+  });
+  return readMutationResult(response);
+}
+
+export async function listInvitations(workspaceSlug: string): Promise<WorkspaceInvitation[]> {
+  const response = await apiFetch(workspaceInvitationsPath(workspaceSlug));
+  if (response === null || !response.ok) return [];
+
+  try {
+    const payload = (await response.json()) as { data?: { invitations?: WorkspaceInvitation[] } };
+    return Array.isArray(payload.data?.invitations) ? payload.data!.invitations! : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function createInvite(
+  workspaceSlug: string,
+  email: string
+): Promise<{ invitation: WorkspaceInvitation; inviteUrl: string } | { error: string }> {
+  const response = await apiFetch(workspaceInvitationsPath(workspaceSlug), {
+    body: JSON.stringify({ email }),
+    method: "POST"
+  });
+  if (response === null) return { error: "API is unavailable" };
+
+  try {
+    const payload = (await response.json()) as { data?: { invitation: WorkspaceInvitation; inviteUrl: string }; error?: string };
+    if (!response.ok || payload.data === undefined) {
+      return { error: payload.error ?? "Could not create invitation" };
+    }
+    return payload.data;
+  } catch {
+    return { error: "Could not create invitation" };
+  }
+}
+
+export async function revokeInvitation(
+  workspaceSlug: string,
+  invitationId: string
+): Promise<{ ok: true } | { error: string }> {
+  const response = await apiFetch(`${workspaceInvitationsPath(workspaceSlug)}/${encodeURIComponent(invitationId)}`, {
+    method: "DELETE"
+  });
+  return readMutationResult(response);
+}
+
+export async function regenerateInvitation(
+  workspaceSlug: string,
+  invitationId: string
+): Promise<{ inviteUrl: string } | { error: string }> {
+  const response = await apiFetch(
+    `${workspaceInvitationsPath(workspaceSlug)}/${encodeURIComponent(invitationId)}/regenerate`,
+    { method: "POST" }
+  );
+  if (response === null) return { error: "API is unavailable" };
+
+  try {
+    const payload = (await response.json()) as { data?: { inviteUrl: string }; error?: string };
+    if (!response.ok || payload.data === undefined) {
+      return { error: payload.error ?? "Could not regenerate invitation" };
+    }
+    return { inviteUrl: payload.data.inviteUrl };
+  } catch {
+    return { error: "Could not regenerate invitation" };
   }
 }
