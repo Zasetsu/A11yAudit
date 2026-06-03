@@ -67,7 +67,8 @@ export interface WorkspaceInvitation {
   email: string;
   role: "member";
   expiresAt: string;
-  createdAt: string;
+  // Present on list responses; omitted from create/regenerate responses.
+  createdAt?: string;
 }
 
 type ApiListResult<T> =
