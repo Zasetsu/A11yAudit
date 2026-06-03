@@ -312,6 +312,70 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, options: Wor
     return { data: { ok: true } };
   });
 
+  app.post("/api/workspaces/:workspaceSlug/invitations/:invitationId/regenerate", async (request, reply) => {
+    const user = await requireAuth(request, reply);
+    if (!user) return undefined;
+
+    const params = invitationParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return reply.code(400).send({ error: "Invalid invitation parameters", issues: params.error.issues });
+    }
+
+    const context = await requireWorkspaceMembership(db, user.id, params.data.workspaceSlug, reply);
+    if (!context) return undefined;
+    if (!requireWorkspaceOwner(context, reply)) return undefined;
+
+    const invitation = db
+      .select({ id: workspaceInvitations.id, acceptedAt: workspaceInvitations.acceptedAt })
+      .from(workspaceInvitations)
+      .where(and(
+        eq(workspaceInvitations.id, params.data.invitationId),
+        eq(workspaceInvitations.workspaceId, context.workspaceId)
+      ))
+      .get();
+
+    if (!invitation) {
+      return reply.code(404).send({ error: "Invitation not found" });
+    }
+
+    if (invitation.acceptedAt) {
+      return reply.code(409).send({ error: "Invitation has already been accepted" });
+    }
+
+    const token = createPlainToken();
+    const now = new Date();
+    db.update(workspaceInvitations)
+      .set({
+        tokenHash: hashToken(token),
+        expiresAt: new Date(now.getTime() + INVITATION_TTL_MS).toISOString(),
+        revokedAt: null
+      })
+      .where(eq(workspaceInvitations.id, invitation.id))
+      .run();
+
+    const updated = db
+      .select({
+        id: workspaceInvitations.id,
+        email: workspaceInvitations.email,
+        role: workspaceInvitations.role,
+        expiresAt: workspaceInvitations.expiresAt
+      })
+      .from(workspaceInvitations)
+      .where(eq(workspaceInvitations.id, invitation.id))
+      .get();
+
+    if (!updated) {
+      return reply.code(404).send({ error: "Invitation not found" });
+    }
+
+    return {
+      data: {
+        invitation: serializeInvitation(updated),
+        inviteUrl: `/invite/${token}`
+      }
+    };
+  });
+
   app.get("/api/workspaces/:workspaceSlug/invitations", async (request, reply) => {
     const user = await requireAuth(request, reply);
     if (!user) return undefined;

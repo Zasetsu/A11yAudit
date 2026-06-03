@@ -3742,5 +3742,66 @@ describe("server", () => {
       }
     });
   });
+
+  it("regenerates an invite token so the old link stops working", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const ownerCookies = authCookies(owner);
+        const created = await createWorkspaceInvite(app, ownerCookies, "owner-workspace", "invitee@example.com");
+        const invitationId = created.json().data.invitation.id;
+        const oldToken = created.json().data.inviteUrl.replace("/invite/", "");
+
+        const regenerated = await app.inject({
+          method: "POST",
+          url: `/api/workspaces/owner-workspace/invitations/${invitationId}/regenerate`,
+          headers: { "x-csrf-token": ownerCookies[csrfCookieName] },
+          cookies: ownerCookies
+        });
+
+        expect(regenerated.statusCode).toBe(200);
+        const newToken = regenerated.json().data.inviteUrl.replace("/invite/", "");
+        expect(newToken).not.toBe(oldToken);
+
+        const acceptOld = await app.inject({
+          method: "POST",
+          url: `/api/invitations/${oldToken}/accept`,
+          payload: { fullName: "Member", email: "invitee@example.com", password: "password12345" }
+        });
+        expect(acceptOld.statusCode).toBe(404);
+
+        const acceptNew = await app.inject({
+          method: "POST",
+          url: `/api/invitations/${newToken}/accept`,
+          payload: { fullName: "Member", email: "invitee@example.com", password: "password12345" }
+        });
+        expect(acceptNew.statusCode).toBe(200);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("rejects regenerating an unknown invitation", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const ownerCookies = authCookies(owner);
+
+        const response = await app.inject({
+          method: "POST",
+          url: "/api/workspaces/owner-workspace/invitations/winv-missing/regenerate",
+          headers: { "x-csrf-token": ownerCookies[csrfCookieName] },
+          cookies: ownerCookies
+        });
+
+        expect(response.statusCode).toBe(404);
+      } finally {
+        await app.close();
+      }
+    });
+  });
   });
 });
