@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { fetchIssues, getFindings, getProjects, getReports, getScans, getSession, type AuthSession } from "./api/client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchIssues, getFindings, getProjects, getReports, getScans, getSession, logout, type AuthSession } from "./api/client";
 import { Sidebar, TopBar } from "./design/shell";
 import { activeProject, emptyProject, type Project, type ScanRun } from "./data";
 import { OverviewPage } from "./pages/overview";
@@ -172,7 +172,8 @@ function DashboardApp({
   session,
   setBrowserRoute,
   theme,
-  setTheme
+  setTheme,
+  onLogout
 }: {
   appRoute: Route & { workspaceSlug: string };
   currentWorkspace: WorkspaceSession;
@@ -181,6 +182,7 @@ function DashboardApp({
   setBrowserRoute: SetBrowserRoute;
   theme: "light" | "dark";
   setTheme: (setValue: (value: "light" | "dark") => "light" | "dark") => void;
+  onLogout: () => void;
 }) {
   const contentRef = useRef<HTMLElement>(null);
   const projectsQuery = useQuery({
@@ -289,6 +291,7 @@ function DashboardApp({
           workspaces={session.workspaces}
           theme={theme}
           toggleTheme={() => setTheme((value) => (value === "light" ? "dark" : "light"))}
+          onLogout={onLogout}
         />
         <main aria-label="Main content" className="content" ref={contentRef}>
           {projectsQuery.isError || scansQuery.isError || findingsQuery.isError || issuesQuery.isError || reportsQuery.isError ? (
@@ -336,10 +339,20 @@ export function App() {
     }
   }, []);
 
+  const queryClient = useQueryClient();
+
   const routeAfterAuth = useCallback((nextSession: AuthSession) => {
     setAuthenticatedSession(nextSession);
     setBrowserRoute(destinationForSession(nextSession), "replace");
   }, [setBrowserRoute]);
+
+  const onLogout = useCallback(() => {
+    void logout().catch(() => undefined).finally(() => {
+      setAuthenticatedSession(null);
+      queryClient.setQueryData(["auth-session"], null);
+      setBrowserRoute({ page: "login" }, "replace");
+    });
+  }, [queryClient, setBrowserRoute]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -379,6 +392,10 @@ export function App() {
       } else if (session.workspaces.length === 1) {
         setBrowserRoute(destinationForSession(session), "replace");
       }
+      return;
+    }
+
+    if (appRoute.page === "invite") {
       return;
     }
 
@@ -427,6 +444,7 @@ export function App() {
       setBrowserRoute={setBrowserRoute}
       setTheme={setTheme}
       theme={theme}
+      onLogout={onLogout}
     />
   );
 }

@@ -19,6 +19,7 @@ const api = vi.hoisted(() => ({
   getScans: vi.fn(),
   getSession: vi.fn(),
   login: vi.fn(),
+  logout: vi.fn(),
   signup: vi.fn()
 }));
 
@@ -113,6 +114,7 @@ function setupQueryMocks() {
   api.getProjects.mockResolvedValue([]);
   api.getReports.mockResolvedValue([]);
   api.getScans.mockResolvedValue([]);
+  api.logout.mockResolvedValue(undefined);
 }
 
 async function renderApp() {
@@ -394,6 +396,44 @@ describe("auth routes", () => {
       password: "secret"
     }));
     await waitFor(() => expect(window.location.pathname).toBe("/w/acme/projects"));
+  });
+
+  it("keeps a logged-in user on the invite page instead of redirecting to the dashboard", async () => {
+    setPath("/invite/token-123");
+    mockSession(acmeSession);
+    const rendered = await renderApp();
+    roots.push(rendered.root);
+
+    await waitFor(() => {
+      const acceptButton = Array.from(rendered.container.querySelectorAll("button")).find((candidate) =>
+        candidate.textContent?.includes("Accept invite")
+      );
+      expect(acceptButton).toBeTruthy();
+    });
+    expect(window.location.pathname).toBe("/invite/token-123");
+  });
+
+  it("signs out from the top bar and returns to login", async () => {
+    setPath("/w/acme/projects");
+    mockSession(acmeSession);
+    api.getProjects.mockResolvedValue([acmeProject]);
+    const rendered = await renderApp();
+    roots.push(rendered.root);
+
+    await waitFor(() => expect(rendered.container.querySelector(".content")?.textContent).toContain("Projects"));
+
+    let logoutButton: HTMLButtonElement | null = null;
+    await waitFor(() => {
+      logoutButton = rendered.container.querySelector<HTMLButtonElement>("[aria-label='Sign out']");
+      expect(logoutButton).toBeTruthy();
+    });
+
+    await act(async () => {
+      logoutButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    await waitFor(() => expect(api.logout).toHaveBeenCalled());
+    await waitFor(() => expect(window.location.pathname).toBe("/login"));
   });
 
   it("does not retain new scan state when switching workspace routes", async () => {

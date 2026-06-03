@@ -629,7 +629,7 @@ export async function createScan(workspaceSlug: string, payload: CreateScanInput
     return {
       id: row.id,
       projectId: row.projectId,
-      projectName: projectName(row.projectId),
+      projectName: row.projectName ?? projectName(row.projectId),
       url: row.url,
       status: scanStatus(row.status),
       mode: row.mode,

@@ -185,7 +185,8 @@ export function TopBar({
   onSelectWorkspace,
   navigate,
   theme,
-  toggleTheme
+  toggleTheme,
+  onLogout
 }: {
   project: Project;
   projects: Project[];
@@ -196,6 +197,7 @@ export function TopBar({
   navigate: Navigate;
   theme: "light" | "dark";
   toggleTheme: () => void;
+  onLogout: () => void;
 }) {
   const selectedProject = project ?? activeProject();
 
@@ -214,6 +216,7 @@ export function TopBar({
       <button aria-label="Repository link is not configured" className="icon-link" disabled title="Repository link is not configured" type="button">
         <Icon name="github" size={17} />
       </button>
+      <Button aria-label="Sign out" className="topbar-logout" icon="log-out" onClick={onLogout} variant="ghost" />
       <div className="local-status"><span className="health-dot" /> Local</div>
     </header>
   );
