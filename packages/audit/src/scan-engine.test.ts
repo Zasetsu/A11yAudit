@@ -396,4 +396,22 @@ describe("runScan", () => {
     expect(artifact?.kind).toBe("element_screenshot");
     expect(calls.filter((c) => c === "style").length).toBeGreaterThanOrEqual(2); // outline set + cleared
   });
+
+  it("keeps the element crop clip within the viewport for edge elements", async () => {
+    let captured: any = null;
+    const el = {
+      evaluate: async () => undefined,
+      boundingBox: async () => ({ x: 1420, y: 880, width: 30, height: 30 })
+    };
+    const page = {
+      screenshot: async (opts: any) => { captured = opts.clip; return Buffer.from("png"); },
+      viewportSize: () => ({ width: 1440, height: 900 })
+    };
+    const storage = { put: async (k: string) => ({ key: k, mimeType: "image/png", sizeBytes: 3 }), get: async () => Buffer.from(""), delete: async () => undefined };
+
+    await captureElementCropEvidence({ runId: "r", page: page as any, element: el as any, fingerprint: "fp", storage: storage as any });
+    expect(captured).not.toBeNull();
+    expect(captured.x + captured.width).toBeLessThanOrEqual(1440);
+    expect(captured.y + captured.height).toBeLessThanOrEqual(900);
+  });
 });

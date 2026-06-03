@@ -344,11 +344,13 @@ export async function captureElementCropEvidence(input: {
     }
 
     const viewport = input.page.viewportSize() ?? { width: box.x + box.width, height: box.y + box.height };
+    const clipX = Math.max(0, box.x - CROP_CONTEXT_PADDING);
+    const clipY = Math.max(0, box.y - CROP_CONTEXT_PADDING);
     const clip = {
-      x: Math.max(0, box.x - CROP_CONTEXT_PADDING),
-      y: Math.max(0, box.y - CROP_CONTEXT_PADDING),
-      width: Math.min(viewport.width, box.width + CROP_CONTEXT_PADDING * 2),
-      height: Math.min(viewport.height, box.height + CROP_CONTEXT_PADDING * 2)
+      x: clipX,
+      y: clipY,
+      width: Math.max(1, Math.min(viewport.width - clipX, box.width + CROP_CONTEXT_PADDING * 2)),
+      height: Math.max(1, Math.min(viewport.height - clipY, box.height + CROP_CONTEXT_PADDING * 2))
     };
     const png = await input.page.screenshot({ type: "png", clip });
     await clearCropHighlight(input.element);
