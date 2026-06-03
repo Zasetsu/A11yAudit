@@ -3,6 +3,7 @@ import { activeProject, type Project } from "../data";
 import { Button, Icon, type IconName } from "./ui";
 import type { Navigate, Route } from "../app";
 import type { AuthSession } from "../api/client";
+import { isWorkspaceOwner, type WorkspaceRole } from "../pages/page-props";
 
 type TopLevelPage = Exclude<Route["page"], "finding-detail">;
 
@@ -34,7 +35,7 @@ function NavButton({ item, route, navigate }: { item: { id: TopLevelPage; label:
   );
 }
 
-export function Sidebar({ route, navigate }: { route: Route; navigate: Navigate }) {
+export function Sidebar({ route, navigate, workspaceRole }: { route: Route; navigate: Navigate; workspaceRole: WorkspaceRole }) {
   return (
     <nav aria-label="Primary" className="sidebar">
       <div className="brand">
@@ -44,6 +45,9 @@ export function Sidebar({ route, navigate }: { route: Route; navigate: Navigate 
       <div className="nav-list">
         {navItems.map((item) => <NavButton item={item} key={item.id} navigate={navigate} route={route} />)}
         <div className="nav-section">Configure</div>
+        {isWorkspaceOwner(workspaceRole) ? (
+          <NavButton item={{ id: "members", label: "Members", icon: "shield-check" }} navigate={navigate} route={route} />
+        ) : null}
         {configItems.map((item) => <NavButton item={item} key={item.id} navigate={navigate} route={route} />)}
       </div>
       <div className="sidebar-foot">

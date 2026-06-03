@@ -1,37 +1,18 @@
-import type { FastifyInstance, FastifyReply } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { StorageAdapter } from "@a11yaudit/storage";
 import { requireAuth } from "../auth/session.js";
 import type { SqliteDatabase } from "../db/client.js";
 import { getAuthorizedArtifactForWorkspace } from "../repositories/artifacts.js";
-import { getAuthorizedWorkspaceBySlug, type WorkspaceAuthContext } from "../repositories/workspaces.js";
+import { requireWorkspaceMembership, workspaceParamsSchema } from "./workspace-access.js";
 
 const artifactQuerySchema = z.object({
   key: z.string().trim().min(1)
 });
 
-const workspaceParamsSchema = z.object({
-  workspaceSlug: z.string().trim().min(1)
-});
-
 export interface ArtifactRouteOptions {
   db: SqliteDatabase;
   storage: StorageAdapter;
-}
-
-async function requireWorkspaceMembership(
-  db: SqliteDatabase,
-  userId: string,
-  workspaceSlug: string,
-  reply: FastifyReply
-): Promise<WorkspaceAuthContext | undefined> {
-  const context = await getAuthorizedWorkspaceBySlug(db, userId, workspaceSlug);
-  if (!context) {
-    await reply.code(404).send({ error: "Workspace not found" });
-    return undefined;
-  }
-
-  return context;
 }
 
 export async function registerArtifactRoutes(app: FastifyInstance, options: ArtifactRouteOptions): Promise<void> {

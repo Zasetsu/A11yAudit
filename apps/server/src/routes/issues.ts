@@ -1,18 +1,14 @@
-import type { FastifyInstance, FastifyReply } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 
 import { requireAuth } from "../auth/session.js";
 import type { SqliteDatabase } from "../db/client.js";
 import { getIssueForWorkspace, listIssuesForWorkspace } from "../repositories/issues.js";
-import { getAuthorizedWorkspaceBySlug, type WorkspaceAuthContext } from "../repositories/workspaces.js";
+import { requireWorkspaceMembership, workspaceParamsSchema } from "./workspace-access.js";
 
 const issueQuerySchema = z.object({
   projectId: z.string().optional(),
   scanRunId: z.string().optional()
-});
-
-const workspaceParamsSchema = z.object({
-  workspaceSlug: z.string().trim().min(1)
 });
 
 const issueParamsSchema = workspaceParamsSchema.extend({
@@ -21,21 +17,6 @@ const issueParamsSchema = workspaceParamsSchema.extend({
 
 export interface IssueRouteOptions {
   db: SqliteDatabase;
-}
-
-async function requireWorkspaceMembership(
-  db: SqliteDatabase,
-  userId: string,
-  workspaceSlug: string,
-  reply: FastifyReply
-): Promise<WorkspaceAuthContext | undefined> {
-  const context = await getAuthorizedWorkspaceBySlug(db, userId, workspaceSlug);
-  if (!context) {
-    await reply.code(404).send({ error: "Workspace not found" });
-    return undefined;
-  }
-
-  return context;
 }
 
 export async function registerIssueRoutes(app: FastifyInstance, options: IssueRouteOptions): Promise<void> {

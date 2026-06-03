@@ -1,34 +1,46 @@
 import { and, eq, gt, isNull } from "drizzle-orm";
-import type { FastifyInstance, FastifyReply } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 
-import {
-  serializeCsrfCookie,
-  serializeSessionCookie
-} from "../auth/cookies.js";
+import { normalizeEmail } from "../auth/email.js";
 import { hashPassword, verifyPassword } from "../auth/password.js";
-import { createSession, requireAuth } from "../auth/session.js";
+import { createSession, requireAuth, setSessionCookies } from "../auth/session.js";
 import { createPlainToken, hashToken } from "../auth/tokens.js";
 import type { SqliteDatabase } from "../db/client.js";
 import { users, workspaceInvitations, workspaceMembers, workspaces } from "../db/schema.js";
 import {
-  getAuthorizedWorkspaceBySlug,
+  buildSessionPayload,
+  emailIsWorkspaceMember,
+  getWorkspaceMember,
+  isLastOwner,
   listMemberships,
-  requireWorkspaceRole,
-  WorkspaceRoleError,
-  type WorkspaceAuthContext,
+  listPendingInvitations,
+  listWorkspaceMembers,
+  pendingInvitationExists,
+  removeMember,
+  type SessionUser,
+  updateMemberRole,
   type WorkspaceRole
 } from "../repositories/workspaces.js";
+import {
+  requireWorkspaceMembership,
+  requireWorkspaceOwner,
+  workspaceParamsSchema
+} from "./workspace-access.js";
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-const workspaceParamsSchema = z.object({
-  workspaceSlug: z.string().trim().min(1)
-});
-
 const invitationParamsSchema = workspaceParamsSchema.extend({
   invitationId: z.string().trim().min(1)
+});
+
+const memberParamsSchema = workspaceParamsSchema.extend({
+  userId: z.string().trim().min(1)
+});
+
+const updateMemberPayloadSchema = z.object({
+  role: z.enum(["owner", "member"])
 });
 
 const acceptParamsSchema = z.object({
@@ -50,65 +62,9 @@ export interface WorkspaceRouteOptions {
   db: SqliteDatabase;
 }
 
-type SessionUser = {
-  id: string;
-  fullName: string;
-  email: string;
-};
-
 class InvitationClaimFailedError extends Error {
   constructor() {
     super("Invitation is no longer valid");
-  }
-}
-
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
-}
-
-function setSessionCookies(reply: FastifyReply, session: { sessionToken: string; csrfToken: string }): void {
-  reply.header("Set-Cookie", [
-    serializeSessionCookie(session.sessionToken),
-    serializeCsrfCookie(session.csrfToken)
-  ]);
-}
-
-async function sessionPayload(db: SqliteDatabase, user: SessionUser): Promise<{
-  user: SessionUser;
-  workspaces: Awaited<ReturnType<typeof listMemberships>>;
-}> {
-  return {
-    user,
-    workspaces: await listMemberships(db, user.id)
-  };
-}
-
-async function requireWorkspaceMembership(
-  db: SqliteDatabase,
-  userId: string,
-  slug: string,
-  reply: FastifyReply
-): Promise<WorkspaceAuthContext | undefined> {
-  const context = await getAuthorizedWorkspaceBySlug(db, userId, slug);
-  if (!context) {
-    await reply.code(404).send({ error: "Workspace not found" });
-    return undefined;
-  }
-
-  return context;
-}
-
-function requireWorkspaceOwner(context: WorkspaceAuthContext, reply: FastifyReply): boolean {
-  try {
-    requireWorkspaceRole(context, ["owner"]);
-    return true;
-  } catch (error) {
-    if (error instanceof WorkspaceRoleError) {
-      reply.code(403).send({ error: "Workspace owner role required" });
-      return false;
-    }
-
-    throw error;
   }
 }
 
@@ -182,6 +138,89 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, options: Wor
     };
   });
 
+  app.get("/api/workspaces/:workspaceSlug/members", async (request, reply) => {
+    const user = await requireAuth(request, reply);
+    if (!user) return undefined;
+
+    const params = parseWorkspaceParams(request.params);
+    if (!params) {
+      return reply.code(400).send({ error: "Invalid workspace parameters" });
+    }
+
+    const context = await requireWorkspaceMembership(db, user.id, params.workspaceSlug, reply);
+    if (!context) return undefined;
+    if (!requireWorkspaceOwner(context, reply)) return undefined;
+
+    return { data: { members: await listWorkspaceMembers(db, context.workspaceId) } };
+  });
+
+  app.patch("/api/workspaces/:workspaceSlug/members/:userId", async (request, reply) => {
+    const user = await requireAuth(request, reply);
+    if (!user) return undefined;
+
+    const params = memberParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return reply.code(400).send({ error: "Invalid member parameters", issues: params.error.issues });
+    }
+
+    const parsed = updateMemberPayloadSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "Invalid member payload", issues: parsed.error.issues });
+    }
+
+    const context = await requireWorkspaceMembership(db, user.id, params.data.workspaceSlug, reply);
+    if (!context) return undefined;
+    if (!requireWorkspaceOwner(context, reply)) return undefined;
+
+    if (params.data.userId === user.id) {
+      return reply.code(400).send({ error: "You cannot change your own role" });
+    }
+
+    const member = getWorkspaceMember(db, context.workspaceId, params.data.userId);
+    if (!member) {
+      return reply.code(404).send({ error: "Member not found" });
+    }
+
+    if (parsed.data.role === "member" && isLastOwner(db, context.workspaceId, member)) {
+      return reply.code(409).send({ error: "Workspace must keep at least one owner" });
+    }
+
+    updateMemberRole(db, context.workspaceId, params.data.userId, parsed.data.role);
+
+    return { data: { ok: true } };
+  });
+
+  app.delete("/api/workspaces/:workspaceSlug/members/:userId", async (request, reply) => {
+    const user = await requireAuth(request, reply);
+    if (!user) return undefined;
+
+    const params = memberParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return reply.code(400).send({ error: "Invalid member parameters", issues: params.error.issues });
+    }
+
+    const context = await requireWorkspaceMembership(db, user.id, params.data.workspaceSlug, reply);
+    if (!context) return undefined;
+    if (!requireWorkspaceOwner(context, reply)) return undefined;
+
+    if (params.data.userId === user.id) {
+      return reply.code(400).send({ error: "You cannot remove yourself" });
+    }
+
+    const member = getWorkspaceMember(db, context.workspaceId, params.data.userId);
+    if (!member) {
+      return reply.code(404).send({ error: "Member not found" });
+    }
+
+    if (isLastOwner(db, context.workspaceId, member)) {
+      return reply.code(409).send({ error: "Workspace must keep at least one owner" });
+    }
+
+    removeMember(db, context.workspaceId, params.data.userId);
+
+    return { data: { ok: true } };
+  });
+
   app.post("/api/workspaces/:workspaceSlug/invitations", async (request, reply) => {
     const user = await requireAuth(request, reply);
     if (!user) return undefined;
@@ -200,12 +239,22 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, options: Wor
     if (!context) return undefined;
     if (!requireWorkspaceOwner(context, reply)) return undefined;
 
-    const token = createPlainToken();
+    const inviteEmail = normalizeEmail(parsed.data.email);
     const now = new Date();
+
+    if (emailIsWorkspaceMember(db, context.workspaceId, inviteEmail)) {
+      return reply.code(409).send({ error: "User is already a workspace member" });
+    }
+
+    if (pendingInvitationExists(db, context.workspaceId, inviteEmail, now.toISOString())) {
+      return reply.code(409).send({ error: "A pending invitation already exists for this email" });
+    }
+
+    const token = createPlainToken();
     const invitation = {
       id: `winv-${nanoid(16)}`,
       workspaceId: context.workspaceId,
-      email: normalizeEmail(parsed.data.email),
+      email: inviteEmail,
       role: parsed.data.role,
       tokenHash: hashToken(token),
       expiresAt: new Date(now.getTime() + INVITATION_TTL_MS).toISOString(),
@@ -257,6 +306,85 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, options: Wor
       .run();
 
     return { data: { ok: true } };
+  });
+
+  app.post("/api/workspaces/:workspaceSlug/invitations/:invitationId/regenerate", async (request, reply) => {
+    const user = await requireAuth(request, reply);
+    if (!user) return undefined;
+
+    const params = invitationParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return reply.code(400).send({ error: "Invalid invitation parameters", issues: params.error.issues });
+    }
+
+    const context = await requireWorkspaceMembership(db, user.id, params.data.workspaceSlug, reply);
+    if (!context) return undefined;
+    if (!requireWorkspaceOwner(context, reply)) return undefined;
+
+    const invitation = db
+      .select({
+        id: workspaceInvitations.id,
+        email: workspaceInvitations.email,
+        role: workspaceInvitations.role,
+        acceptedAt: workspaceInvitations.acceptedAt,
+        revokedAt: workspaceInvitations.revokedAt
+      })
+      .from(workspaceInvitations)
+      .where(and(
+        eq(workspaceInvitations.id, params.data.invitationId),
+        eq(workspaceInvitations.workspaceId, context.workspaceId)
+      ))
+      .get();
+
+    if (!invitation) {
+      return reply.code(404).send({ error: "Invitation not found" });
+    }
+
+    if (invitation.acceptedAt) {
+      return reply.code(409).send({ error: "Invitation has already been accepted" });
+    }
+
+    if (invitation.revokedAt) {
+      return reply.code(409).send({ error: "Invitation has been revoked" });
+    }
+
+    const token = createPlainToken();
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + INVITATION_TTL_MS).toISOString();
+    db.update(workspaceInvitations)
+      .set({ tokenHash: hashToken(token), expiresAt })
+      .where(eq(workspaceInvitations.id, invitation.id))
+      .run();
+
+    return {
+      data: {
+        invitation: serializeInvitation({
+          id: invitation.id,
+          email: invitation.email,
+          role: invitation.role,
+          expiresAt
+        }),
+        inviteUrl: `/invite/${token}`
+      }
+    };
+  });
+
+  app.get("/api/workspaces/:workspaceSlug/invitations", async (request, reply) => {
+    const user = await requireAuth(request, reply);
+    if (!user) return undefined;
+
+    const params = parseWorkspaceParams(request.params);
+    if (!params) {
+      return reply.code(400).send({ error: "Invalid workspace parameters" });
+    }
+
+    const context = await requireWorkspaceMembership(db, user.id, params.workspaceSlug, reply);
+    if (!context) return undefined;
+    if (!requireWorkspaceOwner(context, reply)) return undefined;
+
+    return {
+      data: { invitations: listPendingInvitations(db, context.workspaceId, new Date().toISOString()) }
+    };
   });
 
   app.post("/api/invitations/:token/accept", async (request, reply) => {
@@ -387,6 +515,6 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, options: Wor
     const session = createSession(db, sessionUser.id, now);
     setSessionCookies(reply, session);
 
-    return { data: await sessionPayload(db, sessionUser) };
+    return { data: await buildSessionPayload(db, sessionUser) };
   });
 }

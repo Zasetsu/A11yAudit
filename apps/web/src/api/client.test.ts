@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { WorkspaceInvitation } from "./client";
 
 function jsonDataResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify({ data }), {
@@ -388,6 +389,32 @@ describe("api client", () => {
     expect(requestOptions(fetchMock, 0).body).toBe(JSON.stringify({ name: "Municipal Portal", url: "https://municipal.example.gov/" }));
     expect(requestHeaders(fetchMock, 0).get("Content-Type")).toBe("application/json");
     expect(requestHeaders(fetchMock, 0).get("X-CSRF-Token")).toBe("csrf-token");
+  });
+
+  it("createInvite POSTs to invitations path and returns invitation and inviteUrl", async () => {
+    vi.stubGlobal("document", { cookie: "a11yaudit_csrf=csrf-token" });
+    const invitation: WorkspaceInvitation = {
+      id: "inv-1",
+      email: "x@example.com",
+      role: "member",
+      expiresAt: "2026-07-03T00:00:00.000Z",
+      createdAt: "2026-06-03T00:00:00.000Z"
+    };
+    const inviteUrl = "https://app.example.test/invitations/inv-1/accept?token=abc";
+    const fetchMock = vi.fn(async () =>
+      jsonDataResponse({ invitation, inviteUrl }, 201)
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { createInvite } = await importClient("https://api.example.test/");
+
+    await expect(createInvite("acme", "x@example.com")).resolves.toEqual({ invitation, inviteUrl });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.test/api/workspaces/acme/invitations",
+      expect.objectContaining({ credentials: "include", method: "POST" })
+    );
+    expect(requestOptions(fetchMock).body).toBe(JSON.stringify({ email: "x@example.com" }));
+    expect(requestHeaders(fetchMock).get("X-CSRF-Token")).toBe("csrf-token");
+    expect(requestHeaders(fetchMock).get("Content-Type")).toBe("application/json");
   });
 
   it("maps finding evidence artifacts", async () => {

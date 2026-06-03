@@ -224,7 +224,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
 
   app.addHook("onRequest", async (request, reply) => {
     reply.header("Access-Control-Allow-Origin", trustedBrowserOrigin);
-    reply.header("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
+    reply.header("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
     reply.header("Access-Control-Allow-Headers", "Content-Type,Accept,X-CSRF-Token");
     reply.header("Access-Control-Allow-Credentials", "true");
 
@@ -234,7 +234,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
       return;
     }
 
-    const csrf = validateCsrf(dbClient.db, request, { trustedBrowserOrigin });
+    const csrf = validateCsrf(request, { trustedBrowserOrigin });
     if (!csrf.valid) {
       await reply.code(csrf.statusCode).send({ error: csrf.error });
     }

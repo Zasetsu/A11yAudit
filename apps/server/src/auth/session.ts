@@ -4,7 +4,13 @@ import { nanoid } from "nanoid";
 
 import type { SqliteDatabase } from "../db/client.js";
 import { sessions, users } from "../db/schema.js";
-import { csrfCookieName, sessionCookieName } from "./cookies.js";
+import {
+  csrfCookieName,
+  serializeCookie,
+  serializeCsrfCookie,
+  serializeSessionCookie,
+  sessionCookieName
+} from "./cookies.js";
 import { createPlainToken, hashToken } from "./tokens.js";
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -20,6 +26,7 @@ export interface RequestAuth {
   user: AuthenticatedUser | null;
   sessionId: string | null;
   csrfToken: string | null;
+  csrfTokenHash: string | null;
 }
 
 export interface CreatedSession {
@@ -59,7 +66,8 @@ function anonymousAuth(csrfToken: string | null = null): RequestAuth {
   return {
     user: null,
     sessionId: null,
-    csrfToken
+    csrfToken,
+    csrfTokenHash: null
   };
 }
 
@@ -128,6 +136,27 @@ export function createSession(db: SqliteDatabase, userId: string, now = new Date
   };
 }
 
+export function setSessionCookies(reply: FastifyReply, session: { sessionToken: string; csrfToken: string }): void {
+  reply.header("Set-Cookie", [
+    serializeSessionCookie(session.sessionToken),
+    serializeCsrfCookie(session.csrfToken)
+  ]);
+}
+
+export function setClearedAuthCookies(reply: FastifyReply): void {
+  reply.header("Set-Cookie", [
+    serializeCookie(sessionCookieName, "", {
+      httpOnly: true,
+      maxAgeSeconds: 0,
+      secure: process.env.NODE_ENV === "production"
+    }),
+    serializeCookie(csrfCookieName, "", {
+      maxAgeSeconds: 0,
+      secure: process.env.NODE_ENV === "production"
+    })
+  ]);
+}
+
 export function revokeSession(db: SqliteDatabase, sessionId: string, now = new Date()): void {
   db.update(sessions)
     .set({ revokedAt: now.toISOString() })
@@ -147,6 +176,7 @@ export function readAuthFromRequest(db: SqliteDatabase, request: RequestLike, no
   const row = db
     .select({
       sessionId: sessions.id,
+      csrfTokenHash: sessions.csrfTokenHash,
       userId: users.id,
       fullName: users.fullName,
       email: users.email
@@ -176,7 +206,8 @@ export function readAuthFromRequest(db: SqliteDatabase, request: RequestLike, no
       email: row.email
     },
     sessionId: row.sessionId,
-    csrfToken
+    csrfToken,
+    csrfTokenHash: row.csrfTokenHash
   };
 }
 
@@ -239,7 +270,7 @@ function getCsrfHeader(request: RequestLike): string | undefined {
   return firstHeaderValue(request.headers["x-csrf-token"] ?? request.headers["X-CSRF-Token"]);
 }
 
-export function validateCsrf(db: SqliteDatabase, request: RequestLike, options: CsrfValidationOptions = {}): CsrfValidationResult {
+export function validateCsrf(request: RequestLike, options: CsrfValidationOptions = {}): CsrfValidationResult {
   if (!isUnsafeMethod(request.method)) {
     return { valid: true };
   }
@@ -259,18 +290,9 @@ export function validateCsrf(db: SqliteDatabase, request: RequestLike, options: 
     return { valid: false, statusCode: 403, error: "Invalid CSRF token" };
   }
 
-  const stored = db
-    .select({ csrfTokenHash: sessions.csrfTokenHash })
-    .from(sessions)
-    .where(and(
-      eq(sessions.id, auth.sessionId),
-      eq(sessions.csrfTokenHash, hashToken(headerToken)),
-      isNull(sessions.revokedAt),
-      gt(sessions.expiresAt, new Date().toISOString())
-    ))
-    .get();
-
-  if (!stored) {
+  // auth.csrfTokenHash is populated only by readAuthFromRequest, which filters out
+  // revoked/expired sessions, so a stale session yields a null hash here (rejected below).
+  if (auth.csrfTokenHash === null || auth.csrfTokenHash !== hashToken(headerToken)) {
     return { valid: false, statusCode: 403, error: "Invalid CSRF token" };
   }
 

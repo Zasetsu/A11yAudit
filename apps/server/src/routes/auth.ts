@@ -1,20 +1,21 @@
-import { asc, eq, sql } from "drizzle-orm";
-import type { FastifyInstance, FastifyReply } from "fastify";
+import { eq, sql } from "drizzle-orm";
+import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 
-import {
-  csrfCookieName,
-  serializeCookie,
-  serializeCsrfCookie,
-  serializeSessionCookie,
-  sessionCookieName
-} from "../auth/cookies.js";
+import { normalizeEmail } from "../auth/email.js";
 import { hashPassword, verifyPassword } from "../auth/password.js";
-import { createSession, getRequestAuth, revokeSession } from "../auth/session.js";
+import {
+  createSession,
+  getRequestAuth,
+  revokeSession,
+  setClearedAuthCookies,
+  setSessionCookies
+} from "../auth/session.js";
 import { baseWorkspaceSlug } from "../auth/slug.js";
 import type { SqliteDatabase } from "../db/client.js";
 import { users, workspaces, workspaceMembers } from "../db/schema.js";
+import { buildSessionPayload } from "../repositories/workspaces.js";
 
 const MAX_WORKSPACE_SLUG_LENGTH = 64;
 
@@ -34,19 +35,9 @@ export interface AuthRouteOptions {
   db: SqliteDatabase;
 }
 
-type SessionUser = {
-  id: string;
-  fullName: string;
-  email: string;
-};
-
 class DuplicateEmailError extends Error {}
 
 class PublicSignupDisabledError extends Error {}
-
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
-}
 
 function publicSignupsEnabled(): boolean {
   return process.env.A11YAUDIT_PUBLIC_SIGNUPS === "true";
@@ -62,50 +53,6 @@ function uniqueConstraintFailed(error: unknown): boolean {
 
 function emailUniqueConstraintFailed(error: unknown): boolean {
   return error instanceof Error && /UNIQUE constraint failed: users\.email/i.test(error.message);
-}
-
-function setSessionCookies(reply: FastifyReply, session: { sessionToken: string; csrfToken: string }): void {
-  reply.header("Set-Cookie", [
-    serializeSessionCookie(session.sessionToken),
-    serializeCsrfCookie(session.csrfToken)
-  ]);
-}
-
-function setClearedAuthCookies(reply: FastifyReply): void {
-  reply.header("Set-Cookie", [
-    serializeCookie(sessionCookieName, "", {
-      httpOnly: true,
-      maxAgeSeconds: 0,
-      secure: process.env.NODE_ENV === "production"
-    }),
-    serializeCookie(csrfCookieName, "", {
-      maxAgeSeconds: 0,
-      secure: process.env.NODE_ENV === "production"
-    })
-  ]);
-}
-
-function sessionPayload(db: SqliteDatabase, user: SessionUser): {
-  user: SessionUser;
-  workspaces: Array<{ id: string; name: string; slug: string; role: "owner" | "member" }>;
-} {
-  const rows = db
-    .select({
-      id: workspaces.id,
-      name: workspaces.name,
-      slug: workspaces.slug,
-      role: workspaceMembers.role
-    })
-    .from(workspaceMembers)
-    .innerJoin(workspaces, eq(workspaces.id, workspaceMembers.workspaceId))
-    .where(eq(workspaceMembers.userId, user.id))
-    .orderBy(asc(workspaces.createdAt))
-    .all();
-
-  return {
-    user,
-    workspaces: rows
-  };
 }
 
 function candidateSlug(baseSlug: string, suffix: number): string {
@@ -205,7 +152,7 @@ export async function registerAuthRoutes(app: FastifyInstance, options: AuthRout
     const session = createSession(db, user.id);
     setSessionCookies(reply, session);
 
-    return reply.code(201).send({ data: sessionPayload(db, user) });
+    return reply.code(201).send({ data: await buildSessionPayload(db, user) });
   });
 
   app.post("/api/auth/login", async (request, reply) => {
@@ -234,7 +181,7 @@ export async function registerAuthRoutes(app: FastifyInstance, options: AuthRout
     setSessionCookies(reply, session);
 
     return {
-      data: sessionPayload(db, {
+      data: await buildSessionPayload(db, {
         id: user.id,
         fullName: user.fullName,
         email: user.email
@@ -260,6 +207,6 @@ export async function registerAuthRoutes(app: FastifyInstance, options: AuthRout
       return { data: null };
     }
 
-    return { data: sessionPayload(db, auth.user) };
+    return { data: await buildSessionPayload(db, auth.user) };
   });
 }
