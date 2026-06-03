@@ -31,7 +31,10 @@ export async function collectScreenshotDataUris(
   const keys = new Map<string, string>(); // artifactKey -> mimeType
   for (const finding of findings) {
     for (const evidence of finding.evidence) {
-      if (evidence.kind === "page_screenshot" || evidence.kind === "element_screenshot") {
+      // Only element crops are embedded inline. Full-page screenshots stay as
+      // downloadable artifacts — inlining them duplicated a multi-MB image per
+      // element and bloated the report to hundreds of MB (PDF render then crashed).
+      if (evidence.kind === "element_screenshot") {
         keys.set(evidence.artifactKey, evidence.mimeType);
       }
     }

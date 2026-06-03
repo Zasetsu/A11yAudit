@@ -62,10 +62,11 @@ export interface AuditReportModel {
 }
 
 function preferredScreenshotKey(finding: ScanFinding): string | null {
+  // Only element crops are embedded inline — they are small and element-specific.
+  // Full-page screenshots are NOT inlined (they would bloat the report to hundreds of
+  // MB when many elements share a page); they remain downloadable evidence artifacts.
   const crop = finding.evidence.find((e) => e.kind === "element_screenshot");
-  if (crop) return crop.artifactKey;
-  const page = finding.evidence.find((e) => e.kind === "page_screenshot");
-  return page ? page.artifactKey : null;
+  return crop ? crop.artifactKey : null;
 }
 
 export function buildReportProblems(

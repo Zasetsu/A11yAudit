@@ -36,11 +36,22 @@ describe("buildReportProblems", () => {
     expect(problems[0].ruleId).toBe("crit-rule");
   });
 
-  it("attaches the embedded screenshot data uri for an element by its page_screenshot artifact key", () => {
-    const f = finding({
+  it("embeds the element crop data uri and does NOT inline a page screenshot", () => {
+    const cropped = finding({
+      evidence: [{ kind: "element_screenshot", artifactKey: "crop1", mimeType: "image/png", sizeBytes: 1 }]
+    });
+    const pageOnly = finding({
+      ruleId: "other-rule", fingerprint: "p",
       evidence: [{ kind: "page_screenshot", artifactKey: "k1", mimeType: "image/png", sizeBytes: 1 }]
     });
-    const problems = buildReportProblems([f], "tr", new Map([["k1", "data:image/png;base64,AAA"]]));
-    expect(problems[0].elements[0].screenshotDataUri).toBe("data:image/png;base64,AAA");
+    const problems = buildReportProblems(
+      [cropped, pageOnly],
+      "tr",
+      new Map([["crop1", "data:image/png;base64,CROP"], ["k1", "data:image/png;base64,PAGE"]])
+    );
+    const byRule = new Map(problems.map((p) => [p.ruleId, p]));
+    expect(byRule.get("button-name")!.elements[0].screenshotDataUri).toBe("data:image/png;base64,CROP");
+    // a page-screenshot-only finding is NOT inlined (would bloat the report)
+    expect(byRule.get("other-rule")!.elements[0].screenshotDataUri).toBeNull();
   });
 });
