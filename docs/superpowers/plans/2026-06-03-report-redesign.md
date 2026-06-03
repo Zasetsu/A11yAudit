@@ -20,7 +20,7 @@
 - Package typecheck: `./node_modules/.bin/tsc -p packages/core/tsconfig.json --noEmit` (swap the package).
 - Existing data shapes:
   - `ScanFinding` (core) has: `id, title, severity, status, source, certainty, origin, wcagCriteria: string[], ruleId, description, recommendation, pageUrl, viewport, selector, htmlSnippet, visibleText, helpUrl, fingerprint, evidence: EvidenceArtifact[], instances`.
-  - `EvidenceArtifact` = `{ kind: "page_screenshot" | "element_crop" | "html_snippet"; artifactKey: string; mimeType: string; sizeBytes: number }` (kinds are string-typed; `page_screenshot` is produced today).
+  - `EvidenceArtifact` = `{ kind: "page_screenshot" | "element_screenshot" | "html_snippet"; artifactKey: string; mimeType: string; sizeBytes: number }` (kinds are string-typed; `page_screenshot` is produced today).
   - `AggregatedIssue` (core) has severity/criteria/representative fields — used for the **severity summary and appendix**, NOT the per-element card list.
   - `wcag.ts` exports `WCAG_22_CRITERIA: Record<string, { id, name, level }>` for ids `1.1.1, 1.3.1, 1.4.3, 2.4.4, 2.4.7, 2.4.11, 2.5.8, 4.1.2`.
   - `StorageAdapter` has `get(key): Promise<Buffer>`.
@@ -457,7 +457,7 @@ export interface ReportProblem {
 }
 
 function preferredScreenshotKey(finding: ScanFinding): string | null {
-  const crop = finding.evidence.find((e) => e.kind === "element_crop");
+  const crop = finding.evidence.find((e) => e.kind === "element_screenshot");
   if (crop) return crop.artifactKey;
   const page = finding.evidence.find((e) => e.kind === "page_screenshot");
   return page ? page.artifactKey : null;
@@ -704,7 +704,7 @@ export async function collectScreenshotDataUris(
   const keys = new Map<string, string>(); // artifactKey -> mimeType
   for (const finding of findings) {
     for (const evidence of finding.evidence) {
-      if (evidence.kind === "page_screenshot" || evidence.kind === "element_crop") {
+      if (evidence.kind === "page_screenshot" || evidence.kind === "element_screenshot") {
         keys.set(evidence.artifactKey, evidence.mimeType);
       }
     }
@@ -798,7 +798,7 @@ git commit -m "docs: scope English-only to code; report is localized"
 
 - [ ] **Step 1: Write the failing test**
 
-In `packages/audit/src/evidence.test.ts` (the evidence module is unit-tested against a fake Playwright `Page`/`ElementHandle`-like object and a fake storage — mirror the existing test style), add a test for a new `captureElementCropEvidence` that: outlines the element, reads its bounding box, screenshots a clipped region, removes the outline, stores the bytes via storage, and returns an `EvidenceArtifact` with `kind: "element_crop"`. Assert the outline is set then cleared (track calls on the fake element), and the stored artifact has `kind: "element_crop"`.
+In `packages/audit/src/evidence.test.ts` (the evidence module is unit-tested against a fake Playwright `Page`/`ElementHandle`-like object and a fake storage — mirror the existing test style), add a test for a new `captureElementCropEvidence` that: outlines the element, reads its bounding box, screenshots a clipped region, removes the outline, stores the bytes via storage, and returns an `EvidenceArtifact` with `kind: "element_screenshot"`. Assert the outline is set then cleared (track calls on the fake element), and the stored artifact has `kind: "element_screenshot"`.
 
 ```ts
 it("captures an element crop with a temporary highlight", async () => {
@@ -814,7 +814,7 @@ it("captures an element crop with a temporary highlight", async () => {
   const storage = { put: async (k: string) => ({ key: k, mimeType: "image/png", sizeBytes: 3 }), get: async () => Buffer.from(""), delete: async () => undefined };
 
   const artifact = await captureElementCropEvidence({ runId: "r1", page: page as any, element: el as any, fingerprint: "fp", storage: storage as any });
-  expect(artifact?.kind).toBe("element_crop");
+  expect(artifact?.kind).toBe("element_screenshot");
   expect(calls.filter((c) => c === "style").length).toBeGreaterThanOrEqual(2); // set + clear
 });
 ```
@@ -861,7 +861,7 @@ export async function captureElementCropEvidence(input: {
 
     const key = createArtifactKey({ runId: input.runId, kind: "crop", name: `${input.fingerprint}:crop`, extension: "png" });
     const stored = await input.storage.put(key, Buffer.from(png), "image/png");
-    return { kind: "element_crop", artifactKey: stored.key, mimeType: stored.mimeType, sizeBytes: stored.sizeBytes };
+    return { kind: "element_screenshot", artifactKey: stored.key, mimeType: stored.mimeType, sizeBytes: stored.sizeBytes };
   } catch {
     await clearHighlight(input.element).catch(() => undefined);
     return null;
