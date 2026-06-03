@@ -589,10 +589,12 @@ In `buildServer`, AFTER the `app.addHook("onRequest", ...)` block that sets `req
       max: 1000,
       timeWindow: "1 minute",
       keyGenerator: (request) => request.auth?.user?.id ?? request.ip,
-      errorResponseBuilder: () => ({ error: "Too many requests" })
+      errorResponseBuilder: (_request, context) => ({ statusCode: 429, error: "Too many requests", retryAfter: context.after })
     });
   }
 ```
+
+(Note: `errorResponseBuilder` MUST return `{ statusCode: 429, ... }` — returning only `{ error }` makes `@fastify/rate-limit` respond `500` instead of `429`. The `Retry-After` header is set by the plugin regardless.)
 
 - [ ] **Step 5: Add per-route limits**
 

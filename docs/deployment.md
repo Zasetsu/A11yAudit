@@ -15,6 +15,13 @@ Bootstrap flow:
 
 Public signup is closed by default after the first account. Invite onboarding remains the preferred path when open signup is not intended.
 
+### Evidence Artifact Index
+
+Evidence-artifact downloads are authorized through an indexed `evidence_artifacts`
+table populated when a scan's findings are persisted. Scans created before this
+table existed are not backfilled: their evidence-artifact downloads return 404
+until the project is re-scanned. Report (HTML/PDF) downloads are unaffected.
+
 ## Environment Variables
 
 Current deployment behavior:
