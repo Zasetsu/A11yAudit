@@ -154,6 +154,17 @@ export function MembersPage({ workspaceSlug, workspaceRole }: PageProps) {
           <div className="note">
             <Icon name="info" size={14} /> Invite link (copy now, it is shown once):
             <code className="mono"> {latestLink}</code>
+            <Button
+              icon="arrow-right"
+              onClick={() => {
+                if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+                  void navigator.clipboard.writeText(latestLink);
+                }
+              }}
+              variant="ghost"
+            >
+              Copy
+            </Button>
           </div>
         ) : null}
       </Panel>

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkspaceInvitation } from "./client";
+import { CSRF_COOKIE_MISSING_ERROR } from "./client";
 
 function jsonDataResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify({ data }), {
@@ -415,6 +416,33 @@ describe("api client", () => {
     expect(requestOptions(fetchMock).body).toBe(JSON.stringify({ email: "x@example.com" }));
     expect(requestHeaders(fetchMock).get("X-CSRF-Token")).toBe("csrf-token");
     expect(requestHeaders(fetchMock).get("Content-Type")).toBe("application/json");
+  });
+
+  it("returns a clear error when the CSRF cookie is missing on an unsafe request", async () => {
+    // No a11yaudit_csrf cookie present — document.cookie is empty string.
+    vi.stubGlobal("document", { cookie: "" });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { createInvite } = await importClient("https://api.example.test/");
+
+    const result = await createInvite("acme", "x@example.com");
+    expect(result).toEqual({ error: CSRF_COOKIE_MISSING_ERROR });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("still issues login without a CSRF cookie (exempt path)", async () => {
+    // No a11yaudit_csrf cookie present; login is CSRF-exempt.
+    vi.stubGlobal("document", { cookie: "" });
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        data: { user: { id: "u1", fullName: "Ada", email: "a@b.test" }, workspaces: [] }
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { login } = await importClient("https://api.example.test/");
+
+    await expect(login({ email: "a@b.test", password: "secret" })).resolves.toBeDefined();
+    expect(fetchMock).toHaveBeenCalled();
   });
 
   it("maps finding evidence artifacts", async () => {

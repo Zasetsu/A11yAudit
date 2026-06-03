@@ -4,10 +4,11 @@ import { aggregateScanIssues } from "@a11yaudit/core";
 import { LocalStorageAdapter } from "@a11yaudit/storage";
 import { eq, inArray } from "drizzle-orm";
 import Fastify, { type FastifyInstance } from "fastify";
+import rateLimit from "@fastify/rate-limit";
 import { nanoid } from "nanoid";
 import { getTrustedBrowserOrigin, readAuthFromRequest, validateCsrf } from "./auth/session.js";
 import { createDb, initializeDb, type DbClient } from "./db/client.js";
-import { findings, issues, reports, scanRuns } from "./db/schema.js";
+import { evidenceArtifacts, findings, issues, reports, scanRuns } from "./db/schema.js";
 import { LocalJobRunner } from "./jobs/local-job-runner.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerFindingRoutes } from "./routes/findings.js";
@@ -24,6 +25,7 @@ export interface BuildServerOptions {
   logger?: boolean;
   storageRoot?: string;
   executeScans?: boolean;
+  rateLimit?: boolean;
 }
 
 function chunkArray<T>(items: T[], chunkSize: number): T[][] {
@@ -170,6 +172,25 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
               for (const chunk of chunkArray(findingRows, 200)) {
                 tx.insert(findings).values(chunk).run();
               }
+
+              const evidenceRows = result.findings.flatMap((finding) =>
+                (finding.evidence ?? [])
+                  .filter((artifact) => typeof artifact.artifactKey === "string")
+                  .map((artifact) => ({
+                    id: `evart-${nanoid(12)}`,
+                    artifactKey: artifact.artifactKey,
+                    findingId: `${result.runId}-${finding.id}`,
+                    projectId,
+                    scanRunId: result.runId,
+                    mimeType: artifact.mimeType,
+                    sizeBytes: artifact.sizeBytes,
+                    createdAt: completedAt
+                  }))
+              );
+
+              for (const chunk of chunkArray(evidenceRows, 200)) {
+                tx.insert(evidenceArtifacts).values(chunk).run();
+              }
             }
 
             if (result.reports.length > 0) {
@@ -239,6 +260,18 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
       await reply.code(csrf.statusCode).send({ error: csrf.error });
     }
   });
+
+  if (options.rateLimit !== false) {
+    await app.register(rateLimit, {
+      global: true,
+      max: 1000,
+      timeWindow: "1 minute",
+      keyGenerator: (request) => request.auth?.user?.id ?? request.ip,
+      errorResponseBuilder: (_request, context) => {
+        return { statusCode: 429, error: "Too many requests", retryAfter: context.after };
+      }
+    });
+  }
 
   app.options("/*", async (_request, reply) => reply.code(204).send());
 

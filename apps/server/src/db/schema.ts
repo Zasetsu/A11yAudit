@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -153,3 +153,16 @@ export const reports = sqliteTable("reports", {
   sizeBytes: integer("size_bytes").notNull(),
   createdAt: text("created_at").notNull()
 });
+
+export const evidenceArtifacts = sqliteTable("evidence_artifacts", {
+  id: text("id").primaryKey(),
+  artifactKey: text("artifact_key").notNull(),
+  findingId: text("finding_id").notNull().references(() => findings.id, { onDelete: "cascade" }),
+  projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  scanRunId: text("scan_run_id").notNull().references(() => scanRuns.id, { onDelete: "cascade" }),
+  mimeType: text("mime_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  createdAt: text("created_at").notNull()
+}, (table) => ({
+  artifactKeyIndex: index("idx_evidence_artifacts_key").on(table.artifactKey)
+}));

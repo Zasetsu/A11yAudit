@@ -14,6 +14,7 @@ import {
 import { createPlainToken, hashToken } from "./tokens.js";
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const LAST_SEEN_THROTTLE_MS = 60_000;
 const unsafeMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 export interface AuthenticatedUser {
@@ -177,6 +178,7 @@ export function readAuthFromRequest(db: SqliteDatabase, request: RequestLike, no
     .select({
       sessionId: sessions.id,
       csrfTokenHash: sessions.csrfTokenHash,
+      lastSeenAt: sessions.lastSeenAt,
       userId: users.id,
       fullName: users.fullName,
       email: users.email
@@ -194,10 +196,13 @@ export function readAuthFromRequest(db: SqliteDatabase, request: RequestLike, no
     return anonymousAuth(csrfToken);
   }
 
-  db.update(sessions)
-    .set({ lastSeenAt: now.toISOString() })
-    .where(eq(sessions.id, row.sessionId))
-    .run();
+  const lastSeenMs = Date.parse(row.lastSeenAt);
+  if (Number.isNaN(lastSeenMs) || now.getTime() - lastSeenMs >= LAST_SEEN_THROTTLE_MS) {
+    db.update(sessions)
+      .set({ lastSeenAt: now.toISOString() })
+      .where(eq(sessions.id, row.sessionId))
+      .run();
+  }
 
   return {
     user: {

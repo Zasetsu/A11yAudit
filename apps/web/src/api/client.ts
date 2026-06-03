@@ -156,6 +156,14 @@ type ServerIssue = Partial<Omit<Issue, "severity" | "source" | "certainty" | "co
   sampleUrls?: unknown;
 };
 
+export const CSRF_COOKIE_MISSING_ERROR = "CSRF cookie missing — check cookie/domain configuration";
+
+class CsrfCookieMissingError extends Error {
+  constructor() {
+    super(CSRF_COOKIE_MISSING_ERROR);
+  }
+}
+
 function apiUrl(path: string): string | null {
   if (apiBaseUrl === undefined || apiBaseUrl.trim() === "") {
     return null;
@@ -180,26 +188,30 @@ function readCookie(name: string): string | null {
   return cookie === undefined ? null : decodeURIComponent(cookie.slice(prefix.length));
 }
 
-async function apiFetch(path: string, options: RequestInit = {}): Promise<Response | null> {
+async function apiFetch(path: string, options: RequestInit & { skipCsrf?: boolean } = {}): Promise<Response | null> {
+  const { skipCsrf, ...requestInit } = options;
   const url = apiUrl(path);
   if (url === null) {
     return null;
   }
 
-  const headers = new Headers(options.headers);
+  const headers = new Headers(requestInit.headers);
   headers.set("Accept", "application/json");
-  if (options.body !== undefined) {
+  if (requestInit.body !== undefined) {
     headers.set("Content-Type", "application/json");
   }
 
   const csrfToken = readCookie("a11yaudit_csrf");
-  const method = (options.method ?? "GET").toUpperCase();
+  const method = (requestInit.method ?? "GET").toUpperCase();
   const isUnsafeMethod = method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE";
+  if (isUnsafeMethod && !skipCsrf && (csrfToken === null || csrfToken === "")) {
+    throw new CsrfCookieMissingError();
+  }
   if (isUnsafeMethod && csrfToken !== null && csrfToken !== "") {
     headers.set("X-CSRF-Token", csrfToken);
   }
 
-  return fetch(url, { ...options, credentials: "include", headers });
+  return fetch(url, { ...requestInit, credentials: "include", headers });
 }
 
 function workspaceScansPath(workspaceSlug: string): string {
@@ -286,7 +298,8 @@ async function readAuthSession(response: Response): Promise<AuthSession | null> 
 async function postAuth(path: string, input: SignupInput | LoginInput | InviteAcceptInput): Promise<AuthSession> {
   const response = await apiFetch(path, {
     body: JSON.stringify(input),
-    method: "POST"
+    method: "POST",
+    skipCsrf: true
   });
 
   if (response === null || !response.ok) {
@@ -601,16 +614,16 @@ export function getArtifactDownloadUrl(workspaceSlug: string, artifactKey: strin
 }
 
 export async function createProject(workspaceSlug: string, payload: { name?: string; url: string }): Promise<Project | null> {
-  const response = await apiFetch(workspaceProjectsPath(workspaceSlug), {
-    body: JSON.stringify(payload),
-    method: "POST"
-  });
-
-  if (response === null) {
-    return null;
-  }
-
   try {
+    const response = await apiFetch(workspaceProjectsPath(workspaceSlug), {
+      body: JSON.stringify(payload),
+      method: "POST"
+    });
+
+    if (response === null) {
+      return null;
+    }
+
     if (!response.ok) {
       return null;
     }
@@ -648,16 +661,16 @@ async function readMutationResult(response: Response | null): Promise<{ ok: true
 }
 
 export async function createScan(workspaceSlug: string, payload: CreateScanInput): Promise<ScanRun | null> {
-  const response = await apiFetch(workspaceScansPath(workspaceSlug), {
-    body: JSON.stringify(payload),
-    method: "POST"
-  });
-
-  if (response === null) {
-    return null;
-  }
-
   try {
+    const response = await apiFetch(workspaceScansPath(workspaceSlug), {
+      body: JSON.stringify(payload),
+      method: "POST"
+    });
+
+    if (response === null) {
+      return null;
+    }
+
     if (!response.ok) {
       return null;
     }
@@ -710,21 +723,29 @@ export async function updateMemberRole(
   userId: string,
   role: "owner" | "member"
 ): Promise<{ ok: true } | { error: string }> {
-  const response = await apiFetch(`${workspaceMembersPath(workspaceSlug)}/${encodeURIComponent(userId)}`, {
-    body: JSON.stringify({ role }),
-    method: "PATCH"
-  });
-  return readMutationResult(response);
+  try {
+    const response = await apiFetch(`${workspaceMembersPath(workspaceSlug)}/${encodeURIComponent(userId)}`, {
+      body: JSON.stringify({ role }),
+      method: "PATCH"
+    });
+    return readMutationResult(response);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Request failed" };
+  }
 }
 
 export async function removeMember(
   workspaceSlug: string,
   userId: string
 ): Promise<{ ok: true } | { error: string }> {
-  const response = await apiFetch(`${workspaceMembersPath(workspaceSlug)}/${encodeURIComponent(userId)}`, {
-    method: "DELETE"
-  });
-  return readMutationResult(response);
+  try {
+    const response = await apiFetch(`${workspaceMembersPath(workspaceSlug)}/${encodeURIComponent(userId)}`, {
+      method: "DELETE"
+    });
+    return readMutationResult(response);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Request failed" };
+  }
 }
 
 export async function listInvitations(workspaceSlug: string): Promise<WorkspaceInvitation[]> {
@@ -735,20 +756,20 @@ export async function createInvite(
   workspaceSlug: string,
   email: string
 ): Promise<{ invitation: WorkspaceInvitation; inviteUrl: string } | { error: string }> {
-  const response = await apiFetch(workspaceInvitationsPath(workspaceSlug), {
-    body: JSON.stringify({ email }),
-    method: "POST"
-  });
-  if (response === null) return { error: "API is unavailable" };
-
   try {
+    const response = await apiFetch(workspaceInvitationsPath(workspaceSlug), {
+      body: JSON.stringify({ email }),
+      method: "POST"
+    });
+    if (response === null) return { error: "API is unavailable" };
+
     const payload = (await response.json()) as { data?: { invitation: WorkspaceInvitation; inviteUrl: string }; error?: string };
     if (!response.ok || payload.data === undefined) {
       return { error: payload.error ?? "Could not create invitation" };
     }
     return payload.data;
-  } catch {
-    return { error: "Could not create invitation" };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not create invitation" };
   }
 }
 
@@ -756,29 +777,33 @@ export async function revokeInvitation(
   workspaceSlug: string,
   invitationId: string
 ): Promise<{ ok: true } | { error: string }> {
-  const response = await apiFetch(`${workspaceInvitationsPath(workspaceSlug)}/${encodeURIComponent(invitationId)}`, {
-    method: "DELETE"
-  });
-  return readMutationResult(response);
+  try {
+    const response = await apiFetch(`${workspaceInvitationsPath(workspaceSlug)}/${encodeURIComponent(invitationId)}`, {
+      method: "DELETE"
+    });
+    return readMutationResult(response);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Request failed" };
+  }
 }
 
 export async function regenerateInvitation(
   workspaceSlug: string,
   invitationId: string
 ): Promise<{ inviteUrl: string } | { error: string }> {
-  const response = await apiFetch(
-    `${workspaceInvitationsPath(workspaceSlug)}/${encodeURIComponent(invitationId)}/regenerate`,
-    { method: "POST" }
-  );
-  if (response === null) return { error: "API is unavailable" };
-
   try {
+    const response = await apiFetch(
+      `${workspaceInvitationsPath(workspaceSlug)}/${encodeURIComponent(invitationId)}/regenerate`,
+      { method: "POST" }
+    );
+    if (response === null) return { error: "API is unavailable" };
+
     const payload = (await response.json()) as { data?: { inviteUrl: string }; error?: string };
     if (!response.ok || payload.data === undefined) {
       return { error: payload.error ?? "Could not regenerate invitation" };
     }
     return { inviteUrl: payload.data.inviteUrl };
-  } catch {
-    return { error: "Could not regenerate invitation" };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not regenerate invitation" };
   }
 }

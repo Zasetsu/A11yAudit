@@ -7,7 +7,7 @@ import { csrfCookieName, sessionCookieName } from "./auth/cookies.js";
 import { createSession } from "./auth/session.js";
 import { hashToken } from "./auth/tokens.js";
 import { createDb, initializeDb } from "./db/client.js";
-import { findings, issues, projects, reports, scanRuns, sessions, users, workspaceInvitations, workspaceMembers } from "./db/schema.js";
+import { evidenceArtifacts, findings, issues, projects, reports, scanRuns, sessions, users, workspaceInvitations, workspaceMembers } from "./db/schema.js";
 import { LocalJobRunner } from "./jobs/local-job-runner.js";
 
 const { runScanMock } = vi.hoisted(() => ({
@@ -3130,6 +3130,11 @@ describe("server", () => {
           { kind: "html_snippet", artifactKey: "runs/readable/blob", mimeType: "text/html" }
         ])
       })).run();
+      dbClient.db.insert(evidenceArtifacts).values([
+        { id: "evart-readable-1", artifactKey: "runs/readable/screenshot.png", findingId: "finding-readable", projectId: project.json().id, scanRunId: scan.json().id, mimeType: "image/png", sizeBytes: 3, createdAt: new Date().toISOString() },
+        { id: "evart-readable-2", artifactKey: "runs/readable/snippet.txt", findingId: "finding-readable", projectId: project.json().id, scanRunId: scan.json().id, mimeType: "text/plain", sizeBytes: 7, createdAt: new Date().toISOString() },
+        { id: "evart-readable-3", artifactKey: "runs/readable/blob", findingId: "finding-readable", projectId: project.json().id, scanRunId: scan.json().id, mimeType: "text/html", sizeBytes: 4, createdAt: new Date().toISOString() }
+      ]).run();
 
       const ownerList = await listReports(app, owner, "", workspaceSlug);
       const memberList = await listReports(app, member, "", workspaceSlug);
@@ -3833,5 +3838,144 @@ describe("server", () => {
       }
     });
   });
+  });
+
+  describe("evidence artifact authorization", () => {
+    it("serves an indexed evidence artifact to a workspace member and 404s unknown keys", async () => {
+      await withTempDb(async (dbPath) => {
+        mockCompletedScan();
+        const app = await buildServer({ dbPath, executeScans: true });
+        try {
+          const owner = await signup(app, "owner@example.com", "Owner Workspace");
+          const ownerCookies = authCookies(owner);
+          const project = await createProject(app, owner, "Site", "https://example.com");
+          const projectId = project.json().id;
+
+          const scan = await app.inject({
+            method: "POST",
+            url: "/api/workspaces/owner-workspace/scans",
+            headers: { "x-csrf-token": ownerCookies[csrfCookieName] },
+            cookies: ownerCookies,
+            payload: { projectId, url: "https://example.com", mode: "single_url" }
+          });
+          const scanId = scan.json().id;
+          await waitForCompletedScan(app, owner, scanId);
+
+          const dbClient = createDb(dbPath);
+          let evidenceKey: string;
+          try {
+            const rows = dbClient.db.select().from(evidenceArtifacts).all();
+            expect(rows.length).toBeGreaterThan(0);
+            evidenceKey = rows[0].artifactKey;
+          } finally {
+            dbClient.close();
+          }
+
+          const ok = await app.inject({
+            method: "GET",
+            url: `/api/workspaces/owner-workspace/artifacts/download?key=${encodeURIComponent(evidenceKey)}`,
+            cookies: ownerCookies
+          });
+          expect(ok.statusCode).toBe(200);
+
+          const bogus = await app.inject({
+            method: "GET",
+            url: "/api/workspaces/owner-workspace/artifacts/download?key=runs/does-not-exist/snippet/x.txt",
+            cookies: ownerCookies
+          });
+          expect(bogus.statusCode).toBe(404);
+        } finally {
+          await app.close();
+        }
+      });
+    });
+
+    it("rejects cross-workspace evidence artifact downloads", async () => {
+      await withTempDb(async (dbPath) => {
+        mockCompletedScan();
+        const app = await buildServer({ dbPath, executeScans: true });
+        try {
+          const owner = await signup(app, "owner@example.com", "Owner Workspace");
+          const ownerCookies = authCookies(owner);
+          const project = await createProject(app, owner, "Site", "https://example.com");
+          const scan = await app.inject({
+            method: "POST",
+            url: "/api/workspaces/owner-workspace/scans",
+            headers: { "x-csrf-token": ownerCookies[csrfCookieName] },
+            cookies: ownerCookies,
+            payload: { projectId: project.json().id, url: "https://example.com", mode: "single_url" }
+          });
+          await waitForCompletedScan(app, owner, scan.json().id);
+
+          const dbClient = createDb(dbPath);
+          let evidenceKey: string;
+          try {
+            evidenceKey = dbClient.db.select().from(evidenceArtifacts).all()[0].artifactKey;
+          } finally {
+            dbClient.close();
+          }
+
+          const outsider = await signupWithPublicSignup(app, "outsider@example.com", "Other Workspace");
+          const response = await app.inject({
+            method: "GET",
+            url: `/api/workspaces/other-workspace/artifacts/download?key=${encodeURIComponent(evidenceKey)}`,
+            cookies: authCookies(outsider)
+          });
+          expect(response.statusCode).toBe(404);
+        } finally {
+          await app.close();
+        }
+      });
+    });
+  });
+});
+
+describe("rate limiting", () => {
+  it("returns 429 after exceeding the login attempt limit", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        await signup(app, "owner@example.com", "Owner Workspace");
+
+        let limited = false;
+        let retryAfter: string | undefined;
+        for (let attempt = 0; attempt < 12; attempt += 1) {
+          const response = await app.inject({
+            method: "POST",
+            url: "/api/auth/login",
+            payload: { email: "owner@example.com", password: "wrong-password" }
+          });
+          if (response.statusCode === 429) {
+            limited = true;
+            retryAfter = response.headers["retry-after"] as string | undefined;
+            break;
+          }
+        }
+
+        expect(limited).toBe(true);
+        expect(retryAfter).toBeDefined();
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("does not rate limit when the build option is disabled", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false, rateLimit: false });
+      try {
+        await signup(app, "owner@example.com", "Owner Workspace");
+        for (let attempt = 0; attempt < 15; attempt += 1) {
+          const response = await app.inject({
+            method: "POST",
+            url: "/api/auth/login",
+            payload: { email: "owner@example.com", password: "wrong-password" }
+          });
+          expect(response.statusCode).toBe(401);
+        }
+      } finally {
+        await app.close();
+      }
+    });
   });
 });

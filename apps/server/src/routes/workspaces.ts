@@ -221,7 +221,7 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, options: Wor
     return { data: { ok: true } };
   });
 
-  app.post("/api/workspaces/:workspaceSlug/invitations", async (request, reply) => {
+  app.post("/api/workspaces/:workspaceSlug/invitations", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request, reply) => {
     const user = await requireAuth(request, reply);
     if (!user) return undefined;
 
@@ -308,7 +308,7 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, options: Wor
     return { data: { ok: true } };
   });
 
-  app.post("/api/workspaces/:workspaceSlug/invitations/:invitationId/regenerate", async (request, reply) => {
+  app.post("/api/workspaces/:workspaceSlug/invitations/:invitationId/regenerate", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request, reply) => {
     const user = await requireAuth(request, reply);
     if (!user) return undefined;
 
@@ -387,7 +387,7 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, options: Wor
     };
   });
 
-  app.post("/api/invitations/:token/accept", async (request, reply) => {
+  app.post("/api/invitations/:token/accept", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request, reply) => {
     const params = acceptParamsSchema.safeParse(request.params);
     if (!params.success) {
       return reply.code(400).send({ error: "Invalid invitation parameters", issues: params.error.issues });

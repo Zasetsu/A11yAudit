@@ -178,6 +178,17 @@ export function initializeDb(sqlite: Database.Database): void {
       created_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS evidence_artifacts (
+      id TEXT PRIMARY KEY,
+      artifact_key TEXT NOT NULL,
+      finding_id TEXT NOT NULL REFERENCES findings(id) ON DELETE CASCADE,
+      project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      scan_run_id TEXT NOT NULL REFERENCES scan_runs(id) ON DELETE CASCADE,
+      mime_type TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_projects_domain ON projects(domain);
     CREATE UNIQUE INDEX IF NOT EXISTS projects_workspace_domain_unique ON projects(workspace_id, domain);
     CREATE UNIQUE INDEX IF NOT EXISTS workspace_members_workspace_user_unique ON workspace_members(workspace_id, user_id);
@@ -189,5 +200,6 @@ export function initializeDb(sqlite: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_issues_project_created ON issues(project_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_findings_scan_status ON findings(scan_run_id, status);
     CREATE INDEX IF NOT EXISTS idx_reports_scan_created ON reports(scan_run_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_evidence_artifacts_key ON evidence_artifacts(artifact_key);
   `);
 }
