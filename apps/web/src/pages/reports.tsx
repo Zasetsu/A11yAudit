@@ -8,8 +8,8 @@ export function reportActionLabel(report: PageProps["reports"][number]): string 
   return kind === "" ? "Report" : kind.toUpperCase();
 }
 
-export function reportDownloadUrl(report: PageProps["reports"][number]): string | null {
-  return report.status === "ready" ? getReportDownloadUrl(report.id) : null;
+export function reportDownloadUrl(report: PageProps["reports"][number], workspaceSlug: string): string | null {
+  return report.status === "ready" ? getReportDownloadUrl(workspaceSlug, report.id) : null;
 }
 
 export function reportDownloadTitle(report: PageProps["reports"][number]): string {
@@ -17,7 +17,7 @@ export function reportDownloadTitle(report: PageProps["reports"][number]): strin
   return report.status === "ready" ? `Download ${actionLabel} report` : `${actionLabel} report is still generating`;
 }
 
-export function ReportsPage({ reports, scans, navigate }: PageProps) {
+export function ReportsPage({ workspaceSlug, reports, scans, navigate }: PageProps) {
   return (
     <div className="content-inner fadein">
       <PageHeader
@@ -44,7 +44,7 @@ export function ReportsPage({ reports, scans, navigate }: PageProps) {
 	              {reports.map((report) => {
 	                const scan = scans.find((candidate) => candidate.id === report.scanRunId);
 	                const actionLabel = reportActionLabel(report);
-	                const downloadUrl = reportDownloadUrl(report);
+	                const downloadUrl = reportDownloadUrl(report, workspaceSlug);
 	                return (
                   <tr key={report.id}>
                     <td>

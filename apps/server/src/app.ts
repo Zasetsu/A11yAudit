@@ -5,15 +5,18 @@ import { LocalStorageAdapter } from "@a11yaudit/storage";
 import { eq, inArray } from "drizzle-orm";
 import Fastify, { type FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
+import { getTrustedBrowserOrigin, readAuthFromRequest, validateCsrf } from "./auth/session.js";
 import { createDb, initializeDb, type DbClient } from "./db/client.js";
 import { findings, issues, reports, scanRuns } from "./db/schema.js";
 import { LocalJobRunner } from "./jobs/local-job-runner.js";
+import { registerAuthRoutes } from "./routes/auth.js";
 import { registerFindingRoutes } from "./routes/findings.js";
 import { registerArtifactRoutes } from "./routes/artifacts.js";
 import { registerIssueRoutes } from "./routes/issues.js";
 import { registerProjectRoutes } from "./routes/projects.js";
 import { registerReportRoutes } from "./routes/reports.js";
 import { registerScanRoutes, type ScanJobPayload } from "./routes/scans.js";
+import { registerWorkspaceRoutes } from "./routes/workspaces.js";
 
 export interface BuildServerOptions {
   dbPath?: string;
@@ -31,12 +34,36 @@ function chunkArray<T>(items: T[], chunkSize: number): T[][] {
   return chunks;
 }
 
+function shouldSkipCsrf(requestUrl: string): boolean {
+  const pathname = requestUrl.startsWith("http") ? new URL(requestUrl).pathname : requestUrl.split("?")[0];
+  return pathname === "/health"
+    || pathname === "/api/auth/login"
+    || pathname === "/api/auth/signup"
+    || /^\/api\/invitations\/[^/]+\/accept$/.test(pathname);
+}
+
+function readMaxConcurrentScans(): number {
+  const value = process.env.A11YAUDIT_MAX_CONCURRENT_SCANS;
+  if (value === undefined || !/^\d+$/.test(value)) {
+    return 1;
+  }
+
+  const parsed = Number(value);
+  return parsed > 0 ? parsed : 1;
+}
+
+export function readServerDbPath(): string | undefined {
+  const value = process.env.A11YAUDIT_DB_PATH?.trim();
+  return value === "" ? undefined : value;
+}
+
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: options.logger ?? false });
   const dbClient = options.dbClient ?? createDb(options.dbPath);
   const ownsDbClient = options.dbClient === undefined;
   const storage = new LocalStorageAdapter({ rootDir: options.storageRoot ?? ".a11yaudit/artifacts" });
   const runner = new LocalJobRunner<ScanJobPayload>({
+    maxConcurrentJobs: readMaxConcurrentScans(),
     execute: options.executeScans === false
       ? undefined
       : async (job) => {
@@ -193,10 +220,24 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
 
   initializeDb(dbClient.sqlite);
   markInterruptedScansFailed(dbClient);
-  app.addHook("onRequest", async (_request, reply) => {
-    reply.header("Access-Control-Allow-Origin", "http://localhost:5173");
-    reply.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-    reply.header("Access-Control-Allow-Headers", "Content-Type,Accept");
+  const trustedBrowserOrigin = getTrustedBrowserOrigin();
+
+  app.addHook("onRequest", async (request, reply) => {
+    reply.header("Access-Control-Allow-Origin", trustedBrowserOrigin);
+    reply.header("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
+    reply.header("Access-Control-Allow-Headers", "Content-Type,Accept,X-CSRF-Token");
+    reply.header("Access-Control-Allow-Credentials", "true");
+
+    request.auth = readAuthFromRequest(dbClient.db, request);
+
+    if (shouldSkipCsrf(request.url)) {
+      return;
+    }
+
+    const csrf = validateCsrf(dbClient.db, request, { trustedBrowserOrigin });
+    if (!csrf.valid) {
+      await reply.code(csrf.statusCode).send({ error: csrf.error });
+    }
   });
 
   app.options("/*", async (_request, reply) => reply.code(204).send());
@@ -214,6 +255,8 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
     version: "0.1.0"
   }));
 
+  await registerAuthRoutes(app, { db: dbClient.db });
+  await registerWorkspaceRoutes(app, { db: dbClient.db });
   await registerProjectRoutes(app, { db: dbClient.db });
   await registerScanRoutes(app, { db: dbClient.db, runner });
   await registerFindingRoutes(app, { db: dbClient.db });
@@ -239,6 +282,6 @@ function markInterruptedScansFailed(dbClient: DbClient): void {
 const entryPoint = process.argv[1] ? pathToFileURL(process.argv[1]).href : undefined;
 
 if (import.meta.url === entryPoint) {
-  const app = await buildServer({ logger: true });
+  const app = await buildServer({ logger: true, dbPath: readServerDbPath() });
   await app.listen({ host: "0.0.0.0", port: Number(process.env.PORT ?? 7842) });
 }

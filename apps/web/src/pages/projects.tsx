@@ -3,11 +3,11 @@ import { Button, PageHeader, Panel, Progress, ScoreRing } from "../design/ui";
 import type { Project } from "../data";
 import type { PageProps } from "./page-props";
 
-export function ProjectsPage({ projects, project, navigate, onSelectProject }: PageProps & { onSelectProject: (project: Project) => void }) {
+export function ProjectsPage({ workspaceRole, projects, project, navigate, onSelectProject }: PageProps & { onSelectProject: (project: Project) => void }) {
   return (
     <div className="content-inner fadein">
       <PageHeader
-        actions={<Button icon="plus" onClick={() => navigate({ page: "new-scan" })} variant="primary">Add Public URL</Button>}
+        actions={workspaceRole === "owner" ? <Button icon="plus" onClick={() => navigate({ page: "new-scan" })} variant="primary">New Project</Button> : undefined}
         icon="folder"
         subtitle="Public websites configured for local A11yAudit scans."
         title="Projects"

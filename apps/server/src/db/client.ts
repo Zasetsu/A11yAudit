@@ -39,12 +39,63 @@ export function createDb(path = ".a11yaudit/a11yaudit.db"): DbClient {
 
 export function initializeDb(sqlite: Database.Database): void {
   sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      full_name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS workspaces (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS projects (
       id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL DEFAULT 'default-workspace' REFERENCES workspaces(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
       url TEXT NOT NULL,
       domain TEXT NOT NULL,
       created_at TEXT NOT NULL
+    );
+
+    INSERT OR IGNORE INTO workspaces (id, name, slug, created_at)
+    VALUES ('default-workspace', 'Default Workspace', 'default-workspace', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+
+    CREATE TABLE IF NOT EXISTS workspace_members (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      role TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS workspace_invitations (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      email TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'member',
+      token_hash TEXT NOT NULL UNIQUE,
+      expires_at TEXT NOT NULL,
+      accepted_at TEXT,
+      revoked_at TEXT,
+      invited_by_user_id TEXT NOT NULL REFERENCES users(id),
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token_hash TEXT NOT NULL UNIQUE,
+      csrf_token_hash TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      last_seen_at TEXT NOT NULL,
+      revoked_at TEXT
     );
 
     CREATE TABLE IF NOT EXISTS scan_runs (
@@ -128,29 +179,15 @@ export function initializeDb(sqlite: Database.Database): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_projects_domain ON projects(domain);
+    CREATE UNIQUE INDEX IF NOT EXISTS projects_workspace_domain_unique ON projects(workspace_id, domain);
+    CREATE UNIQUE INDEX IF NOT EXISTS workspace_members_workspace_user_unique ON workspace_members(workspace_id, user_id);
     CREATE INDEX IF NOT EXISTS idx_scan_runs_project_created ON scan_runs(project_id, created_at);
+    CREATE UNIQUE INDEX IF NOT EXISTS scan_runs_active_project_unique
+      ON scan_runs(project_id)
+      WHERE status IN ('queued', 'crawling', 'auditing', 'reporting');
     CREATE INDEX IF NOT EXISTS idx_issues_scan_severity ON issues(scan_run_id, severity);
     CREATE INDEX IF NOT EXISTS idx_issues_project_created ON issues(project_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_findings_scan_status ON findings(scan_run_id, status);
     CREATE INDEX IF NOT EXISTS idx_reports_scan_created ON reports(scan_run_id, created_at);
   `);
-
-  addColumnIfMissing(sqlite, "scan_runs", "score", "INTEGER");
-  addColumnIfMissing(sqlite, "scan_runs", "max_pages", "INTEGER NOT NULL DEFAULT 10");
-  addColumnIfMissing(sqlite, "scan_runs", "max_depth", "INTEGER NOT NULL DEFAULT 1");
-  addColumnIfMissing(sqlite, "scan_runs", "viewports", "TEXT NOT NULL DEFAULT 'desktop,mobile'");
-  addColumnIfMissing(sqlite, "findings", "viewport", "TEXT NOT NULL DEFAULT 'desktop'");
-  addColumnIfMissing(sqlite, "findings", "certainty", "TEXT NOT NULL DEFAULT 'automatic_violation'");
-  addColumnIfMissing(sqlite, "findings", "evidence", "TEXT NOT NULL DEFAULT '[]'");
-  addColumnIfMissing(sqlite, "findings", "fingerprint", "TEXT NOT NULL DEFAULT ''");
-  addColumnIfMissing(sqlite, "findings", "issue_id", "TEXT REFERENCES issues(id) ON DELETE SET NULL");
-}
-
-function addColumnIfMissing(sqlite: Database.Database, table: string, column: string, definition: string): void {
-  const columns = sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
-  if (columns.some((row) => row.name === column)) {
-    return;
-  }
-
-  sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
 }

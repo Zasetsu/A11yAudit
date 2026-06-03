@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createProject, createScan } from "../api/client";
 import { Button, Field, Icon, PageHeader, Panel, SelectInput, TextInput, Toggle } from "../design/ui";
@@ -8,16 +8,17 @@ import type { PageProps } from "./page-props";
 type ScanMode = "single_url" | "same_domain_crawl";
 type ProjectMode = "existing" | "new";
 
-function defaultProjectMode(projects: Project[]): ProjectMode {
-  return projects.length === 0 ? "new" : "existing";
+function defaultProjectMode(projects: Project[], canCreateProject: boolean): ProjectMode {
+  return canCreateProject && projects.length === 0 ? "new" : "existing";
 }
 
 function defaultProjectId(project: Project, projects: Project[]): string {
   return projects.some((candidate) => candidate.id === project.id) ? project.id : projects[0]?.id ?? "";
 }
 
-export function NewScanPage({ project, projects, navigate, onSelectProject }: PageProps & { onSelectProject: (project: Project) => void }) {
-  const [projectMode, setProjectMode] = useState<ProjectMode>(() => defaultProjectMode(projects));
+export function NewScanPage({ workspaceSlug, workspaceRole, project, projects, navigate, onSelectProject }: PageProps & { onSelectProject: (project: Project) => void }) {
+  const canCreateProject = workspaceRole === "owner";
+  const [projectMode, setProjectMode] = useState<ProjectMode>(() => defaultProjectMode(projects, canCreateProject));
   const [projectId, setProjectId] = useState(() => defaultProjectId(project, projects));
   const selected = projects.find((candidate) => candidate.id === projectId) ?? project;
   const [url, setUrl] = useState(selected.url);
@@ -29,18 +30,34 @@ export function NewScanPage({ project, projects, navigate, onSelectProject }: Pa
   const [mobile, setMobile] = useState(true);
   const queryClient = useQueryClient();
   const selectedViewports = [desktop ? "desktop" : null, mobile ? "mobile" : null].filter(Boolean) as Array<"desktop" | "mobile">;
+  const projectsFingerprint = useMemo(
+    () => projects.map((candidate) => `${candidate.id}:${candidate.name}:${candidate.url}`).join("|"),
+    [projects]
+  );
+
+  useEffect(() => {
+    const nextProjectId = defaultProjectId(project, projects);
+    const nextSelected = projects.find((candidate) => candidate.id === nextProjectId) ?? project;
+
+    setProjectMode(defaultProjectMode(projects, canCreateProject));
+    setProjectId(nextProjectId);
+    setUrl(nextSelected.url);
+    setProjectName(nextSelected.name);
+  }, [canCreateProject, project.id, project.name, project.url, projectsFingerprint, workspaceSlug]);
 
   const mutation = useMutation({
     mutationFn: async () => {
       if (selectedViewports.length === 0) return null;
 
+      if (projectMode === "new" && !canCreateProject) return null;
+
       const scanProject = projectMode === "new"
-        ? await createProject({ name: projectName.trim() === "" ? undefined : projectName, url })
+        ? await createProject(workspaceSlug, { name: projectName.trim() === "" ? undefined : projectName, url })
         : selected;
 
       if (scanProject === null || scanProject.id === "") return null;
 
-      const scan = await createScan({
+      const scan = await createScan(workspaceSlug, {
         projectId: scanProject.id,
         url,
         mode: scanMode,
@@ -57,10 +74,11 @@ export function NewScanPage({ project, projects, navigate, onSelectProject }: Pa
       }
 
       onSelectProject(scan.project);
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
-      void queryClient.invalidateQueries({ queryKey: ["scans"] });
-      void queryClient.invalidateQueries({ queryKey: ["findings"] });
-      void queryClient.invalidateQueries({ queryKey: ["reports"] });
+      void queryClient.invalidateQueries({ queryKey: ["projects", workspaceSlug] });
+      void queryClient.invalidateQueries({ queryKey: ["scans", workspaceSlug] });
+      void queryClient.invalidateQueries({ queryKey: ["findings", workspaceSlug] });
+      void queryClient.invalidateQueries({ queryKey: ["issues", workspaceSlug] });
+      void queryClient.invalidateQueries({ queryKey: ["reports", workspaceSlug] });
       navigate({ page: "scan-runs" });
     }
   });
@@ -87,7 +105,7 @@ export function NewScanPage({ project, projects, navigate, onSelectProject }: Pa
                 value={projectMode}
               >
                 <option value="existing" disabled={projects.length === 0}>Use existing project</option>
-                <option value="new">Create new project</option>
+                {canCreateProject ? <option value="new">Create new project</option> : null}
               </SelectInput>
             </Field>
             {projectMode === "existing" ? (
