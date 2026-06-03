@@ -16,7 +16,7 @@ export interface RenderReportHtmlOptions {
 }
 
 export function renderReportHtml(report: AuditReportModel, options: RenderReportHtmlOptions = {}): string {
-  const locale: ReportLocale = report.locale ?? "en";
+  const locale: ReportLocale = report.locale ?? "tr";
   const strings = reportStrings(locale);
   const issues = report.issues ?? [];
   const severitySummary = report.severitySummary ?? summarizeSeverity(report);
@@ -125,37 +125,6 @@ export function renderReportHtml(report: AuditReportModel, options: RenderReport
     </tbody>
   </table>
 
-  <!-- Executive Summary (legacy section header kept for tests) -->
-  <h2>Executive Summary</h2>
-  <p>A11yAudit scanned ${report.pagesAudited} page and viewport combination${report.pagesAudited === 1 ? "" : "s"} for ${escapeHtml(report.domain)} and found ${uniqueIssues} unique issue${uniqueIssues === 1 ? "" : "s"} across ${totalOccurrences} occurrence${totalOccurrences === 1 ? "" : "s"}.</p>
-
-  <!-- Audit Scope -->
-  <h2>Audit Scope</h2>
-  <table>
-    <tbody>
-      <tr><th>Target URL</th><td>${escapeHtml(report.targetUrl)}</td></tr>
-      <tr><th>Mode</th><td>${escapeHtml(report.mode)}</td></tr>
-      <tr><th>Domain</th><td>${escapeHtml(report.domain)}</td></tr>
-      <tr><th>Pages with Errors</th><td>${failedPages}</td></tr>
-    </tbody>
-  </table>
-
-  <!-- Severity Summary (legacy section header kept for tests) -->
-  <h2>Severity Summary</h2>
-  <table>
-    <thead>
-      <tr><th>Critical</th><th>Serious</th><th>Moderate</th><th>Minor</th></tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>${severitySummary.critical}</td>
-        <td>${severitySummary.serious}</td>
-        <td>${severitySummary.moderate}</td>
-        <td>${severitySummary.minor}</td>
-      </tr>
-    </tbody>
-  </table>
-
   <!-- FIX THESE FIRST -->
   <h2>${escapeHtml(strings.fixFirst)}</h2>
   ${fixFirstList}
@@ -164,24 +133,16 @@ export function renderReportHtml(report: AuditReportModel, options: RenderReport
   <h2>${escapeHtml(strings.allIssues)}</h2>
   ${allIssuesHtml}
 
-  <!-- Grouped Issues (legacy label kept for tests) -->
-  <h2>Grouped Issues</h2>
-  ${renderGroupedIssuesTable(report, options.maxDetailedFindings)}
-
-  <!-- TECHNICAL APPENDIX -->
-  <h2>${escapeHtml(strings.technicalAppendix)}</h2>
-
-  <h2>Raw Occurrence Appendix</h2>
-  ${renderFindingsTable(report, options.maxDetailedFindings)}
-
-  <h2>Evidence Appendix</h2>
-  ${renderEvidenceAppendix(report, options.maxEvidenceRows)}
-
   <!-- MANUAL REVIEW + DISCLAIMER -->
-  <h2>Manual Review Notice</h2>
   <div class="notice">${escapeHtml(strings.manualReview)}</div>
 
   <div class="disclaimer">${escapeHtml(strings.disclaimer)}</div>
+
+  <!-- TECHNICAL APPENDIX -->
+  <h2>${escapeHtml(strings.technicalAppendix)}</h2>
+  ${renderFindingsTable(report, options.maxDetailedFindings)}
+  ${renderEvidenceAppendix(report, options.maxEvidenceRows)}
+
 </body>
 </html>`;
 }
@@ -210,50 +171,6 @@ function renderProblemCard(problem: ReportProblem, strings: ReportStrings, local
     <div class="block"><b>${escapeHtml(strings.howToFix)}</b><br>${fix}</div>
     <div class="block"><b>${escapeHtml(strings.whereFound)} (${problem.elements.length})</b>${elements}</div>
   </div>`;
-}
-
-function renderGroupedIssuesTable(report: AuditReportModel, maxDetailedFindings?: number): string {
-  const issues = report.issues ?? [];
-
-  if (issues.length === 0) {
-    return "<p>No grouped issues were detected by the automated scan.</p>";
-  }
-
-  const visibleIssues = limitItems(issues, maxDetailedFindings);
-  const hiddenCount = issues.length - visibleIssues.length;
-  const limitNote = hiddenCount > 0
-    ? `<div class="limit-note">Showing ${visibleIssues.length} of ${issues.length} grouped issues. ${hiddenCount} additional grouped issues are summarized in the issue totals and remain available in the stored scan data.</div>`
-    : "";
-  const rows = visibleIssues.map((issue) => `<tr>
-    <td>${escapeHtml(issue.title)}</td>
-    <td>${escapeHtml(issue.severity)}</td>
-    <td>${escapeHtml(issue.wcagCriteria.join(", "))}</td>
-    <td>${escapeHtml(formatLikelyScope(issue))}</td>
-    <td>${escapeHtml(issue.componentArea)}</td>
-    <td>${escapeHtml(issue.cmsHint)}</td>
-    <td>${issue.affectedPages}</td>
-    <td>${issue.occurrences}</td>
-    <td>${escapeHtml(formatSampleUrls(issue.sampleUrls))}</td>
-    <td>${escapeHtml(issue.recommendation)}</td>
-  </tr>`).join("");
-
-  return `${limitNote}<table>
-    <thead>
-      <tr>
-        <th>Issue</th>
-        <th>Severity</th>
-        <th>WCAG</th>
-        <th>Likely Scope</th>
-        <th>Component Area</th>
-        <th>CMS Hint</th>
-        <th>Affected Pages</th>
-        <th>Occurrences</th>
-        <th>Sample URLs</th>
-        <th>Recommendation</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>`;
 }
 
 function renderFindingsTable(report: AuditReportModel, maxDetailedFindings?: number): string {
@@ -348,16 +265,8 @@ function summarizeSeverity(report: AuditReportModel): SeveritySummary {
   });
 }
 
-function formatLikelyScope(issue: AuditReportModel["issues"][number]): string {
-  return `${issue.likelyScope} (${issue.confidence})`;
-}
-
 function countAffectedPagesFromIssues(issues: AuditReportModel["issues"]): number {
   return new Set(issues.flatMap((issue) => issue.sampleUrls)).size;
-}
-
-function formatSampleUrls(sampleUrls: string[]): string {
-  return sampleUrls.length === 0 ? "N/A" : sampleUrls.join(", ");
 }
 
 function limitItems<T>(items: T[], maxItems?: number): T[] {

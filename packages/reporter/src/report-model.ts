@@ -128,7 +128,7 @@ export function buildAuditReportModel(input: {
 }): AuditReportModel {
   const url = new URL(input.request.targetUrl);
   const issues = aggregateScanIssues(input.findings, { auditedPages: input.pages });
-  const locale = input.locale ?? "en";
+  const locale = input.locale ?? "tr";
   const screenshotDataUris = input.screenshotDataUris ?? new Map();
   const problems = buildReportProblems(input.findings, locale, screenshotDataUris);
 
