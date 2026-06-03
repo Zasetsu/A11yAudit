@@ -217,4 +217,30 @@ describe("sessions", () => {
 
     expect(validateCsrf(request)).toEqual({ valid: true });
   });
+
+  it("does not rewrite last_seen_at within the throttle window", async () => {
+    const client = setupDb();
+    seedUser(client);
+    const session = createSession(client.db, "user-1", new Date("2026-06-03T10:00:00.000Z"));
+
+    readAuthFromRequest(client.db, createRequest({
+      cookie: `${sessionCookieName}=${session.sessionToken}`
+    }), new Date("2026-06-03T10:00:30.000Z"));
+
+    const row = client.db.select().from(sessions).all()[0];
+    expect(row.lastSeenAt).toBe("2026-06-03T10:00:00.000Z");
+  });
+
+  it("rewrites last_seen_at after the throttle window", async () => {
+    const client = setupDb();
+    seedUser(client);
+    const session = createSession(client.db, "user-1", new Date("2026-06-03T10:00:00.000Z"));
+
+    readAuthFromRequest(client.db, createRequest({
+      cookie: `${sessionCookieName}=${session.sessionToken}`
+    }), new Date("2026-06-03T10:05:00.000Z"));
+
+    const row = client.db.select().from(sessions).all()[0];
+    expect(row.lastSeenAt).toBe("2026-06-03T10:05:00.000Z");
+  });
 });
