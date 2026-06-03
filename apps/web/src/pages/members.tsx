@@ -12,7 +12,7 @@ import {
   type WorkspaceMember
 } from "../api/client";
 import { Button, Icon, PageHeader, Panel } from "../design/ui";
-import type { PageProps } from "./page-props";
+import { isWorkspaceOwner, type PageProps } from "./page-props";
 
 function inviteLink(inviteUrl: string): string {
   return `${window.location.origin}${inviteUrl}`;
@@ -24,19 +24,24 @@ export function MembersPage({ workspaceSlug, workspaceRole }: PageProps) {
   const [error, setError] = useState<string | null>(null);
   const [latestLink, setLatestLink] = useState<string | null>(null);
 
+  const canManage = isWorkspaceOwner(workspaceRole);
+
   const membersQuery = useQuery({
     queryKey: ["members", workspaceSlug],
     queryFn: () => listMembers(workspaceSlug),
-    enabled: workspaceRole === "owner"
+    enabled: canManage
   });
   const invitationsQuery = useQuery({
     queryKey: ["invitations", workspaceSlug],
     queryFn: () => listInvitations(workspaceSlug),
-    enabled: workspaceRole === "owner"
+    enabled: canManage
   });
 
-  function refresh() {
+  function refreshMembers() {
     void queryClient.invalidateQueries({ queryKey: ["members", workspaceSlug] });
+  }
+
+  function refreshInvitations() {
     void queryClient.invalidateQueries({ queryKey: ["invitations", workspaceSlug] });
   }
 
@@ -50,7 +55,7 @@ export function MembersPage({ workspaceSlug, workspaceRole }: PageProps) {
       }
       setEmail("");
       setLatestLink(inviteLink(result.inviteUrl));
-      refresh();
+      refreshInvitations();
     }
   });
 
@@ -63,7 +68,7 @@ export function MembersPage({ workspaceSlug, workspaceRole }: PageProps) {
         setError(result.error);
         return;
       }
-      refresh();
+      refreshMembers();
     }
   });
 
@@ -75,7 +80,7 @@ export function MembersPage({ workspaceSlug, workspaceRole }: PageProps) {
         setError(result.error);
         return;
       }
-      refresh();
+      refreshMembers();
     }
   });
 
@@ -87,7 +92,7 @@ export function MembersPage({ workspaceSlug, workspaceRole }: PageProps) {
         setError(result.error);
         return;
       }
-      refresh();
+      refreshInvitations();
     }
   });
 
@@ -100,11 +105,11 @@ export function MembersPage({ workspaceSlug, workspaceRole }: PageProps) {
         return;
       }
       setLatestLink(inviteLink(result.inviteUrl));
-      refresh();
+      refreshInvitations();
     }
   });
 
-  if (workspaceRole !== "owner") {
+  if (!canManage) {
     return (
       <div className="content-inner fadein">
         <PageHeader icon="shield-check" subtitle="Workspace membership" title="Members" />

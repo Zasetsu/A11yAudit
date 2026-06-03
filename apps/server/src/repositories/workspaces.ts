@@ -117,6 +117,10 @@ export function countWorkspaceOwners(db: SqliteDatabase, workspaceId: string): n
     .get()?.count ?? 0;
 }
 
+export function isLastOwner(db: SqliteDatabase, workspaceId: string, member: { role: WorkspaceRole }): boolean {
+  return member.role === "owner" && countWorkspaceOwners(db, workspaceId) === 1;
+}
+
 export function getWorkspaceMember(
   db: SqliteDatabase,
   workspaceId: string,

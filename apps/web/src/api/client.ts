@@ -688,16 +688,21 @@ export async function createScan(workspaceSlug: string, payload: CreateScanInput
   }
 }
 
-export async function listMembers(workspaceSlug: string): Promise<WorkspaceMember[]> {
-  const response = await apiFetch(workspaceMembersPath(workspaceSlug));
+async function fetchNestedList<T>(path: string, key: string): Promise<T[]> {
+  const response = await apiFetch(path);
   if (response === null || !response.ok) return [];
 
   try {
-    const payload = (await response.json()) as { data?: { members?: WorkspaceMember[] } };
-    return Array.isArray(payload.data?.members) ? payload.data!.members! : [];
+    const payload = (await response.json()) as { data?: Record<string, unknown> };
+    const value = payload.data?.[key];
+    return Array.isArray(value) ? (value as T[]) : [];
   } catch {
     return [];
   }
+}
+
+export async function listMembers(workspaceSlug: string): Promise<WorkspaceMember[]> {
+  return fetchNestedList<WorkspaceMember>(workspaceMembersPath(workspaceSlug), "members");
 }
 
 export async function updateMemberRole(
@@ -723,15 +728,7 @@ export async function removeMember(
 }
 
 export async function listInvitations(workspaceSlug: string): Promise<WorkspaceInvitation[]> {
-  const response = await apiFetch(workspaceInvitationsPath(workspaceSlug));
-  if (response === null || !response.ok) return [];
-
-  try {
-    const payload = (await response.json()) as { data?: { invitations?: WorkspaceInvitation[] } };
-    return Array.isArray(payload.data?.invitations) ? payload.data!.invitations! : [];
-  } catch {
-    return [];
-  }
+  return fetchNestedList<WorkspaceInvitation>(workspaceInvitationsPath(workspaceSlug), "invitations");
 }
 
 export async function createInvite(

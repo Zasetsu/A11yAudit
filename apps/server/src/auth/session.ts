@@ -290,6 +290,8 @@ export function validateCsrf(request: RequestLike, options: CsrfValidationOption
     return { valid: false, statusCode: 403, error: "Invalid CSRF token" };
   }
 
+  // auth.csrfTokenHash is populated only by readAuthFromRequest, which filters out
+  // revoked/expired sessions, so a stale session yields a null hash here (rejected below).
   if (auth.csrfTokenHash === null || auth.csrfTokenHash !== hashToken(headerToken)) {
     return { valid: false, statusCode: 403, error: "Invalid CSRF token" };
   }

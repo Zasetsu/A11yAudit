@@ -11,9 +11,9 @@ import type { SqliteDatabase } from "../db/client.js";
 import { users, workspaceInvitations, workspaceMembers, workspaces } from "../db/schema.js";
 import {
   buildSessionPayload,
-  countWorkspaceOwners,
   emailIsWorkspaceMember,
   getWorkspaceMember,
+  isLastOwner,
   listMemberships,
   listPendingInvitations,
   listWorkspaceMembers,
@@ -181,11 +181,7 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, options: Wor
       return reply.code(404).send({ error: "Member not found" });
     }
 
-    if (
-      member.role === "owner" &&
-      parsed.data.role === "member" &&
-      countWorkspaceOwners(db, context.workspaceId) === 1
-    ) {
+    if (parsed.data.role === "member" && isLastOwner(db, context.workspaceId, member)) {
       return reply.code(409).send({ error: "Workspace must keep at least one owner" });
     }
 
@@ -216,7 +212,7 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, options: Wor
       return reply.code(404).send({ error: "Member not found" });
     }
 
-    if (member.role === "owner" && countWorkspaceOwners(db, context.workspaceId) === 1) {
+    if (isLastOwner(db, context.workspaceId, member)) {
       return reply.code(409).send({ error: "Workspace must keep at least one owner" });
     }
 
@@ -328,6 +324,8 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, options: Wor
     const invitation = db
       .select({
         id: workspaceInvitations.id,
+        email: workspaceInvitations.email,
+        role: workspaceInvitations.role,
         acceptedAt: workspaceInvitations.acceptedAt,
         revokedAt: workspaceInvitations.revokedAt
       })
@@ -352,32 +350,20 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, options: Wor
 
     const token = createPlainToken();
     const now = new Date();
+    const expiresAt = new Date(now.getTime() + INVITATION_TTL_MS).toISOString();
     db.update(workspaceInvitations)
-      .set({
-        tokenHash: hashToken(token),
-        expiresAt: new Date(now.getTime() + INVITATION_TTL_MS).toISOString()
-      })
+      .set({ tokenHash: hashToken(token), expiresAt })
       .where(eq(workspaceInvitations.id, invitation.id))
       .run();
 
-    const updated = db
-      .select({
-        id: workspaceInvitations.id,
-        email: workspaceInvitations.email,
-        role: workspaceInvitations.role,
-        expiresAt: workspaceInvitations.expiresAt
-      })
-      .from(workspaceInvitations)
-      .where(eq(workspaceInvitations.id, invitation.id))
-      .get();
-
-    if (!updated) {
-      return reply.code(404).send({ error: "Invitation not found" });
-    }
-
     return {
       data: {
-        invitation: serializeInvitation(updated),
+        invitation: serializeInvitation({
+          id: invitation.id,
+          email: invitation.email,
+          role: invitation.role,
+          expiresAt
+        }),
         inviteUrl: `/invite/${token}`
       }
     };
