@@ -817,7 +817,7 @@ describe("server", () => {
 
         expect(response.statusCode).toBe(204);
         expect(response.headers["access-control-allow-origin"]).toBe("http://localhost:5173");
-        expect(response.headers["access-control-allow-methods"]).toBe("GET,POST,DELETE,OPTIONS");
+        expect(response.headers["access-control-allow-methods"]).toBe("GET,POST,PATCH,DELETE,OPTIONS");
         expect(response.headers["access-control-allow-headers"]).toContain("X-CSRF-Token");
         expect(response.headers["access-control-allow-credentials"]).toBe("true");
       } finally {
@@ -3798,6 +3798,36 @@ describe("server", () => {
         });
 
         expect(response.statusCode).toBe(404);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("rejects regenerating a revoked invitation", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const ownerCookies = authCookies(owner);
+        const created = await createWorkspaceInvite(app, ownerCookies, "owner-workspace", "invitee@example.com");
+        const invitationId = created.json().data.invitation.id;
+
+        await app.inject({
+          method: "DELETE",
+          url: `/api/workspaces/owner-workspace/invitations/${invitationId}`,
+          headers: { "x-csrf-token": ownerCookies[csrfCookieName] },
+          cookies: ownerCookies
+        });
+
+        const response = await app.inject({
+          method: "POST",
+          url: `/api/workspaces/owner-workspace/invitations/${invitationId}/regenerate`,
+          headers: { "x-csrf-token": ownerCookies[csrfCookieName] },
+          cookies: ownerCookies
+        });
+
+        expect(response.statusCode).toBe(409);
       } finally {
         await app.close();
       }

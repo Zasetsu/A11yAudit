@@ -42,12 +42,12 @@ export function MembersPage({ workspaceSlug, workspaceRole }: PageProps) {
 
   const inviteMutation = useMutation({
     mutationFn: () => createInvite(workspaceSlug, email),
+    onMutate: () => setError(null),
     onSuccess: (result) => {
       if ("error" in result) {
         setError(result.error);
         return;
       }
-      setError(null);
       setEmail("");
       setLatestLink(inviteLink(result.inviteUrl));
       refresh();
@@ -57,48 +57,48 @@ export function MembersPage({ workspaceSlug, workspaceRole }: PageProps) {
   const roleMutation = useMutation({
     mutationFn: (input: { userId: string; role: "owner" | "member" }) =>
       updateMemberRole(workspaceSlug, input.userId, input.role),
+    onMutate: () => setError(null),
     onSuccess: (result) => {
       if ("error" in result) {
         setError(result.error);
         return;
       }
-      setError(null);
       refresh();
     }
   });
 
   const removeMutation = useMutation({
     mutationFn: (userId: string) => removeMember(workspaceSlug, userId),
+    onMutate: () => setError(null),
     onSuccess: (result) => {
       if ("error" in result) {
         setError(result.error);
         return;
       }
-      setError(null);
       refresh();
     }
   });
 
   const revokeMutation = useMutation({
     mutationFn: (invitationId: string) => revokeInvitation(workspaceSlug, invitationId),
+    onMutate: () => setError(null),
     onSuccess: (result) => {
       if ("error" in result) {
         setError(result.error);
         return;
       }
-      setError(null);
       refresh();
     }
   });
 
   const regenerateMutation = useMutation({
     mutationFn: (invitationId: string) => regenerateInvitation(workspaceSlug, invitationId),
+    onMutate: () => setError(null),
     onSuccess: (result) => {
       if ("error" in result) {
         setError(result.error);
         return;
       }
-      setError(null);
       setLatestLink(inviteLink(result.inviteUrl));
       refresh();
     }

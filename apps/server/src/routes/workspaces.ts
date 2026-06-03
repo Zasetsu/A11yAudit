@@ -326,7 +326,11 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, options: Wor
     if (!requireWorkspaceOwner(context, reply)) return undefined;
 
     const invitation = db
-      .select({ id: workspaceInvitations.id, acceptedAt: workspaceInvitations.acceptedAt })
+      .select({
+        id: workspaceInvitations.id,
+        acceptedAt: workspaceInvitations.acceptedAt,
+        revokedAt: workspaceInvitations.revokedAt
+      })
       .from(workspaceInvitations)
       .where(and(
         eq(workspaceInvitations.id, params.data.invitationId),
@@ -342,13 +346,16 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, options: Wor
       return reply.code(409).send({ error: "Invitation has already been accepted" });
     }
 
+    if (invitation.revokedAt) {
+      return reply.code(409).send({ error: "Invitation has been revoked" });
+    }
+
     const token = createPlainToken();
     const now = new Date();
     db.update(workspaceInvitations)
       .set({
         tokenHash: hashToken(token),
-        expiresAt: new Date(now.getTime() + INVITATION_TTL_MS).toISOString(),
-        revokedAt: null
+        expiresAt: new Date(now.getTime() + INVITATION_TTL_MS).toISOString()
       })
       .where(eq(workspaceInvitations.id, invitation.id))
       .run();
