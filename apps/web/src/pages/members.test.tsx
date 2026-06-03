@@ -123,6 +123,7 @@ describe("members page", () => {
     }
     roots = [];
     document.body.innerHTML = "";
+    vi.unstubAllGlobals();
   });
 
   it("shows the members table for an owner", async () => {
@@ -228,6 +229,26 @@ describe("members page", () => {
 
     await act(async () => { clickButton(rendered.container, "Revoke"); });
     await waitFor(() => expect(api.revokeInvitation).toHaveBeenCalledWith("acme", "winv-1"));
+  });
+
+  it("copies the invite link to the clipboard", async () => {
+    api.getSession.mockResolvedValue(ownerSession);
+    api.createInvite.mockResolvedValue({
+      invitation: { id: "winv-1", email: "new@example.test", role: "member", expiresAt: "2026-06-10T00:00:00.000Z", createdAt: "2026-06-03T00:00:00.000Z" },
+      inviteUrl: "/invite/tok-123"
+    });
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+    const rendered = await renderApp();
+    roots.push(rendered.root);
+
+    await waitFor(() => expect(rendered.container.textContent).toContain("Invite a member"));
+    await act(async () => { fillInput(rendered.container, "Email", "new@example.test"); });
+    await act(async () => { clickButton(rendered.container, "Send invite"); });
+    await waitFor(() => expect(rendered.container.textContent).toContain("/invite/tok-123"));
+
+    await act(async () => { clickButton(rendered.container, "Copy"); });
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/invite/tok-123`));
   });
 
   it("shows the error banner when a mutation fails", async () => {
