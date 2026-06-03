@@ -26,6 +26,7 @@ export interface RequestAuth {
   user: AuthenticatedUser | null;
   sessionId: string | null;
   csrfToken: string | null;
+  csrfTokenHash: string | null;
 }
 
 export interface CreatedSession {
@@ -65,7 +66,8 @@ function anonymousAuth(csrfToken: string | null = null): RequestAuth {
   return {
     user: null,
     sessionId: null,
-    csrfToken
+    csrfToken,
+    csrfTokenHash: null
   };
 }
 
@@ -174,6 +176,7 @@ export function readAuthFromRequest(db: SqliteDatabase, request: RequestLike, no
   const row = db
     .select({
       sessionId: sessions.id,
+      csrfTokenHash: sessions.csrfTokenHash,
       userId: users.id,
       fullName: users.fullName,
       email: users.email
@@ -203,7 +206,8 @@ export function readAuthFromRequest(db: SqliteDatabase, request: RequestLike, no
       email: row.email
     },
     sessionId: row.sessionId,
-    csrfToken
+    csrfToken,
+    csrfTokenHash: row.csrfTokenHash
   };
 }
 
@@ -266,7 +270,7 @@ function getCsrfHeader(request: RequestLike): string | undefined {
   return firstHeaderValue(request.headers["x-csrf-token"] ?? request.headers["X-CSRF-Token"]);
 }
 
-export function validateCsrf(db: SqliteDatabase, request: RequestLike, options: CsrfValidationOptions = {}): CsrfValidationResult {
+export function validateCsrf(request: RequestLike, options: CsrfValidationOptions = {}): CsrfValidationResult {
   if (!isUnsafeMethod(request.method)) {
     return { valid: true };
   }
@@ -286,18 +290,7 @@ export function validateCsrf(db: SqliteDatabase, request: RequestLike, options: 
     return { valid: false, statusCode: 403, error: "Invalid CSRF token" };
   }
 
-  const stored = db
-    .select({ csrfTokenHash: sessions.csrfTokenHash })
-    .from(sessions)
-    .where(and(
-      eq(sessions.id, auth.sessionId),
-      eq(sessions.csrfTokenHash, hashToken(headerToken)),
-      isNull(sessions.revokedAt),
-      gt(sessions.expiresAt, new Date().toISOString())
-    ))
-    .get();
-
-  if (!stored) {
+  if (auth.csrfTokenHash === null || auth.csrfTokenHash !== hashToken(headerToken)) {
     return { valid: false, statusCode: 403, error: "Invalid CSRF token" };
   }
 

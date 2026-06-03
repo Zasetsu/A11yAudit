@@ -158,7 +158,7 @@ describe("sessions", () => {
 
     request.auth = readAuthFromRequest(client.db, request, new Date("2026-06-03T00:00:00.000Z"));
 
-    expect(validateCsrf(client.db, request)).toEqual({ valid: true });
+    expect(validateCsrf(request)).toEqual({ valid: true });
   });
 
   it("accepts CSRF from the trusted browser origin when posting to the API origin", () => {
@@ -177,7 +177,7 @@ describe("sessions", () => {
 
     request.auth = readAuthFromRequest(client.db, request, new Date("2026-06-03T00:00:00.000Z"));
 
-    expect(validateCsrf(client.db, request)).toEqual({ valid: true });
+    expect(validateCsrf(request)).toEqual({ valid: true });
   });
 
   it("rejects CSRF when an authenticated unsafe request omits the header", () => {
@@ -191,7 +191,7 @@ describe("sessions", () => {
 
     request.auth = readAuthFromRequest(client.db, request, new Date("2026-06-03T00:00:00.000Z"));
 
-    expect(validateCsrf(client.db, request)).toMatchObject({ valid: false, statusCode: 403 });
+    expect(validateCsrf(request)).toMatchObject({ valid: false, statusCode: 403 });
   });
 
   it("rejects CSRF when the header and cookie do not match the stored session hash", () => {
@@ -207,7 +207,7 @@ describe("sessions", () => {
 
     request.auth = readAuthFromRequest(client.db, request, new Date("2026-06-03T00:00:00.000Z"));
 
-    expect(validateCsrf(client.db, request)).toMatchObject({ valid: false, statusCode: 403 });
+    expect(validateCsrf(request)).toMatchObject({ valid: false, statusCode: 403 });
   });
 
   it("does not CSRF-block anonymous unsafe requests", () => {
@@ -215,6 +215,6 @@ describe("sessions", () => {
     const request = createRequest({ method: "POST" });
     request.auth = readAuthFromRequest(client.db, request);
 
-    expect(validateCsrf(client.db, request)).toEqual({ valid: true });
+    expect(validateCsrf(request)).toEqual({ valid: true });
   });
 });

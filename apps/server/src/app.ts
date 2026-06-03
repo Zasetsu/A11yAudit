@@ -234,7 +234,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
       return;
     }
 
-    const csrf = validateCsrf(dbClient.db, request, { trustedBrowserOrigin });
+    const csrf = validateCsrf(request, { trustedBrowserOrigin });
     if (!csrf.valid) {
       await reply.code(csrf.statusCode).send({ error: csrf.error });
     }
