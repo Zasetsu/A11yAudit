@@ -12,6 +12,7 @@ import { users, workspaceInvitations, workspaceMembers, workspaces } from "../db
 import {
   buildSessionPayload,
   listMemberships,
+  listWorkspaceMembers,
   type SessionUser,
   type WorkspaceRole
 } from "../repositories/workspaces.js";
@@ -120,6 +121,22 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, options: Wor
         }
       }
     };
+  });
+
+  app.get("/api/workspaces/:workspaceSlug/members", async (request, reply) => {
+    const user = await requireAuth(request, reply);
+    if (!user) return undefined;
+
+    const params = parseWorkspaceParams(request.params);
+    if (!params) {
+      return reply.code(400).send({ error: "Invalid workspace parameters" });
+    }
+
+    const context = await requireWorkspaceMembership(db, user.id, params.workspaceSlug, reply);
+    if (!context) return undefined;
+    if (!requireWorkspaceOwner(context, reply)) return undefined;
+
+    return { data: { members: await listWorkspaceMembers(db, context.workspaceId) } };
   });
 
   app.post("/api/workspaces/:workspaceSlug/invitations", async (request, reply) => {

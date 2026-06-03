@@ -389,6 +389,27 @@ async function createWorkspaceInvite(
   });
 }
 
+async function addWorkspaceMember(
+  app: Awaited<ReturnType<typeof buildServer>>,
+  ownerCookies: Record<string, string>,
+  workspaceSlug: string,
+  email: string,
+  password = "password12345"
+) {
+  const invite = await createWorkspaceInvite(app, ownerCookies, workspaceSlug, email);
+  const token = invite.json().data.inviteUrl.replace("/invite/", "");
+  const accepted = await app.inject({
+    method: "POST",
+    url: `/api/invitations/${token}/accept`,
+    payload: { fullName: "Member", email, password }
+  });
+  return {
+    accepted,
+    cookies: authCookies(accepted),
+    userId: accepted.json().data.user.id as string
+  };
+}
+
 interface SignedInResponse {
   headers: Record<string, string | string[] | undefined>;
   json: () => { data: { workspaces: Array<{ slug: string }> } };
@@ -3437,5 +3458,62 @@ describe("server", () => {
 
   it("does not listen as a side effect when imported", async () => {
     expect(typeof buildServer).toBe("function");
+  });
+
+  describe("workspace members", () => {
+    it("lets an owner list workspace members with roles", async () => {
+      await withTempDb(async (dbPath) => {
+        const app = await buildServer({ dbPath, executeScans: false });
+        try {
+          const owner = await signup(app, "owner@example.com", "Owner Workspace");
+          const ownerCookies = authCookies(owner);
+          await addWorkspaceMember(app, ownerCookies, "owner-workspace", "member@example.com");
+
+          const response = await app.inject({
+            method: "GET",
+            url: "/api/workspaces/owner-workspace/members",
+            cookies: ownerCookies
+          });
+
+          expect(response.statusCode).toBe(200);
+          const members = response.json().data.members as Array<{ email: string; role: string }>;
+          expect(members).toHaveLength(2);
+          expect(members.map((m) => `${m.email}:${m.role}`).sort()).toEqual([
+            "member@example.com:member",
+            "owner@example.com:owner"
+          ]);
+        } finally {
+          await app.close();
+        }
+      });
+    });
+
+    it("rejects member listing by non-owners", async () => {
+      await withTempDb(async (dbPath) => {
+        const app = await buildServer({ dbPath, executeScans: false });
+        try {
+          const owner = await signup(app, "owner@example.com", "Owner Workspace");
+          const ownerCookies = authCookies(owner);
+          const member = await addWorkspaceMember(app, ownerCookies, "owner-workspace", "member@example.com");
+          const outsider = await signupWithPublicSignup(app, "outsider@example.com", "Other Workspace");
+
+          const asMember = await app.inject({
+            method: "GET",
+            url: "/api/workspaces/owner-workspace/members",
+            cookies: member.cookies
+          });
+          const asOutsider = await app.inject({
+            method: "GET",
+            url: "/api/workspaces/owner-workspace/members",
+            cookies: authCookies(outsider)
+          });
+
+          expect(asMember.statusCode).toBe(403);
+          expect(asOutsider.statusCode).toBe(404);
+        } finally {
+          await app.close();
+        }
+      });
+    });
   });
 });

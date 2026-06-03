@@ -1,7 +1,7 @@
 import { and, asc, eq } from "drizzle-orm";
 
 import type { SqliteDatabase } from "../db/client.js";
-import { workspaceMembers, workspaces } from "../db/schema.js";
+import { users, workspaceMembers, workspaces } from "../db/schema.js";
 
 export type WorkspaceRole = "owner" | "member";
 
@@ -83,4 +83,28 @@ export async function buildSessionPayload(db: SqliteDatabase, user: SessionUser)
     user,
     workspaces: await listMemberships(db, user.id)
   };
+}
+
+export interface WorkspaceMemberRow {
+  userId: string;
+  fullName: string;
+  email: string;
+  role: WorkspaceRole;
+  joinedAt: string;
+}
+
+export async function listWorkspaceMembers(db: SqliteDatabase, workspaceId: string): Promise<WorkspaceMemberRow[]> {
+  return db
+    .select({
+      userId: users.id,
+      fullName: users.fullName,
+      email: users.email,
+      role: workspaceMembers.role,
+      joinedAt: workspaceMembers.createdAt
+    })
+    .from(workspaceMembers)
+    .innerJoin(users, eq(users.id, workspaceMembers.userId))
+    .where(eq(workspaceMembers.workspaceId, workspaceId))
+    .orderBy(asc(workspaceMembers.createdAt))
+    .all();
 }
