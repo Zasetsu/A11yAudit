@@ -92,22 +92,32 @@ And add this index alongside the other `CREATE INDEX` lines:
     CREATE INDEX IF NOT EXISTS idx_evidence_artifacts_key ON evidence_artifacts(artifact_key);
 ```
 
-- [ ] **Step 3: Typecheck**
+- [ ] **Step 3: Generate the Drizzle migration**
+
+The project keeps versioned Drizzle migrations alongside the boot-time `initializeDb`. Generate the migration for the new table so the schema change is tracked (not only created at boot).
+
+Run (drizzle-kit is in the repo `node_modules`; `pnpm` is not on PATH):
+`./node_modules/.bin/drizzle-kit generate:sqlite --config apps/server/drizzle.config.ts`
+Expected: a new file under the server's migrations directory (the path is set in `apps/server/drizzle.config.ts`) containing `CREATE TABLE \`evidence_artifacts\` ...` and the index. Stage it with the commit in Step 6. If `drizzle.config.ts` points at an output dir, confirm the new `.sql` file appeared there.
+
+- [ ] **Step 4: Typecheck**
 
 Run: `./node_modules/.bin/tsc -p apps/server/tsconfig.json --noEmit`
 Expected: exit 0.
 
-- [ ] **Step 4: Verify the table is created**
+- [ ] **Step 5: Verify the table is created**
 
 Run: `./node_modules/.bin/vitest run apps/server/src/app.test.ts -t "health"` (any existing test boots `buildServer` → `initializeDb`).
 Expected: PASS (no SQL error).
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add apps/server/src/db/schema.ts apps/server/src/db/client.ts
+git add apps/server/src/db/schema.ts apps/server/src/db/client.ts apps/server/migrations
 git commit -m "feat(server): add evidence_artifacts index table"
 ```
+
+(Adjust the migrations path to whatever `drizzle.config.ts` writes; if no migrations directory is tracked in this repo, omit it and rely on `initializeDb`.)
 
 ---
 
@@ -452,7 +462,7 @@ with a throttled one:
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `./node_modules/.bin/vitest run apps/server/src/auth/session.test.ts`
-Expected: PASS (all, including the 2 new). Note: the pre-existing test "updates last_seen_at" (if any) used a now far enough from createdAt — confirm it still passes; if it asserted a write within 60s of creation, adjust its `now` to be >60s after `createSession`'s timestamp.
+Expected: PASS (all, including the 2 new). The pre-existing read test (`session.test.ts` ~line 112) creates the session at `2026-06-02T10:00:00Z` and reads at `2026-06-03T10:00:00Z` (24h later) and asserts `lastSeenAt` becomes the read time — 24h is far outside the 60s throttle window, so the write still happens and the assertion holds. No change needed to existing tests.
 
 - [ ] **Step 5: Typecheck + commit**
 
@@ -653,12 +663,27 @@ In `apps/web/src/api/client.test.ts`, add a test that calls a mutation client fu
 it("returns a clear error when the CSRF cookie is missing on an unsafe request", async () => {
   // No a11yaudit_csrf cookie set on document.cookie.
   const result = await createInvite("acme", "x@example.com");
-  expect(result).toEqual({ error: "Session cookie missing — check cookie/domain configuration" });
+  expect(result).toEqual({ error: "CSRF cookie missing — check cookie/domain configuration" });
   expect(fetchMock).not.toHaveBeenCalled();
 });
 ```
 
 Ensure no `a11yaudit_csrf` cookie is present for this test (clear `document.cookie` in setup if the harness sets one elsewhere).
+
+Also add a regression test proving the CSRF-exempt auth path still works with no cookie (this guards the `skipCsrf` exemption):
+
+```ts
+it("still issues login without a CSRF cookie (exempt path)", async () => {
+  // No a11yaudit_csrf cookie present; login is CSRF-exempt.
+  fetchMock.mockResolvedValueOnce(jsonResponse({
+    data: { user: { id: "u1", fullName: "Ada", email: "a@b.test" }, workspaces: [] }
+  }));
+  await expect(login({ email: "a@b.test", password: "secret" })).resolves.toBeDefined();
+  expect(fetchMock).toHaveBeenCalled();
+});
+```
+
+(Adjust `jsonResponse`/`fetchMock` to the real harness names; the point is: login must NOT throw `CsrfCookieMissingError`.)
 
 - [ ] **Step 3: Run to verify it fails**
 
@@ -667,42 +692,11 @@ Expected: FAIL — `apiFetch` currently issues the request and returns a generic
 
 - [ ] **Step 4: Implement the diagnostic in `apiFetch`**
 
-In `apps/web/src/api/client.ts`, define a shared sentinel near the top:
+In `apps/web/src/api/client.ts`, define a shared sentinel + error class near the top:
 
 ```ts
-export const CSRF_COOKIE_MISSING_ERROR = "Session cookie missing — check cookie/domain configuration";
-```
+export const CSRF_COOKIE_MISSING_ERROR = "CSRF cookie missing — check cookie/domain configuration";
 
-In `apiFetch`, after computing `method`/`isUnsafeMethod` and reading the CSRF cookie, add — BEFORE issuing `fetch` — a guard that returns `null` (the existing "unavailable" signal) is NOT enough because callers need a distinct message. Instead, make `apiFetch` throw a tagged error and have the mutation helpers translate it. Concretely:
-
-Replace the CSRF-header block:
-
-```ts
-  const csrfToken = readCookie("a11yaudit_csrf");
-  const method = (options.method ?? "GET").toUpperCase();
-  const isUnsafeMethod = method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE";
-  if (isUnsafeMethod && csrfToken !== null && csrfToken !== "") {
-    headers.set("X-CSRF-Token", csrfToken);
-  }
-```
-
-with:
-
-```ts
-  const csrfToken = readCookie("a11yaudit_csrf");
-  const method = (options.method ?? "GET").toUpperCase();
-  const isUnsafeMethod = method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE";
-  if (isUnsafeMethod && (csrfToken === null || csrfToken === "")) {
-    throw new CsrfCookieMissingError();
-  }
-  if (isUnsafeMethod && csrfToken !== null && csrfToken !== "") {
-    headers.set("X-CSRF-Token", csrfToken);
-  }
-```
-
-Define the error class near the top of the file:
-
-```ts
 class CsrfCookieMissingError extends Error {
   constructor() {
     super(CSRF_COOKIE_MISSING_ERROR);
@@ -710,9 +704,54 @@ class CsrfCookieMissingError extends Error {
 }
 ```
 
-Then update the mutation helpers that return `{ error }` (`readMutationResult`, `createInvite`, `regenerateInvitation`, `createProject`, `createScan`, and the `postAuth` path) to catch this error and surface it. The cleanest single place: wrap the `apiFetch` call sites that already return `{ error: string }`. For `readMutationResult`-based helpers, change them to catch:
+**Critical:** `apiFetch` issues unsafe (POST/PATCH/DELETE) requests for BOTH CSRF-protected mutations AND the CSRF-EXEMPT auth endpoints (login, signup, invite-accept). Those auth calls run *before* a session exists, so they legitimately have no `a11yaudit_csrf` cookie — the diagnostic must NOT fire for them or login/signup would break. Add a `skipCsrf` option to `apiFetch` and set it on those calls.
 
-For `updateMemberRole`/`removeMember`/`revokeInvitation` (which call `readMutationResult(await apiFetch(...))`), wrap:
+Change the `apiFetch` signature to accept and strip the option, and add the guard (keep the rest of the existing body — only the destructure, the guard, and using `requestInit` instead of `options` change):
+
+```ts
+async function apiFetch(path: string, options: RequestInit & { skipCsrf?: boolean } = {}): Promise<Response | null> {
+  const { skipCsrf, ...requestInit } = options;
+  const url = apiUrl(path);
+  if (url === null) {
+    return null;
+  }
+
+  const headers = new Headers(requestInit.headers);
+  headers.set("Accept", "application/json");
+  if (requestInit.body !== undefined) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const csrfToken = readCookie("a11yaudit_csrf");
+  const method = (requestInit.method ?? "GET").toUpperCase();
+  const isUnsafeMethod = method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE";
+  if (isUnsafeMethod && !skipCsrf && (csrfToken === null || csrfToken === "")) {
+    throw new CsrfCookieMissingError();
+  }
+  if (isUnsafeMethod && csrfToken !== null && csrfToken !== "") {
+    headers.set("X-CSRF-Token", csrfToken);
+  }
+
+  return fetch(url, { ...requestInit, credentials: "include", headers });
+}
+```
+
+Mark the CSRF-exempt auth calls with `skipCsrf: true` in `postAuth` (used by `login`, `signup`, `acceptInvite`):
+
+```ts
+async function postAuth(path: string, input: SignupInput | LoginInput | InviteAcceptInput): Promise<AuthSession> {
+  const response = await apiFetch(path, {
+    body: JSON.stringify(input),
+    method: "POST",
+    skipCsrf: true
+  });
+  // ...rest of postAuth unchanged
+}
+```
+
+(`logout` is CSRF-protected and only runs while authenticated, so it must NOT set `skipCsrf` — a logged-in user has the CSRF cookie. Leave `logout` as-is.)
+
+Then make the CSRF-protected mutation helpers translate the thrown `CsrfCookieMissingError` into their existing `{ error }` shape. For `updateMemberRole`:
 
 ```ts
 export async function updateMemberRole(
@@ -732,7 +771,7 @@ export async function updateMemberRole(
 }
 ```
 
-Apply the same `try/catch` wrapper to `removeMember`, `revokeInvitation`, `createInvite`, and `regenerateInvitation` so a missing-cookie throw becomes `{ error: CSRF_COOKIE_MISSING_ERROR }`. (For `createInvite`/`regenerateInvitation`, the catch returns `{ error: ... }`, matching their existing return type.)
+Apply the same `try/catch` wrapper to `removeMember`, `revokeInvitation`, `createInvite`, `regenerateInvitation`, `createProject`, and `createScan` so a missing-cookie throw becomes `{ error: CSRF_COOKIE_MISSING_ERROR }` (each keeps its own existing success/return shape).
 
 - [ ] **Step 5: Run the test + the full client suite**
 

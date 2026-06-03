@@ -77,7 +77,7 @@ Existing scans' evidence artifacts are **not** backfilled into `evidence_artifac
 ### Design
 Add `@fastify/rate-limit` (in-memory store; Redis is optional and out of scope for the single-instance deployment).
 
-- **Global backstop:** register the plugin with a generous default (e.g. `max: 300`, `timeWindow: "1 minute"`) so every route has a ceiling.
+- **Global backstop:** register the plugin with a generous default (`max: 1000`, `timeWindow: "1 minute"`) so every route has a ceiling. The backstop is deliberately loose — the security value is in the strict per-route limits below; a loose global ceiling also avoids tripping the suite's polling/scan tests that issue many requests against one in-memory limiter instance.
 - **Per-route stricter limits** via each route's `config.rateLimit`:
   - `POST /api/auth/login` — 10 / minute
   - `POST /api/auth/signup` — 5 / minute
@@ -118,7 +118,8 @@ Add `@fastify/rate-limit` (in-memory store; Redis is optional and out of scope f
 The double-submit CSRF cookie (`a11yaudit_csrf`) must be JS-readable for the web client to echo it in the `X-CSRF-Token` header. If it is absent (e.g. a split `app.`/`api.` subdomain or cookie-domain misconfiguration), `apiFetch` silently omits the header and every mutation fails with a generic `403`, giving no diagnostic.
 
 ### Design
-- In `apiFetch` (`apps/web/src/api/client.ts`), on an unsafe method (POST/PUT/PATCH/DELETE) when the `a11yaudit_csrf` cookie is **absent**, do not send the request blindly. Surface a clear, distinguishable error/result (e.g. `{ error: "Session cookie missing — check cookie/domain configuration" }`) so callers and the UI can show a meaningful message instead of a generic failure.
+- In `apiFetch` (`apps/web/src/api/client.ts`), on an unsafe method (POST/PUT/PATCH/DELETE) when the `a11yaudit_csrf` cookie is **absent**, do not send the request blindly. Surface a clear, distinguishable error/result (e.g. `{ error: "CSRF cookie missing — check cookie/domain configuration" }`) so callers and the UI can show a meaningful message instead of a generic failure.
+- **Exempt the CSRF-free endpoints.** Login, signup, and invite-accept are CSRF-exempt on the server and run before a session (no CSRF cookie yet), so `apiFetch` must NOT raise the diagnostic for them. Thread a `skipCsrf` option through `apiFetch` and set it on those auth calls; the diagnostic fires only for genuinely CSRF-protected mutations.
 - Client-only change; the server CSRF logic is unchanged.
 
 ### Tests
