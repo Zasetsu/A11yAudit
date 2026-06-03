@@ -65,6 +65,44 @@ export const WCAG_CRITERION_CONTENT: Record<string, Record<ReportLocale, WcagCri
     },
   },
 
+  "2.1.1": {
+    tr: {
+      name: "Klavye (Keyboard)",
+      userImpact:
+        "Yalnızca klavye ya da klavye benzeri yardımcı teknoloji kullanan kullanıcılar, fareyle tıklanabilen bu kontrolü çalıştıramaz; öğeye sekme (Tab) ile ulaşılamadığı veya Enter/Space ile etkinleştirilemediği için işlev tamamen erişilemez kalır.",
+      howToFix:
+        "Tüm etkileşimli kontrolleri klavyeyle erişilebilir yapın: yerel <a>/<button> öğelerini kullanın ya da özel öğelerde tabindex=\"0\", uygun rol ve klavye olay işleyicileri (Enter/Space) ekleyin. Yalnızca onclick içeren <div>/<span> kontrollerinden kaçının.",
+      w3cUrl: "https://www.w3.org/WAI/WCAG22/Understanding/keyboard.html",
+    },
+    en: {
+      name: "Keyboard",
+      userImpact:
+        "Users who rely on a keyboard or keyboard-like assistive technology cannot operate this control because it cannot be reached with Tab or activated with Enter/Space, leaving the function entirely inaccessible.",
+      howToFix:
+        "Make all interactive controls keyboard-operable: use native <a>/<button> elements, or for custom widgets add tabindex=\"0\", an appropriate role, and keyboard handlers (Enter/Space). Avoid <div>/<span> controls that only have an onclick handler.",
+      w3cUrl: "https://www.w3.org/WAI/WCAG22/Understanding/keyboard.html",
+    },
+  },
+
+  "2.1.2": {
+    tr: {
+      name: "Klavye Tuzağı Yok (No Keyboard Trap)",
+      userImpact:
+        "Yalnızca klavye kullanan kullanıcılar bir bileşene (ör. modal, gömülü oynatıcı) sekmeyle girdikten sonra dışarı çıkamazsa sayfanın geri kalanında gezinemez ve sıkışıp kalır.",
+      howToFix:
+        "Klavye odağının her bileşene girip standart yöntemlerle (Tab/Shift+Tab veya Esc) çıkabildiğinden emin olun. Modal/overlay'lerde odağı tutarken kapatma yolunu (Esc) sağlayın ve odağı döngüye sokan hatalı tuzakları kaldırın.",
+      w3cUrl: "https://www.w3.org/WAI/WCAG22/Understanding/no-keyboard-trap.html",
+    },
+    en: {
+      name: "No Keyboard Trap",
+      userImpact:
+        "Keyboard-only users who tab into a component (e.g. a modal or embedded player) and cannot tab back out get stuck and can no longer navigate the rest of the page.",
+      howToFix:
+        "Ensure keyboard focus can enter and leave every component using standard means (Tab/Shift+Tab or Esc). In modals/overlays that trap focus deliberately, always provide an Esc exit, and remove faulty traps that cycle focus.",
+      w3cUrl: "https://www.w3.org/WAI/WCAG22/Understanding/no-keyboard-trap.html",
+    },
+  },
+
   "2.4.4": {
     tr: {
       name: "Bağlantı Amacı (Bağlamda) (Link Purpose (In Context))",

@@ -1,4 +1,4 @@
-import type { ReportLocale } from "@a11yaudit/core";
+import { WCAG_22_CRITERIA, type ReportLocale } from "@a11yaudit/core";
 import {
   SEVERITY_COLORS,
   formatMode,
@@ -14,6 +14,11 @@ export interface RenderReportHtmlOptions {
   maxDetailedFindings?: number;
   maxEvidenceRows?: number;
 }
+
+// Bound the element list (and therefore embedded crops) shown per problem card.
+// Without this, one rule failing on hundreds of elements embeds hundreds of crop
+// data URIs into a single card, re-bloating the HTML/PDF. Overflow is summarized.
+const MAX_ELEMENTS_PER_CARD = 12;
 
 export function renderReportHtml(report: AuditReportModel, options: RenderReportHtmlOptions = {}): string {
   const locale: ReportLocale = report.locale ?? "tr";
@@ -150,12 +155,32 @@ export function renderReportHtml(report: AuditReportModel, options: RenderReport
 function renderProblemCard(problem: ReportProblem, strings: ReportStrings, locale: ReportLocale): string {
   const sevColor = SEVERITY_COLORS[problem.severity];
   const crit = problem.criterion;
-  const wcagLine = crit
-    ? `<a href="${escapeHtml(crit.w3cUrl)}">WCAG ${escapeHtml(crit.id)} — ${escapeHtml(crit.name)} (${escapeHtml(crit.level)})</a>`
-    : escapeHtml(problem.wcagCriteria.join(", "));
-  const impact = crit ? escapeHtml(crit.content.userImpact) : "";
-  const fix = crit ? escapeHtml(crit.content.howToFix) : "";
-  const elements = problem.elements.map((el) => `
+
+  // Fallback for criteria with no authored content (e.g. axe long-tail criteria not
+  // in the content table): still show the criterion id+level from wcag.ts when known,
+  // a link to the W3C WCAG 2.2 Understanding index, and generic localized prose —
+  // so the impact/fix fields are never blank.
+  let wcagLine: string;
+  let impact: string;
+  let fix: string;
+  if (crit) {
+    wcagLine = `<a href="${escapeHtml(crit.w3cUrl)}">WCAG ${escapeHtml(crit.id)} — ${escapeHtml(crit.name)} (${escapeHtml(crit.level)})</a>`;
+    impact = escapeHtml(crit.content.userImpact);
+    fix = escapeHtml(crit.content.howToFix);
+  } else {
+    const firstId = problem.wcagCriteria[0];
+    const meta = firstId ? WCAG_22_CRITERIA[firstId] : undefined;
+    const label = meta
+      ? `WCAG ${escapeHtml(meta.id)} — ${escapeHtml(meta.name)} (${escapeHtml(meta.level)})`
+      : `WCAG ${escapeHtml(problem.wcagCriteria.join(", ") || "—")}`;
+    wcagLine = `<a href="${escapeHtml(strings.wcagIndexUrl)}">${label}</a>`;
+    impact = escapeHtml(strings.genericImpact);
+    fix = escapeHtml(strings.genericFix);
+  }
+
+  const shown = problem.elements.slice(0, MAX_ELEMENTS_PER_CARD);
+  const hidden = problem.elements.length - shown.length;
+  const elements = shown.map((el) => `
     <div class="element">
       ${el.screenshotDataUri ? `<img class="shot" alt="" src="${el.screenshotDataUri}" />` : ""}
       <div class="element-detail">
@@ -163,13 +188,16 @@ function renderProblemCard(problem: ReportProblem, strings: ReportStrings, local
         <div class="element-meta">${strings.selector} <code>${escapeHtml(el.selector ?? "—")}</code> · ${strings.page} ${escapeHtml(el.pageUrl)} · ${escapeHtml(el.viewport)}</div>
       </div>
     </div>`).join("");
+  const moreNote = hidden > 0
+    ? `<div class="element-meta">${escapeHtml(strings.moreElements.replace("{n}", String(hidden)))}</div>`
+    : "";
 
   return `<div class="card problem">
     <div class="problem-head"><span class="sev" style="background:${sevColor}">${escapeHtml(severityLabel(problem.severity, locale))}</span> <strong>${escapeHtml(problem.title)}</strong></div>
     <div class="wcag-line">${wcagLine} · ${problem.occurrences} ${escapeHtml(strings.occurrences)} · ${problem.affectedPages} ${escapeHtml(strings.affectedPages)}</div>
     <div class="block"><b>${escapeHtml(strings.whatItMeans)}</b><br>${impact}</div>
     <div class="block"><b>${escapeHtml(strings.howToFix)}</b><br>${fix}</div>
-    <div class="block"><b>${escapeHtml(strings.whereFound)} (${problem.elements.length})</b>${elements}</div>
+    <div class="block"><b>${escapeHtml(strings.whereFound)} (${problem.elements.length})</b>${elements}${moreNote}</div>
   </div>`;
 }
 

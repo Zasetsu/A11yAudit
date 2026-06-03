@@ -79,6 +79,54 @@ describe("renderReportHtml", () => {
     expect(html).toContain("&lt;button class=&quot;nav-toggle&quot;&gt;"); // escaped snippet
     expect(html).toContain("data:image/png;base64,AAA");     // embedded screenshot
   });
+
+  it("renders a fallback card (generic prose + W3C index link) when the criterion has no content", () => {
+    const html = renderReportHtml({
+      projectName: "x", domain: "x", score: 50, pagesAudited: 1, findingsTotal: 1,
+      uniqueIssues: 1, totalOccurrences: 1, generatedAt: "2026-06-03T09:14:00.000Z",
+      findings: [], issues: [], pages: [], targetUrl: "https://x", mode: "single_url",
+      locale: "en",
+      problems: [{
+        ruleId: "color-contrast-enhanced",
+        title: "Elements must meet enhanced contrast",
+        severity: "serious",
+        wcagCriteria: ["1.4.6"],          // not in the authored content table
+        criterion: null,
+        elements: [{
+          htmlSnippet: "<p>x</p>", selector: "p", pageUrl: "https://x/", viewport: "desktop",
+          screenshotDataUri: null
+        }],
+        affectedPages: 1, occurrences: 1
+      }]
+    });
+    expect(html).toContain("Elements must meet enhanced contrast");
+    expect(html).toContain("WCAG 1.4.6");                                 // criterion id surfaced
+    expect(html).toContain("https://www.w3.org/WAI/WCAG22/Understanding/"); // index link
+    expect(html).toContain("cannot be fully evaluated automatically");    // generic impact (en)
+    expect(html).toContain("Refer to the linked W3C WCAG 2.2 document");  // generic fix (en)
+  });
+
+  it("caps elements per card and notes the overflow", () => {
+    const elements = Array.from({ length: 15 }, (_, i) => ({
+      htmlSnippet: `<button>b${i}</button>`, selector: `button.n${i}`,
+      pageUrl: "https://x/", viewport: "desktop", screenshotDataUri: null
+    }));
+    const html = renderReportHtml({
+      projectName: "x", domain: "x", score: 50, pagesAudited: 1, findingsTotal: 15,
+      uniqueIssues: 1, totalOccurrences: 15, generatedAt: "2026-06-03T09:14:00.000Z",
+      findings: [], issues: [], pages: [], targetUrl: "https://x", mode: "single_url",
+      locale: "en",
+      problems: [{
+        ruleId: "button-name", title: "Buttons must have discernible text",
+        severity: "critical", wcagCriteria: ["4.1.2"], criterion: null,
+        elements, affectedPages: 1, occurrences: 15
+      }]
+    });
+    expect(html).toContain("(15)");                      // full count in the "Where" header
+    expect(html).toContain("button.n11");               // 12th element shown (index 11)
+    expect(html).not.toContain("button.n12");           // 13th element capped
+    expect(html).toContain("+ 3 more elements, same format");
+  });
 });
 
 describe("real report rendering", () => {

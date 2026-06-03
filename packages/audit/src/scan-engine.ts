@@ -69,6 +69,7 @@ export async function runScan(input: RunScanInput): Promise<CompletedScanResult>
   const startedAt = new Date().toISOString();
   const pages: AuditedPage[] = [];
   const findings: ScanFinding[] = [];
+  const cropCapWarnings: string[] = [];
   let browser: Browser | null = null;
 
   await emitProgress(input, "crawling", 0, 0, 0);
@@ -120,6 +121,7 @@ export async function runScan(input: RunScanInput): Promise<CompletedScanResult>
             : null;
 
           let cropsThisPage = 0;
+          let cropsSkippedByCap = 0;
           for (const finding of auditResult.findings) {
             let elementCrop: EvidenceArtifact | null = null;
             if (finding.selector && cropsThisPage < MAX_ELEMENT_CROPS_PER_PAGE) {
@@ -135,6 +137,8 @@ export async function runScan(input: RunScanInput): Promise<CompletedScanResult>
                 await handle.dispose().catch(() => undefined);
                 if (elementCrop) cropsThisPage += 1;
               }
+            } else if (finding.selector && cropsThisPage >= MAX_ELEMENT_CROPS_PER_PAGE) {
+              cropsSkippedByCap += 1;
             }
             const snippet = await captureSnippetEvidence(input.request.runId, finding, input.storage);
             const evidence = [
@@ -143,6 +147,11 @@ export async function runScan(input: RunScanInput): Promise<CompletedScanResult>
               ...snippet
             ];
             findings.push({ ...finding, evidence });
+          }
+          if (cropsSkippedByCap > 0) {
+            const warning = `Element screenshot cap reached on ${normalizedUrl} (${viewport.name}): ${MAX_ELEMENT_CROPS_PER_PAGE} crops captured, ${cropsSkippedByCap} additional flagged element(s) shown without a crop.`;
+            cropCapWarnings.push(warning);
+            console.warn(`[scan-engine] ${warning}`);
           }
         } catch (error) {
           pages.push(createFailedPage(url, viewport.name, error));
@@ -178,7 +187,7 @@ export async function runScan(input: RunScanInput): Promise<CompletedScanResult>
     pages,
     findings,
     reports,
-    reportWarnings,
+    reportWarnings: [...cropCapWarnings, ...reportWarnings],
     score,
     startedAt,
     finishedAt: new Date().toISOString()

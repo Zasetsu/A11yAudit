@@ -9,6 +9,10 @@ export interface ReportStrings {
   howToFix: string;
   whereFound: string;
   wcagReference: string;
+  wcagIndexUrl: string;
+  genericImpact: string;
+  genericFix: string;
+  moreElements: string;
   manualReview: string;
   disclaimer: string;
   technicalAppendix: string;
@@ -32,6 +36,10 @@ const STRINGS: Record<ReportLocale, ReportStrings> = {
     howToFix: "Nasıl düzeltilir",
     whereFound: "Nerede bulundu",
     wcagReference: "WCAG 2.2 kaynağı",
+    wcagIndexUrl: "https://www.w3.org/WAI/WCAG22/Understanding/",
+    genericImpact: "Bu kriter otomatik olarak tam değerlendirilemez ve manuel inceleme gerektirir. Etkisini ve karşılama yöntemini bağlantılı WCAG 2.2 kaynağından inceleyin.",
+    genericFix: "Bu başarı kriterinin nasıl karşılanacağına ilişkin ayrıntılar için bağlantılı W3C WCAG 2.2 belgesine başvurun.",
+    moreElements: "+ {n} element daha, aynı biçimde",
     manualReview: "Manuel inceleme hâlâ gereklidir. Bu otomatik teknik bir doğrulamadır; WCAG uygunluğunu veya yasal uyumluluğu belgelemez.",
     disclaimer: "A11yAudit otomatik teknik erişilebilirlik denetim sonuçları sunar. Yasal uyumluluğu belgelemez. Bazı WCAG 2.2 başarı kriterleri manuel inceleme ve insan değerlendirmesi gerektirir.",
     technicalAppendix: "Teknik ek (geliştiriciler için)",
@@ -53,6 +61,10 @@ const STRINGS: Record<ReportLocale, ReportStrings> = {
     howToFix: "How to fix",
     whereFound: "Where it was found",
     wcagReference: "WCAG 2.2 reference",
+    wcagIndexUrl: "https://www.w3.org/WAI/WCAG22/Understanding/",
+    genericImpact: "This criterion cannot be fully evaluated automatically and requires manual review. See the linked WCAG 2.2 resource for its impact and how to meet it.",
+    genericFix: "Refer to the linked W3C WCAG 2.2 document for details on how to meet this success criterion.",
+    moreElements: "+ {n} more elements, same format",
     manualReview: "Manual review is still required. This is automated technical verification; it does not certify WCAG conformance or legal compliance.",
     disclaimer: "A11yAudit provides automated technical accessibility audit results. It does not certify legal compliance. Some WCAG 2.2 success criteria require manual review and human judgment.",
     technicalAppendix: "Technical appendix (for developers)",
