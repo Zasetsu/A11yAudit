@@ -10,6 +10,7 @@ import { ScanRunsPage } from "./pages/scan-runs";
 import { FindingsPage } from "./pages/findings";
 import { FindingDetailPage } from "./pages/finding-detail";
 import { ReportsPage } from "./pages/reports";
+import { MembersPage } from "./pages/members";
 import { SettingsPage } from "./pages/settings";
 import { LoginPage } from "./pages/login";
 import { SignupPage } from "./pages/signup";
@@ -25,6 +26,7 @@ export type Route =
   | { page: "findings" }
   | { page: "finding-detail"; findingId: string }
   | { page: "reports" }
+  | { page: "members" }
   | { page: "settings" }
   | { page: "docs" };
 
@@ -47,6 +49,7 @@ const workspacePages = new Set<Exclude<WorkspacePage, "finding-detail">>([
   "scan-runs",
   "findings",
   "reports",
+  "members",
   "settings",
   "docs"
 ]);
@@ -269,6 +272,9 @@ function DashboardApp({
     case "reports":
       view = <ReportsPage {...common} />;
       break;
+    case "members":
+      view = <MembersPage {...common} />;
+      break;
     case "settings":
       view = <SettingsPage {...common} />;
       break;
@@ -279,7 +285,7 @@ function DashboardApp({
 
   return (
     <div className="app">
-      <Sidebar navigate={navigate} route={route} />
+      <Sidebar navigate={navigate} route={route} workspaceRole={currentWorkspace.role} />
       <div className="main">
         <TopBar
           navigate={navigate}
