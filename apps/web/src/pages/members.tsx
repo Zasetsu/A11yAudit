@@ -81,7 +81,11 @@ export function MembersPage({ workspaceSlug, workspaceRole }: PageProps) {
 
   const revokeMutation = useMutation({
     mutationFn: (invitationId: string) => revokeInvitation(workspaceSlug, invitationId),
-    onSuccess: () => {
+    onSuccess: (result) => {
+      if ("error" in result) {
+        setError(result.error);
+        return;
+      }
       setError(null);
       refresh();
     }
