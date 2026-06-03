@@ -2,7 +2,7 @@ import { FormEvent, useState } from "react";
 import { login, type AuthSession } from "../api/client";
 import { Button, Field, PageHeader, Panel, TextInput } from "../design/ui";
 
-export function LoginPage({ onAuthenticated }: { onAuthenticated: (session: AuthSession) => void }) {
+export function LoginPage({ onAuthenticated, onSignup }: { onAuthenticated: (session: AuthSession) => void; onSignup: () => void }) {
   const [error, setError] = useState<string | null>(null);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -36,6 +36,10 @@ export function LoginPage({ onAuthenticated }: { onAuthenticated: (session: Auth
             <Button type="submit" variant="primary">Sign in</Button>
           </form>
         </Panel>
+        <div className="note">
+          No account yet?
+          <Button onClick={onSignup} type="button" variant="ghost">Create account</Button>
+        </div>
       </div>
     </main>
   );
