@@ -10,6 +10,7 @@ import { getTrustedBrowserOrigin, readAuthFromRequest, validateCsrf } from "./au
 import { createDb, initializeDb, type DbClient } from "./db/client.js";
 import { evidenceArtifacts, findings, issues, reports, scanRuns } from "./db/schema.js";
 import { LocalJobRunner } from "./jobs/local-job-runner.js";
+import { getBaselineIssues } from "./repositories/issues.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerFindingRoutes } from "./routes/findings.js";
 import { registerArtifactRoutes } from "./routes/artifacts.js";
@@ -70,6 +71,16 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
       ? undefined
       : async (job) => {
         try {
+          let baselineIssues: ReturnType<typeof getBaselineIssues>;
+          try {
+            baselineIssues = getBaselineIssues(dbClient.db, {
+              projectId: job.payload.projectId,
+              excludeScanRunId: job.id
+            });
+          } catch {
+            baselineIssues = []; // degrade gracefully — a baseline read failure must not fail the scan
+          }
+
           const result = await runScan({
             request: {
               runId: job.id,
@@ -94,7 +105,8 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
                 })
                 .where(eq(scanRuns.id, job.id))
                 .run();
-            }
+            },
+            baselineIssues
           });
 
           const completedAt = result.finishedAt;
@@ -117,6 +129,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
                   projectId,
                   scanRunId: result.runId,
                   issueKey: issue.issueKey,
+                  status: issue.status,
                   title: issue.title,
                   severity: issue.severity,
                   source: issue.source,
@@ -142,6 +155,41 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
               });
 
               for (const chunk of chunkArray(issueRows, 200)) {
+                tx.insert(issues).values(chunk).run();
+              }
+            }
+
+            if ((result.resolvedIssues?.length ?? 0) > 0) {
+              const resolvedRows = result.resolvedIssues.map((r, index) => ({
+                id: `${result.runId}-resolved-${index}`,
+                projectId,
+                scanRunId: result.runId,
+                issueKey: r.issueKey,
+                status: "resolved" as const,
+                title: r.title,
+                severity: r.severity,
+                source: r.source,
+                certainty: r.certainty,
+                ruleId: r.ruleId,
+                wcagCriteria: r.wcagCriteria.join(","),
+                description: r.description,
+                recommendation: r.recommendation,
+                likelyScope: r.likelyScope,
+                urlScopeGroup: r.urlScopeGroup,
+                componentArea: r.componentArea,
+                cmsHint: r.cmsHint,
+                confidence: r.confidence,
+                affectedPages: r.affectedPages,
+                occurrences: r.occurrences,
+                viewportSummary: r.viewportSummary,
+                representativeUrl: r.representativeUrl,
+                representativeSelector: r.representativeSelector,
+                representativeHtmlSnippet: r.representativeHtmlSnippet,
+                sampleUrls: JSON.stringify(r.sampleUrls),
+                createdAt: completedAt
+              }));
+
+              for (const chunk of chunkArray(resolvedRows, 200)) {
                 tx.insert(issues).values(chunk).run();
               }
             }

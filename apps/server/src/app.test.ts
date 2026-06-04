@@ -231,6 +231,69 @@ function mockLargeCompletedScan(count: number): void {
   });
 }
 
+interface DiffMockFinding {
+  ruleId: string;
+  selector: string;
+  title: string;
+  wcagCriteria: string[];
+}
+
+// Drives a repeat-scan diff through the real server persistence path. The mock
+// stands in for the audit engine's diff: it stamps each current finding with
+// `ongoing` when a baseline issue shares its ruleId, otherwise `new`, and emits
+// `resolvedIssues` for baseline issues with no matching current finding. This
+// proves the server loaded the prior scan's issues as baseline, passed them to
+// runScan, and persisted the resulting diff (status + resolved carry-over rows).
+function mockDiffScan(currentFindings: DiffMockFinding[]): void {
+  runScanMock.mockImplementation(async ({ request, baselineIssues }: {
+    request: { runId: string; projectId: string | null; targetUrl: string };
+    baselineIssues?: Array<{ ruleId: string; issueKey: string; title: string; severity: string; source: string; certainty: string; wcagCriteria: string[]; description: string; recommendation: string; likelyScope: string; urlScopeGroup: string; componentArea: string; cmsHint: string; confidence: string; affectedPages: number; occurrences: number; viewportSummary: string; representativeUrl: string; representativeSelector: string | null; representativeHtmlSnippet: string | null; sampleUrls: string[] }>;
+  }) => {
+    const baseline = baselineIssues ?? [];
+    const baselineRuleIds = new Set(baseline.map((issue) => issue.ruleId));
+    const currentRuleIds = new Set(currentFindings.map((finding) => finding.ruleId));
+
+    const findings = currentFindings.map((finding) => ({
+      id: `finding-${finding.ruleId}`,
+      pageUrl: request.targetUrl,
+      viewport: "desktop",
+      selector: finding.selector,
+      htmlSnippet: `<${finding.selector}></${finding.selector}>`,
+      visibleText: null,
+      helpUrl: null,
+      fingerprint: `fingerprint-${finding.ruleId}`,
+      evidence: [],
+      instances: 1,
+      title: finding.title,
+      severity: "serious",
+      status: baselineRuleIds.has(finding.ruleId) ? "ongoing" : "new",
+      source: "axe",
+      certainty: "automatic_violation",
+      origin: "content",
+      wcagCriteria: finding.wcagCriteria,
+      ruleId: finding.ruleId,
+      description: `${finding.title} description.`,
+      recommendation: `Fix ${finding.ruleId}.`
+    }));
+
+    const resolvedIssues = baseline.filter((issue) => !currentRuleIds.has(issue.ruleId));
+
+    return {
+      runId: request.runId,
+      projectId: request.projectId,
+      targetUrl: request.targetUrl,
+      mode: "single_url",
+      pages: [{ url: request.targetUrl, normalizedUrl: request.targetUrl, title: "Fixture", viewport: "desktop", statusCode: 200, finalUrl: request.targetUrl, durationMs: 1, errorMessage: null }],
+      findings,
+      resolvedIssues,
+      reports: [],
+      score: 100 - findings.length * 10,
+      startedAt: "2026-05-31T00:00:00.000Z",
+      finishedAt: "2026-05-31T00:00:01.000Z"
+    };
+  });
+}
+
 function mockGroupedIssueCompletedScan(): void {
   runScanMock.mockImplementation(async ({ request }: {
     request: { runId: string; projectId: string | null; targetUrl: string };
@@ -2516,6 +2579,84 @@ describe("server", () => {
         viewport_summary: "desktop,mobile"
       });
       expect(findingRows.map((finding) => finding.issue_id)).toEqual([issueRows[0]?.id, issueRows[0]?.id]);
+    } finally {
+      await app.close();
+      dbClient.close();
+    }
+  });
+
+  it("persists issue diff status and resolved carry-over rows across repeat scans", async () => {
+    const dbClient = createDb(":memory:");
+    const app = await buildServer({ dbClient });
+
+    try {
+      const owner = await signup(app, "owner@example.com", "Owner Workspace");
+      const project = await createProject(app, owner, "Repeat Fixture", "https://repeat.example.com");
+      const projectId = project.json().id;
+
+      // First scan: two issues, both brand new (no baseline).
+      mockDiffScan([
+        { ruleId: "image-alt", selector: "img", title: "Image missing alternative text", wcagCriteria: ["1.1.1"] },
+        { ruleId: "color-contrast", selector: "p", title: "Text has insufficient contrast", wcagCriteria: ["1.4.3"] }
+      ]);
+      const firstScan = await startScan(app, owner, projectId, {
+        url: "https://repeat.example.com/",
+        mode: "single_url",
+        maxPages: 1,
+        viewports: ["desktop"]
+      });
+      await waitForCompletedScan(app, owner, firstScan.json().id);
+
+      const firstIssues = dbClient.sqlite
+        .prepare("SELECT issue_key, status FROM issues WHERE scan_run_id = ?")
+        .all(firstScan.json().id) as Array<{ issue_key: string; status: string }>;
+      expect(firstIssues).toHaveLength(2);
+      expect(firstIssues.every((row) => row.status === "new")).toBe(true);
+      const keepKey = firstIssues.find((row) => row.issue_key.includes("image-alt"))?.issue_key;
+      const dropKey = firstIssues.find((row) => row.issue_key.includes("color-contrast"))?.issue_key;
+      expect(keepKey).toBeDefined();
+      expect(dropKey).toBeDefined();
+
+      // Second scan of the SAME project: keep image-alt, drop color-contrast, add button-name.
+      mockDiffScan([
+        { ruleId: "image-alt", selector: "img", title: "Image missing alternative text", wcagCriteria: ["1.1.1"] },
+        { ruleId: "button-name", selector: "button", title: "Buttons must have discernible text", wcagCriteria: ["4.1.2"] }
+      ]);
+      const secondScan = await startScan(app, owner, projectId, {
+        url: "https://repeat.example.com/",
+        mode: "single_url",
+        maxPages: 1,
+        viewports: ["desktop"]
+      });
+      await waitForCompletedScan(app, owner, secondScan.json().id);
+
+      const secondIssues = dbClient.sqlite
+        .prepare("SELECT issue_key, status FROM issues WHERE scan_run_id = ?")
+        .all(secondScan.json().id) as Array<{ issue_key: string; status: string }>;
+      const byKey = new Map(secondIssues.map((row) => [row.issue_key, row.status]));
+
+      const keptKey = secondIssues.find((row) => row.issue_key.includes("image-alt"))?.issue_key;
+      const addedKey = secondIssues.find((row) => row.issue_key.includes("button-name"))?.issue_key;
+      const resolvedKey = secondIssues.find((row) => row.issue_key.includes("color-contrast"))?.issue_key;
+
+      expect(keptKey).toBe(keepKey);
+      expect(byKey.get(keptKey!)).toBe("ongoing");
+      expect(addedKey).toBeDefined();
+      expect(byKey.get(addedKey!)).toBe("new");
+      expect(resolvedKey).toBe(dropKey);
+      expect(byKey.get(resolvedKey!)).toBe("resolved");
+
+      // The resolved carry-over row has no backing findings on the second run.
+      const resolvedFindingCount = dbClient.sqlite
+        .prepare("SELECT COUNT(*) AS n FROM findings WHERE scan_run_id = ? AND rule_id = 'color-contrast'")
+        .get(secondScan.json().id) as { n: number };
+      expect(resolvedFindingCount.n).toBe(0);
+
+      // Score reflects only the two current findings (resolved row didn't move it).
+      const secondRun = dbClient.sqlite
+        .prepare("SELECT score FROM scan_runs WHERE id = ?")
+        .get(secondScan.json().id) as { score: number };
+      expect(secondRun.score).toBe(80);
     } finally {
       await app.close();
       dbClient.close();
