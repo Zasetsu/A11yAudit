@@ -4265,3 +4265,109 @@ describe("assist widget bundle route", () => {
     });
   });
 });
+
+describe("dashboard SPA route", () => {
+  // Resolve the built web dist the same way the route does: walk up from this
+  // test module until we find apps/web/dist/index.html.
+  function resolveWebDist(): string | undefined {
+    let dir = dirname(fileURLToPath(import.meta.url));
+    for (let i = 0; i < 12; i += 1) {
+      const candidate = join(dir, "apps/web/dist");
+      if (existsSync(join(candidate, "index.html"))) return candidate;
+      const parent = dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+    return undefined;
+  }
+
+  // The web app is built in an earlier task, but to make these tests
+  // deterministic regardless of build state we synthesize a fixture
+  // apps/web/dist/index.html (referencing /app/assets/) when it is missing,
+  // and remove only what we created.
+  let createdIndex = false;
+  let fixtureDir: string | undefined;
+
+  beforeAll(async () => {
+    if (resolveWebDist() !== undefined) return;
+    let dir = dirname(fileURLToPath(import.meta.url));
+    for (let i = 0; i < 12; i += 1) {
+      if (existsSync(join(dir, "apps"))) break;
+      const parent = dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+    fixtureDir = join(dir, "apps/web/dist");
+    await mkdir(fixtureDir, { recursive: true });
+    const index = join(fixtureDir, "index.html");
+    if (!existsSync(index)) {
+      await writeFile(
+        index,
+        '<!doctype html><html><head><script type="module" src="/app/assets/index.js"></script></head><body><div id="root"></div></body></html>',
+        "utf8"
+      );
+      createdIndex = true;
+    }
+  });
+
+  afterAll(async () => {
+    if (fixtureDir === undefined) return;
+    if (createdIndex) await rm(join(fixtureDir, "index.html"), { force: true });
+  });
+
+  it("serves the dashboard SPA shell at /app", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const res = await app.inject({ method: "GET", url: "/app" });
+        expect(res.statusCode).toBe(200);
+        expect(res.headers["content-type"]).toContain("text/html");
+        expect(res.body).toContain("/app/assets/");
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("falls back to the SPA shell for client routes under /app", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const res = await app.inject({ method: "GET", url: "/app/login" });
+        expect(res.statusCode).toBe(200);
+        expect(res.headers["content-type"]).toContain("text/html");
+        expect(res.body).toContain("/app/assets/");
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("returns 404 for a missing /app asset with a file extension", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const res = await app.inject({ method: "GET", url: "/app/assets/does-not-exist.js" });
+        expect(res.statusCode).toBe(404);
+        expect(res.headers["content-type"] ?? "").not.toContain("text/html");
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("still serves the landing at / and does not break /health or /assist", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        expect((await app.inject({ method: "GET", url: "/" })).statusCode).toBe(200);
+        expect((await app.inject({ method: "GET", url: "/health" })).statusCode).toBe(200);
+
+        const assist = await app.inject({ method: "GET", url: "/assist/a11yaudit-assist.js" });
+        expect([200, 404]).toContain(assist.statusCode);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+});
