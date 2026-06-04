@@ -12,6 +12,7 @@ import { FindingsPage } from "./pages/findings";
 import { FindingDetailPage } from "./pages/finding-detail";
 import { ReportsPage } from "./pages/reports";
 import { MembersPage } from "./pages/members";
+import { WidgetSettingsPage } from "./pages/widget-settings";
 import { SettingsPage } from "./pages/settings";
 import { LoginPage } from "./pages/login";
 import { SignupPage } from "./pages/signup";
@@ -30,6 +31,7 @@ export type Route =
   | { page: "finding-detail"; findingId: string }
   | { page: "reports" }
   | { page: "members" }
+  | { page: "widget-settings" }
   | { page: "settings" }
   | { page: "docs" };
 
@@ -53,6 +55,7 @@ const workspacePages = new Set<Exclude<WorkspacePage, "finding-detail" | "scan-r
   "findings",
   "reports",
   "members",
+  "widget-settings",
   "settings",
   "docs"
 ]);
@@ -324,6 +327,9 @@ function DashboardApp({
       break;
     case "members":
       view = <MembersPage {...common} />;
+      break;
+    case "widget-settings":
+      view = <WidgetSettingsPage {...common} />;
       break;
     case "settings":
       view = <SettingsPage {...common} />;

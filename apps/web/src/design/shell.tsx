@@ -55,6 +55,7 @@ export function Sidebar({ route, navigate, workspaceRole }: { route: Route; navi
         {isWorkspaceOwner(workspaceRole) ? (
           <NavButton item={{ id: "members", labelKey: "nav.members", icon: "shield-check" }} navigate={navigate} route={route} />
         ) : null}
+        <NavButton item={{ id: "widget-settings", labelKey: "nav.widget", icon: "settings" }} navigate={navigate} route={route} />
         {configItems.map((item) => <NavButton item={item} key={item.id} navigate={navigate} route={route} />)}
       </div>
     </nav>

@@ -1,6 +1,8 @@
 import { ASSIST_SECTIONS, CONTENT_FEATURES, NAVIGATION_FEATURES, COLOR_FEATURES, WIDGET_LOCALES, type AssistSection, type WidgetLocale } from "./config.js";
 import type { WidgetPosition } from "./loader.js";
 
+export { ASSIST_SECTIONS, CONTENT_FEATURES, NAVIGATION_FEATURES, COLOR_FEATURES } from "./config.js";
+
 export const WIDGET_CONFIG_GLOBAL = "__AA_ASSIST_CONFIG__";
 export const WIDGET_CONFIG_CSS_MAX_BYTES = 50_000;
 
