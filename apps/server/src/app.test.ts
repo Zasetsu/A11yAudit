@@ -4267,6 +4267,128 @@ describe("assist widget bundle route", () => {
   });
 });
 
+describe("widget config route", () => {
+  it("owner PUT saves config and GET reads it back", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const ownerCookies = authCookies(owner);
+        const project = await createProject(app, owner, "Site", "https://example.com");
+        const projectId = project.json().id as string;
+        const slug = primaryWorkspaceSlug(owner);
+
+        const put = await app.inject({
+          method: "PUT",
+          url: `/api/workspaces/${slug}/projects/${projectId}/widget-config`,
+          headers: { "x-csrf-token": ownerCookies[csrfCookieName] },
+          cookies: ownerCookies,
+          payload: {
+            position: "top-left",
+            brand: { accent: "#abcdef" },
+            customCss: "@import url(x); a{}"
+          }
+        });
+
+        expect(put.statusCode).toBe(200);
+        const putConfig = put.json().config as Record<string, unknown>;
+        expect(putConfig.position).toBe("top-left");
+        expect(typeof putConfig.customCss).toBe("string");
+        expect((putConfig.customCss as string)).not.toMatch(/@import/i);
+
+        const get = await app.inject({
+          method: "GET",
+          url: `/api/workspaces/${slug}/projects/${projectId}/widget-config`,
+          cookies: ownerCookies
+        });
+
+        expect(get.statusCode).toBe(200);
+        expect((get.json().config as Record<string, unknown>).position).toBe("top-left");
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("member PUT is rejected with 403", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const ownerCookies = authCookies(owner);
+        const project = await createProject(app, owner, "Site", "https://example.com");
+        const projectId = project.json().id as string;
+        const slug = primaryWorkspaceSlug(owner);
+
+        const member = await addWorkspaceMember(app, ownerCookies, slug, "member@example.com");
+
+        const put = await app.inject({
+          method: "PUT",
+          url: `/api/workspaces/${slug}/projects/${projectId}/widget-config`,
+          headers: { "x-csrf-token": member.cookies[csrfCookieName] },
+          cookies: member.cookies,
+          payload: { position: "top-right" }
+        });
+
+        expect(put.statusCode).toBe(403);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("member GET returns 200", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const ownerCookies = authCookies(owner);
+        const project = await createProject(app, owner, "Site", "https://example.com");
+        const projectId = project.json().id as string;
+        const slug = primaryWorkspaceSlug(owner);
+
+        const member = await addWorkspaceMember(app, ownerCookies, slug, "member@example.com");
+
+        const get = await app.inject({
+          method: "GET",
+          url: `/api/workspaces/${slug}/projects/${projectId}/widget-config`,
+          cookies: member.cookies
+        });
+
+        expect(get.statusCode).toBe(200);
+        expect(get.json()).toHaveProperty("config");
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("owner PUT with invalid brand accent returns 400", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const owner = await signup(app, "owner@example.com", "Owner Workspace");
+        const ownerCookies = authCookies(owner);
+        const project = await createProject(app, owner, "Site", "https://example.com");
+        const projectId = project.json().id as string;
+        const slug = primaryWorkspaceSlug(owner);
+
+        const put = await app.inject({
+          method: "PUT",
+          url: `/api/workspaces/${slug}/projects/${projectId}/widget-config`,
+          headers: { "x-csrf-token": ownerCookies[csrfCookieName] },
+          cookies: ownerCookies,
+          payload: { brand: { accent: "red" } }
+        });
+
+        expect(put.statusCode).toBe(400);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+});
+
 describe("dashboard SPA route", () => {
   // Resolve the built web dist the same way the route does: walk up from this
   // test module until we find apps/web/dist/index.html.

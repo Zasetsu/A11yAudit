@@ -20,6 +20,7 @@ import { registerLandingRoutes } from "./routes/landing.js";
 import { registerProjectRoutes } from "./routes/projects.js";
 import { registerReportRoutes } from "./routes/reports.js";
 import { registerScanRoutes, type ScanJobPayload } from "./routes/scans.js";
+import { registerWidgetConfigRoutes } from "./routes/widget-config.js";
 import { registerWorkspaceRoutes } from "./routes/workspaces.js";
 
 export interface BuildServerOptions {
@@ -349,6 +350,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   await registerReportRoutes(app, { db: dbClient.db, storage });
   await registerArtifactRoutes(app, { db: dbClient.db, storage });
   await registerAssistRoutes(app, { db: dbClient.db });
+  await registerWidgetConfigRoutes(app, { db: dbClient.db });
 
   // Register the static landing site LAST so the API, assist, and health routes
   // above always take precedence over the `/` catch-all served from disk.
