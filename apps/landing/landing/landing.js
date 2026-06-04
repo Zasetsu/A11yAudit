@@ -84,7 +84,7 @@
       '<div class="c-cap">Önem dağılımı</div>' +
       '<div class="c-meter">' +
       severityRows.map(function (r, i) {
-        var w = [16, 28, 18, 10][i];
+        var w = [22, 39, 25, 14][i];
         return '<i style="width:' + w + '%;background:' + SEV[r.k] + '"></i>';
       }).join("") +
       '</div>' +
