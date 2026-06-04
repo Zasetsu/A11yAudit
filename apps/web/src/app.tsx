@@ -7,6 +7,7 @@ import { OverviewPage } from "./pages/overview";
 import { ProjectsPage } from "./pages/projects";
 import { NewScanPage } from "./pages/new-scan";
 import { ScanRunsPage } from "./pages/scan-runs";
+import { ScanRunDetailPage } from "./pages/scan-run-detail";
 import { FindingsPage } from "./pages/findings";
 import { FindingDetailPage } from "./pages/finding-detail";
 import { ReportsPage } from "./pages/reports";
@@ -24,6 +25,7 @@ export type Route =
   | { page: "projects" }
   | { page: "new-scan" }
   | { page: "scan-runs" }
+  | { page: "scan-run-detail"; scanRunId: string }
   | { page: "findings" }
   | { page: "finding-detail"; findingId: string }
   | { page: "reports" }
@@ -43,7 +45,7 @@ export type AppRoute =
   | (Route & { workspaceSlug: string });
 
 const activeScanStatuses = new Set<ScanRun["status"]>(["queued", "crawling", "auditing", "reporting"]);
-const workspacePages = new Set<Exclude<WorkspacePage, "finding-detail">>([
+const workspacePages = new Set<Exclude<WorkspacePage, "finding-detail" | "scan-run-detail">>([
   "overview",
   "projects",
   "new-scan",
@@ -63,6 +65,9 @@ function routePath(route: AppRoute): string {
   if (route.page === "finding-detail") {
     return `/w/${encodeURIComponent(route.workspaceSlug)}/findings/${encodeURIComponent(route.findingId)}`;
   }
+  if (route.page === "scan-run-detail") {
+    return `/w/${encodeURIComponent(route.workspaceSlug)}/scan-runs/${encodeURIComponent(route.scanRunId)}`;
+  }
 
   return `/w/${encodeURIComponent(route.workspaceSlug)}/${route.page}`;
 }
@@ -73,6 +78,7 @@ function isWorkspaceRoute(route: AppRoute): route is Route & { workspaceSlug: st
 
 function dashboardRoute(route: Route & { workspaceSlug: string }): Route {
   if (route.page === "finding-detail") return { page: "finding-detail", findingId: route.findingId };
+  if (route.page === "scan-run-detail") return { page: "scan-run-detail", scanRunId: route.scanRunId };
   return { page: route.page };
 }
 
@@ -117,13 +123,25 @@ export function parsePath(pathname: string): AppRoute {
       workspaceSlug
     };
   }
+  const scanRun = pathname.match(/^\/w\/([^/]+)\/scan-runs\/([^/]+)$/);
+  if (scanRun) {
+    const workspaceSlug = safeDecodePathPart(scanRun[1]);
+    const scanRunId = safeDecodePathPart(scanRun[2]);
+    if (workspaceSlug === null || scanRunId === null) return { page: "login" };
+
+    return {
+      page: "scan-run-detail",
+      scanRunId,
+      workspaceSlug
+    };
+  }
   const workspace = pathname.match(/^\/w\/([^/]+)\/([^/]+)$/);
-  if (workspace && workspacePages.has(workspace[2] as Exclude<WorkspacePage, "finding-detail">)) {
+  if (workspace && workspacePages.has(workspace[2] as Exclude<WorkspacePage, "finding-detail" | "scan-run-detail">)) {
     const workspaceSlug = safeDecodePathPart(workspace[1]);
     if (workspaceSlug === null) return { page: "login" };
 
     return {
-      page: workspace[2] as Exclude<WorkspacePage, "finding-detail">,
+      page: workspace[2] as Exclude<WorkspacePage, "finding-detail" | "scan-run-detail">,
       workspaceSlug
     };
   }
@@ -265,6 +283,9 @@ function DashboardApp({
       break;
     case "scan-runs":
       view = <ScanRunsPage {...common} />;
+      break;
+    case "scan-run-detail":
+      view = <ScanRunDetailPage {...common} scanRunId={route.scanRunId} />;
       break;
     case "findings":
       view = <FindingsPage {...common} />;

@@ -146,7 +146,9 @@ export function OverviewPage({ project, scans, issues, navigate }: PageProps) {
               <tbody>
                 {projectScans.slice(0, 4).map((scan) => (
                   <tr key={scan.id}>
-                    <td className="mono">{scan.id}</td>
+                    <td className="mono">
+                      <button className="link-button" onClick={() => navigate({ page: "scan-run-detail", scanRunId: scan.id })} title={t("run.viewDetail")(scan.id)} type="button">{scan.id}</button>
+                    </td>
                     <td><RunStatusBadge status={scan.status} /></td>
                     <td>{formatDate(scan.createdAt, locale, t("common.notAvailable"))}</td>
                     <td className="num tnum">{scan.findingsTotal}</td>

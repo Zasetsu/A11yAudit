@@ -7,7 +7,7 @@ import { isWorkspaceOwner, type WorkspaceRole } from "../pages/page-props";
 import { useT } from "../i18n/locale-context.js";
 import type { Messages } from "../i18n/messages.js";
 
-type TopLevelPage = Exclude<Route["page"], "finding-detail">;
+type TopLevelPage = Exclude<Route["page"], "finding-detail" | "scan-run-detail">;
 
 type StringMessageKey = { [K in keyof Messages]: Messages[K] extends string ? K : never }[keyof Messages];
 
@@ -25,7 +25,9 @@ const configItems: Array<{ id: TopLevelPage; labelKey: StringMessageKey; icon: I
 ];
 
 function isActive(route: Route, id: Route["page"]): boolean {
-  return route.page === id || (id === "findings" && route.page === "finding-detail");
+  return route.page === id
+    || (id === "findings" && route.page === "finding-detail")
+    || (id === "scan-runs" && route.page === "scan-run-detail");
 }
 
 function NavButton({ item, route, navigate }: { item: { id: TopLevelPage; labelKey: StringMessageKey; icon: IconName }; route: Route; navigate: Navigate }) {

@@ -166,6 +166,22 @@ h3 {
   background: var(--accent-bg);
 }
 
+.link-button {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: var(--accent);
+  cursor: pointer;
+  text-align: left;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
 .app {
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);

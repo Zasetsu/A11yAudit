@@ -16,7 +16,7 @@ export function ProjectsPage({ workspaceRole, projects, project, navigate, onSel
       />
       <div className="project-grid">
         {projects.map((candidate) => (
-          <button className={`project-card ${candidate.id === project.id ? "selected" : ""}`} key={candidate.id} onClick={() => onSelectProject(candidate)} type="button">
+          <button className={`project-card ${candidate.id === project.id ? "selected" : ""}`} key={candidate.id} onClick={() => { onSelectProject(candidate); navigate({ page: "overview" }); }} type="button">
             <div className="project-card-head">
               <div>
                 <h2>{candidate.name}</h2>

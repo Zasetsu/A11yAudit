@@ -56,7 +56,9 @@ export function ScanRunsPage({ scans, navigate }: PageProps) {
             <tbody>
               {scans.map((scan) => (
                 <tr key={scan.id}>
-                  <td className="mono">{scan.id}</td>
+                  <td className="mono">
+                    <button className="link-button" onClick={() => navigate({ page: "scan-run-detail", scanRunId: scan.id })} title={t("run.viewDetail")(scan.id)} type="button">{scan.id}</button>
+                  </td>
                   <td>{scan.projectName}</td>
 	                  <td>
 	                    <RunStatusBadge status={scan.status} />

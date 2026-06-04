@@ -138,6 +138,18 @@ export interface Messages {
   "runs.profileMeta": (viewports: string, maxPages: number, maxDepth: number) => string;
   "runs.pagesWord": string;
   "runs.failedAfter": string;
+  // scan-run detail
+  "run.back": string;
+  "run.notFound": string;
+  "run.summary": string;
+  "run.mode": string;
+  "run.score": string;
+  "run.error": string;
+  "run.relatedIssues": string;
+  "run.relatedReports": string;
+  "run.noIssues": string;
+  "run.noReports": string;
+  "run.viewDetail": (runId: string) => string;
   // findings
   "findings.subtitle": string;
   "findings.markResolved": string;
@@ -428,6 +440,17 @@ export const MESSAGES: Record<Locale, Messages> = {
     "runs.profileMeta": (viewports, maxPages, maxDepth) => `${viewports} · ${maxPages} sayfa · derinlik ${maxDepth}`,
     "runs.pagesWord": "sayfa",
     "runs.failedAfter": "Şu kadar sonra başarısız:",
+    "run.back": "Taramalara dön",
+    "run.notFound": "Tarama bulunamadı",
+    "run.summary": "Tarama özeti",
+    "run.mode": "Mod",
+    "run.score": "Puan",
+    "run.error": "Hata",
+    "run.relatedIssues": "Bu taramanın sorunları",
+    "run.relatedReports": "Bu taramanın raporları",
+    "run.noIssues": "Bu tarama için gruplanmış sorun yok.",
+    "run.noReports": "Bu tarama için rapor yok.",
+    "run.viewDetail": (runId) => `${runId} taramasının detayını gör`,
     "findings.subtitle": "WCAG referansları ve kanıt işaretçileriyle gruplanmış erişilebilirlik sorunları.",
     "findings.markResolved": "Çözüldü İşaretle",
     "findings.markResolvedDisabled": "Çözüldü işaretleme MVP dışındadır",
@@ -701,6 +724,17 @@ export const MESSAGES: Record<Locale, Messages> = {
     "runs.profileMeta": (viewports, maxPages, maxDepth) => `${viewports} · ${maxPages} pages · depth ${maxDepth}`,
     "runs.pagesWord": "pages",
     "runs.failedAfter": "Failed after",
+    "run.back": "Back to scan runs",
+    "run.notFound": "Scan run not found",
+    "run.summary": "Scan summary",
+    "run.mode": "Mode",
+    "run.score": "Score",
+    "run.error": "Error",
+    "run.relatedIssues": "Issues from this scan",
+    "run.relatedReports": "Reports from this scan",
+    "run.noIssues": "No grouped issues for this scan.",
+    "run.noReports": "No reports for this scan.",
+    "run.viewDetail": (runId) => `View detail for scan ${runId}`,
     "findings.subtitle": "Grouped accessibility issues with WCAG references and evidence pointers.",
     "findings.markResolved": "Mark Resolved",
     "findings.markResolvedDisabled": "Mark Resolved is outside the MVP",
