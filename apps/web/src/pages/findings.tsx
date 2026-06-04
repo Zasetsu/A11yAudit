@@ -3,6 +3,7 @@ import { severityMeta, type Issue, type Severity } from "../data";
 import { Button, PageHeader, Panel, SeverityBadge } from "../design/ui";
 import { useT } from "../i18n/locale-context.js";
 import type { Messages } from "../i18n/messages.js";
+import { areaLabel, cmsLabel, scopeLabel } from "../i18n/inference-labels.js";
 import type { PageProps } from "./page-props";
 
 type TFn = <K extends keyof Messages>(key: K) => Messages[K];
@@ -24,7 +25,7 @@ function confidenceLabel(confidence: Issue["confidence"], t: TFn): string {
 }
 
 export function FindingsPage({ issues, project, navigate }: PageProps) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const [severity, setSeverity] = useState<Severity | "all">("all");
   const projectIssues = useMemo(() => {
     return sortIssuesForTriage(
@@ -94,11 +95,11 @@ export function FindingsPage({ issues, project, navigate }: PageProps) {
                   </td>
                   <td><span className="wcag">{issue.wcagCriteria}</span></td>
                   <td>
-                    {issue.likelyScope}
+                    {scopeLabel(issue.likelyScope, locale)}
                     <div className="table-sub">{confidenceLabel(issue.confidence, t)}</div>
                   </td>
-                  <td>{issue.componentArea}</td>
-                  <td>{issue.cmsHint}</td>
+                  <td>{areaLabel(issue.componentArea, locale)}</td>
+                  <td>{cmsLabel(issue.cmsHint, locale)}</td>
                   <td className="num tnum">{issue.affectedPages}</td>
                   <td className="num tnum">{issue.occurrences}</td>
                 </tr>

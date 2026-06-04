@@ -47,7 +47,7 @@ const STRINGS: Record<ReportLocale, ReportStrings> = {
     genericFix: "Bu başarı kriterinin nasıl karşılanacağına ilişkin ayrıntılar için bağlantılı W3C WCAG 2.2 belgesine başvurun.",
     moreElements: "+ {n} element daha, aynı biçimde",
     manualReview: "Manuel inceleme hâlâ gereklidir. Bu otomatik teknik bir doğrulamadır; WCAG uygunluğunu veya yasal uyumluluğu belgelemez.",
-    disclaimer: "A11yAudit otomatik teknik erişilebilirlik denetim sonuçları sunar. Yasal uyumluluğu belgelemez. Bazı WCAG 2.2 başarı kriterleri manuel inceleme ve insan değerlendirmesi gerektirir.",
+    disclaimer: "Audera otomatik teknik erişilebilirlik denetim sonuçları sunar. Yasal uyumluluğu belgelemez. Bazı WCAG 2.2 başarı kriterleri manuel inceleme ve insan değerlendirmesi gerektirir.",
     technicalAppendix: "Teknik ek (geliştiriciler için)",
     scoreOutOf: "puan /100",
     uniqueIssues: "benzersiz sorun",
@@ -62,7 +62,7 @@ const STRINGS: Record<ReportLocale, ReportStrings> = {
     changesOngoing: "devam eden",
     changesResolved: "çözüldü",
     changesResolvedList: "Çözülen sorunlar",
-    changesFirstAudit: "İlk denetim — karşılaştırılacak önceki tarama yok."
+    changesFirstAudit: "İlk denetim: karşılaştırılacak önceki tarama yok."
   },
   en: {
     reportTitle: "Accessibility Audit Report",
@@ -78,7 +78,7 @@ const STRINGS: Record<ReportLocale, ReportStrings> = {
     genericFix: "Refer to the linked W3C WCAG 2.2 document for details on how to meet this success criterion.",
     moreElements: "+ {n} more elements, same format",
     manualReview: "Manual review is still required. This is automated technical verification; it does not certify WCAG conformance or legal compliance.",
-    disclaimer: "A11yAudit provides automated technical accessibility audit results. It does not certify legal compliance. Some WCAG 2.2 success criteria require manual review and human judgment.",
+    disclaimer: "Audera provides automated technical accessibility audit results. It does not certify legal compliance. Some WCAG 2.2 success criteria require manual review and human judgment.",
     technicalAppendix: "Technical appendix (for developers)",
     scoreOutOf: "score /100",
     uniqueIssues: "unique issues",
@@ -93,7 +93,7 @@ const STRINGS: Record<ReportLocale, ReportStrings> = {
     changesOngoing: "ongoing",
     changesResolved: "resolved",
     changesResolvedList: "Resolved issues",
-    changesFirstAudit: "First audit — no prior scan to compare."
+    changesFirstAudit: "First audit: no prior scan to compare."
   }
 };
 

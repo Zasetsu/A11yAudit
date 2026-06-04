@@ -40,13 +40,13 @@ export function renderReportHtml(report: AuditReportModel, options: RenderReport
   // top-5 fix-first list
   const top5 = problems.slice(0, 5);
   const fixFirstList = top5.length === 0
-    ? `<p>—</p>`
+    ? `<p>-</p>`
     : `<ol>${top5.map((p) =>
-        `<li><strong>${escapeHtml(p.title)}</strong> — WCAG ${escapeHtml(p.wcagCriteria.join(", "))} · ${p.occurrences} ${escapeHtml(strings.occurrences)}</li>`
+        `<li><strong>${escapeHtml(p.title)}</strong> · WCAG ${escapeHtml(p.wcagCriteria.join(", "))} · ${p.occurrences} ${escapeHtml(strings.occurrences)}</li>`
       ).join("")}</ol>`;
 
   const allIssuesHtml = problems.length === 0
-    ? `<p>—</p>`
+    ? `<p>-</p>`
     : problems.map((p) => renderProblemCard(p, strings, locale)).join("");
 
 
@@ -183,15 +183,15 @@ function renderProblemCard(problem: ReportProblem, strings: ReportStrings, local
   let impact: string;
   let fix: string;
   if (crit) {
-    wcagLine = `<a href="${escapeHtml(crit.w3cUrl)}">WCAG ${escapeHtml(crit.id)} — ${escapeHtml(crit.name)} (${escapeHtml(crit.level)})</a>`;
+    wcagLine = `<a href="${escapeHtml(crit.w3cUrl)}">WCAG ${escapeHtml(crit.id)} · ${escapeHtml(crit.name)} (${escapeHtml(crit.level)})</a>`;
     impact = escapeHtml(crit.content.userImpact);
     fix = escapeHtml(crit.content.howToFix);
   } else {
     const firstId = problem.wcagCriteria[0];
     const meta = firstId ? WCAG_22_CRITERIA[firstId] : undefined;
     const label = meta
-      ? `WCAG ${escapeHtml(meta.id)} — ${escapeHtml(meta.name)} (${escapeHtml(meta.level)})`
-      : `WCAG ${escapeHtml(problem.wcagCriteria.join(", ") || "—")}`;
+      ? `WCAG ${escapeHtml(meta.id)} · ${escapeHtml(meta.name)} (${escapeHtml(meta.level)})`
+      : `WCAG ${escapeHtml(problem.wcagCriteria.join(", ") || "-")}`;
     wcagLine = `<a href="${escapeHtml(strings.wcagIndexUrl)}">${label}</a>`;
     impact = escapeHtml(strings.genericImpact);
     fix = escapeHtml(strings.genericFix);
@@ -204,7 +204,7 @@ function renderProblemCard(problem: ReportProblem, strings: ReportStrings, local
       ${el.screenshotDataUri ? `<img class="shot" alt="" src="${el.screenshotDataUri}" />` : ""}
       <div class="element-detail">
         <pre class="snippet">${escapeHtml(el.htmlSnippet ?? "")}</pre>
-        <div class="element-meta">${strings.selector} <code>${escapeHtml(el.selector ?? "—")}</code> · ${strings.page} ${escapeHtml(el.pageUrl)} · ${escapeHtml(el.viewport)}</div>
+        <div class="element-meta">${strings.selector} <code>${escapeHtml(el.selector ?? "-")}</code> · ${strings.page} ${escapeHtml(el.pageUrl)} · ${escapeHtml(el.viewport)}</div>
       </div>
     </div>`).join("");
   const moreNote = hidden > 0

@@ -191,7 +191,7 @@ export const WCAG_CRITERION_CONTENT: Record<string, Record<ReportLocale, WcagCri
     en: {
       name: "Name, Role, Value",
       userImpact:
-        "Screen-reader users hear no label for this control — only something like \"button\" — so they cannot tell what it does.",
+        "Screen-reader users hear no label for this control, only something like \"button\", so they cannot tell what it does.",
       howToFix:
         "Give every interactive element an accessible name: add visible text, an aria-label, or a title; for custom widgets, expose the correct role and state.",
       w3cUrl: "https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html",

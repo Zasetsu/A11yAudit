@@ -114,12 +114,22 @@ export async function registerLandingRoutes(server: FastifyInstance): Promise<vo
   }
 
   // `wildcard: false` registers one route per file/dir (e.g. `/`, `/index.html`,
-  // `/landing/*`, `/assets/*`, `/demo/*`) instead of a single `/*` catch-all,
+  // `/landing/*`, `/assist/*`) instead of a single `/*` catch-all,
   // so the static plugin never shadows `/api`, `/assist`, `/health`, or `/app`.
   await server.register(fastifyStatic, {
     root,
     prefix: "/",
     index: ["index.html"],
-    wildcard: false
+    wildcard: false,
+    // The landing HTML always revalidates so it points at the current asset
+    // versions; CSS/JS are version-busted via `?v=<hash>` and also revalidate
+    // (cheap 304) so an edit is never served stale. Images cache for a day.
+    setHeaders: (res, filePath) => {
+      if (/\.(html|css|js)$/.test(filePath)) {
+        res.setHeader("Cache-Control", "no-cache, must-revalidate");
+      } else {
+        res.setHeader("Cache-Control", "public, max-age=86400");
+      }
+    }
   });
 }

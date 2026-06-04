@@ -222,7 +222,7 @@ function DashboardApp({
   setTheme: (setValue: (value: "light" | "dark") => "light" | "dark") => void;
   onLogout: () => void;
 }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const contentRef = useRef<HTMLElement>(null);
   const projectsQuery = useQuery({
     queryKey: ["projects", currentWorkspaceSlug],
@@ -239,7 +239,11 @@ function DashboardApp({
   });
   const projects = projectsQuery.data ?? [activeProject()];
   const [selectedProjectId, setSelectedProjectId] = useState<string>(activeProject().id);
-  const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? projects[0] ?? emptyProject();
+  const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? projects[0] ?? {
+    ...emptyProject(),
+    name: locale === "tr" ? "Proje seçilmedi" : "No project selected",
+    domain: ""
+  };
   const selectedScan = useMemo(
     () => latestScanForProject(scansQuery.data, selectedProject.id),
     [scansQuery.data, selectedProject.id]

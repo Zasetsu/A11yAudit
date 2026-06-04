@@ -14,8 +14,10 @@ GET /api/*       → API (auth + data)
 ```
 
 - The **landing** (`apps/landing`) is static (`index.html` + `landing/` + `assets/` + `demo/`), served via `@fastify/static` at `/`. It embeds the real accessibility widget (dogfood) and its live demo loads the widget inside an `<iframe>` pointed at `/demo/ornek-site.html`. The contact form is `mailto:`-only (no backend yet).
-- The **dashboard** (`apps/web`) must be built with `base: "/app/"` (already configured); the server serves `apps/web/dist` at `/app/*` with a client-route fallback (extensionless `/app/...` → the SPA shell). API calls remain origin-relative `/api/*`. If `apps/web/dist` is absent, `/app` returns 404 (run `pnpm build`).
+- The **dashboard** (`apps/web`) must be built with `base: "/app/"` (already configured); the server serves `apps/web/dist` at `/app/*` with a client-route fallback (extensionless `/app/...` → the SPA shell). If `apps/web/dist` is absent, `/app` returns 404 (run `pnpm build`).
+- **Required build-time API base.** The web app resolves its API origin at *build* time from `VITE_A11YAUDIT_API_BASE_URL` (or `A11YAUDIT_SERVER_URL`). When neither is set the bundle runs in **offline demo mode** — `apiUrl()` returns `null`, so login/signup throw "not configured" and only demo data renders. A real deployment **must** build the web bundle with the env set to the browser-reachable origin, e.g. for a same-origin reverse-proxied deploy: `VITE_A11YAUDIT_API_BASE_URL=https://audit.example.com pnpm --filter @a11yaudit/web build`. Rebuild and redeploy `apps/web/dist` whenever the public origin changes.
 - Route order: API / assist / health / `/app` are registered before the `/` landing static (which uses `wildcard:false`), so the landing never shadows them.
+- **Restart the server after every web rebuild.** The `/app` static plugin runs with `wildcard:false`, which registers one route **per real file enumerated at boot**. Vite emits content-hashed asset names (`index-<hash>.js`), so a freshly deployed bundle has filenames the running process never scanned — they `404` and the dashboard renders blank — until the service is restarted (`systemctl restart audera`). Landing/widget/static files under other prefixes are read from disk per request and do **not** need a restart; only `apps/web/dist` does.
 
 ## Fresh Database Assumption
 

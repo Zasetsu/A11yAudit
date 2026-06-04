@@ -4224,13 +4224,14 @@ describe("assist widget bundle route", () => {
     });
   });
 
-  it("serves the landing demo sample page", async () => {
+  it("serves the in-page assist demo panel", async () => {
     await withTempDb(async (dbPath) => {
       const app = await buildServer({ dbPath, executeScans: false });
       try {
-        const res = await app.inject({ method: "GET", url: "/demo/ornek-site.html" });
+        const res = await app.inject({ method: "GET", url: "/" });
         expect(res.statusCode).toBe(200);
-        expect(res.body).toContain("/assist/a11yaudit-assist.js");
+        expect(res.body).toContain("assist-panel");
+        expect(res.body).toContain("Erişilebilirlik tercihleri");
       } finally {
         await app.close();
       }
