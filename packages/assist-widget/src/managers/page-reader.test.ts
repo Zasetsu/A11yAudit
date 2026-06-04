@@ -79,7 +79,7 @@ describe("PageReaderManager", () => {
           }
         });
 
-        const manager = new module.PageReaderManager();
+        const manager = new module.PageReaderManager("en");
         manager.enable(2);
         document.getElementById("widget").click();
         document.getElementById("copy").click();
@@ -152,7 +152,7 @@ describe("PageReaderManager", () => {
           }
         });
 
-        const manager = new module.PageReaderManager();
+        const manager = new module.PageReaderManager("en");
         manager.enable(1);
         const speedOneRate = utterances.at(-1).rate;
         manager.enable(3);
@@ -227,7 +227,7 @@ describe("PageReaderManager", () => {
           }
         });
 
-        const manager = new module.PageReaderManager();
+        const manager = new module.PageReaderManager("en");
         manager.enable(2);
         document.getElementById("first").click();
         const firstUtterance = utterances.at(-1);

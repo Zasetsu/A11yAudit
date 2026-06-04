@@ -12,12 +12,25 @@ type HighlightState = {
   outlineOffset: string;
 };
 
+type PageReaderLocale = "tr" | "en";
+
+const SPEECH_LANG: Record<PageReaderLocale, string> = { tr: "tr-TR", en: "en-US" };
+const ENABLED_ANNOUNCEMENT: Record<PageReaderLocale, string> = {
+  tr: "Sayfa okuyucu açık. Okumak istediğiniz metne tıklayın.",
+  en: "Page reader enabled. Click the text you want to read."
+};
+
 export class PageReaderManager {
   private enabled = false;
   private speed: PageReaderSpeed = 0;
   private highlightedElement: HTMLElement | null = null;
   private highlightState: HighlightState | null = null;
   private speechVersion = 0;
+  private readonly locale: PageReaderLocale;
+
+  constructor(locale: PageReaderLocale = "tr") {
+    this.locale = locale;
+  }
 
   private readonly handleClick = (event: MouseEvent): void => {
     if (!(event.target instanceof Element) || this.shouldIgnore(event.target)) return;
@@ -39,7 +52,7 @@ export class PageReaderManager {
       this.enabled = true;
       document.addEventListener("click", this.handleClick);
     }
-    this.speak("Page reader enabled. Click the text you want to read.");
+    this.speak(ENABLED_ANNOUNCEMENT[this.locale]);
   }
 
   disable(): void {
@@ -68,6 +81,11 @@ export class PageReaderManager {
     if (typeof SpeechSynthesisUtterance === "undefined" || typeof speechSynthesis === "undefined") return;
 
     const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = SPEECH_LANG[this.locale];
+    const voices = typeof speechSynthesis.getVoices === "function" ? speechSynthesis.getVoices() : [];
+    const voice = voices.find((v) => v.lang === SPEECH_LANG[this.locale])
+      ?? voices.find((v) => v.lang.startsWith(this.locale));
+    if (voice) utterance.voice = voice;
     if (this.speed !== 0) utterance.rate = SPEED_RATES[this.speed];
     utterance.onend = () => {
       if (speechVersion === this.speechVersion) this.clearHighlight();
