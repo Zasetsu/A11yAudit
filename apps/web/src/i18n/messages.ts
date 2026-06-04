@@ -35,7 +35,6 @@ export interface Messages {
   "shell.switchThemeDark": string;
   "shell.switchThemeLight": string;
   "shell.signOut": string;
-  "shell.local": string;
   "shell.language": string;
   "shell.primaryNav": string;
   // app / docs
@@ -338,7 +337,6 @@ export const MESSAGES: Record<Locale, Messages> = {
     "shell.switchThemeDark": "Koyu temaya geç",
     "shell.switchThemeLight": "Açık temaya geç",
     "shell.signOut": "Çıkış yap",
-    "shell.local": "Yerel",
     "shell.language": "Dil",
     "shell.primaryNav": "Birincil",
     "app.mainContent": "Ana içerik",
@@ -618,7 +616,6 @@ export const MESSAGES: Record<Locale, Messages> = {
     "shell.switchThemeDark": "Switch to dark theme",
     "shell.switchThemeLight": "Switch to light theme",
     "shell.signOut": "Sign out",
-    "shell.local": "Local",
     "shell.language": "Language",
     "shell.primaryNav": "Primary",
     "app.mainContent": "Main content",

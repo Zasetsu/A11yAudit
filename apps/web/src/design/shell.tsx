@@ -234,7 +234,6 @@ export function TopBar({
       </div>
       <Button aria-label={theme === "light" ? t("shell.switchThemeDark") : t("shell.switchThemeLight")} className="topbar-theme" icon={theme === "light" ? "moon" : "sun"} onClick={toggleTheme} variant="ghost" />
       <Button aria-label={t("shell.signOut")} className="topbar-logout" icon="log-out" onClick={onLogout} variant="ghost" />
-      <div className="local-status"><span className="health-dot" /> {t("shell.local")}</div>
     </header>
   );
 }
