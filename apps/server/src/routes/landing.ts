@@ -120,6 +120,16 @@ export async function registerLandingRoutes(server: FastifyInstance): Promise<vo
     root,
     prefix: "/",
     index: ["index.html"],
-    wildcard: false
+    wildcard: false,
+    // The landing HTML always revalidates so it points at the current asset
+    // versions; CSS/JS are version-busted via `?v=<hash>` and also revalidate
+    // (cheap 304) so an edit is never served stale. Images cache for a day.
+    setHeaders: (res, filePath) => {
+      if (/\.(html|css|js)$/.test(filePath)) {
+        res.setHeader("Cache-Control", "no-cache, must-revalidate");
+      } else {
+        res.setHeader("Cache-Control", "public, max-age=86400");
+      }
+    }
   });
 }
