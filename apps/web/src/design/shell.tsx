@@ -47,7 +47,7 @@ export function Sidebar({ route, navigate, workspaceRole }: { route: Route; navi
     <nav aria-label={t("shell.primaryNav")} className="sidebar">
       <div className="brand">
         <img alt="" className="brand-mark" height={28} src="/favicon.svg" width={28} />
-        <div className="name">Audera<small>{t("shell.brandSub")}</small></div>
+        <div className="name">Audera</div>
       </div>
       <div className="nav-list">
         {navItems.map((item) => <NavButton item={item} key={item.id} navigate={navigate} route={route} />)}
@@ -56,13 +56,6 @@ export function Sidebar({ route, navigate, workspaceRole }: { route: Route; navi
           <NavButton item={{ id: "members", labelKey: "nav.members", icon: "shield-check" }} navigate={navigate} route={route} />
         ) : null}
         {configItems.map((item) => <NavButton item={item} key={item.id} navigate={navigate} route={route} />)}
-      </div>
-      <div className="sidebar-foot">
-        <span className="health-dot" />
-        <div>
-          <div className="foot-title">{t("shell.selfHosted")}</div>
-          <div className="mono foot-copy">{t("shell.localApi")}</div>
-        </div>
       </div>
     </nav>
   );
@@ -240,9 +233,6 @@ export function TopBar({
         ))}
       </div>
       <Button aria-label={theme === "light" ? t("shell.switchThemeDark") : t("shell.switchThemeLight")} className="topbar-theme" icon={theme === "light" ? "moon" : "sun"} onClick={toggleTheme} variant="ghost" />
-      <button aria-label={t("shell.repoNotConfigured")} className="icon-link" disabled title={t("shell.repoNotConfigured")} type="button">
-        <Icon name="github" size={17} />
-      </button>
       <Button aria-label={t("shell.signOut")} className="topbar-logout" icon="log-out" onClick={onLogout} variant="ghost" />
       <div className="local-status"><span className="health-dot" /> {t("shell.local")}</div>
     </header>

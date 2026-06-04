@@ -28,16 +28,12 @@ export interface Messages {
   "nav.members": string;
   "nav.configure": string;
   // shell
-  "shell.brandSub": string;
-  "shell.selfHosted": string;
-  "shell.localApi": string;
   "shell.switchProject": string;
   "shell.switchWorkspace": string;
   "shell.searchLabel": string;
   "shell.searchPlaceholder": string;
   "shell.switchThemeDark": string;
   "shell.switchThemeLight": string;
-  "shell.repoNotConfigured": string;
   "shell.signOut": string;
   "shell.local": string;
   "shell.language": string;
@@ -335,16 +331,12 @@ export const MESSAGES: Record<Locale, Messages> = {
     "nav.docs": "Dokümantasyon",
     "nav.members": "Üyeler",
     "nav.configure": "Yapılandırma",
-    "shell.brandSub": "WCAG 2.2 Konsolu",
-    "shell.selfHosted": "Kendi sunucunuzda",
-    "shell.localApi": "yerel API · v0.1.0",
     "shell.switchProject": "Proje değiştir",
     "shell.switchWorkspace": "Çalışma alanı değiştir",
     "shell.searchLabel": "Bulgu, URL ve WCAG kriteri ara",
     "shell.searchPlaceholder": "Bulgu, URL, WCAG kriteri ara...",
     "shell.switchThemeDark": "Koyu temaya geç",
     "shell.switchThemeLight": "Açık temaya geç",
-    "shell.repoNotConfigured": "Depo bağlantısı yapılandırılmadı",
     "shell.signOut": "Çıkış yap",
     "shell.local": "Yerel",
     "shell.language": "Dil",
@@ -619,16 +611,12 @@ export const MESSAGES: Record<Locale, Messages> = {
     "nav.docs": "Documentation",
     "nav.members": "Members",
     "nav.configure": "Configure",
-    "shell.brandSub": "WCAG 2.2 Console",
-    "shell.selfHosted": "Self-hosted instance",
-    "shell.localApi": "local API · v0.1.0",
     "shell.switchProject": "Switch project",
     "shell.switchWorkspace": "Switch workspace",
     "shell.searchLabel": "Search findings, URLs, and WCAG criteria",
     "shell.searchPlaceholder": "Search findings, URLs, WCAG criteria...",
     "shell.switchThemeDark": "Switch to dark theme",
     "shell.switchThemeLight": "Switch to light theme",
-    "shell.repoNotConfigured": "Repository link is not configured",
     "shell.signOut": "Sign out",
     "shell.local": "Local",
     "shell.language": "Language",
