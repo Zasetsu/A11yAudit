@@ -1,0 +1,818 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Northstar Grid Works</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #16212f;
+        --muted: #5b6775;
+        --line: #d9e1ea;
+        --paper: #fbfaf7;
+        --panel: #ffffff;
+        --teal: #006b68;
+        --teal-dark: #034c4a;
+        --orange: #e0682f;
+        --gold: #f2b84b;
+        --blue: #2a63a7;
+        --shadow: 0 18px 45px rgba(22, 33, 47, 0.14);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Avenir Next", "Segoe UI", sans-serif;
+        background:
+          linear-gradient(180deg, rgba(0, 107, 104, 0.08), transparent 420px),
+          var(--paper);
+        color: var(--ink);
+        line-height: 1.55;
+      }
+
+      a {
+        color: var(--teal-dark);
+        text-decoration-thickness: 0.12em;
+        text-underline-offset: 0.2em;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      .site-shell {
+        min-height: 100vh;
+      }
+
+      .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        padding: 18px clamp(18px, 4vw, 56px);
+        background: rgba(251, 250, 247, 0.94);
+        border-bottom: 1px solid var(--line);
+        backdrop-filter: blur(14px);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: var(--ink);
+        font-weight: 800;
+        letter-spacing: 0;
+        text-decoration: none;
+      }
+
+      .brand-mark {
+        display: inline-grid;
+        width: 38px;
+        height: 38px;
+        place-items: center;
+        border-radius: 8px;
+        background: var(--teal);
+        color: #fff;
+      }
+
+      .primary-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        align-items: center;
+      }
+
+      .primary-nav a {
+        color: var(--ink);
+        font-size: 0.95rem;
+        font-weight: 650;
+        text-decoration: none;
+      }
+
+      .nav-action {
+        border: 1px solid var(--teal);
+        border-radius: 6px;
+        padding: 10px 14px;
+        background: var(--teal);
+        color: #fff;
+        cursor: pointer;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+        gap: clamp(28px, 5vw, 72px);
+        align-items: center;
+        padding: clamp(40px, 7vw, 86px) clamp(18px, 4vw, 56px) 48px;
+      }
+
+      .eyebrow {
+        margin: 0 0 14px;
+        color: var(--orange);
+        font-size: 0.82rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      h1 {
+        max-width: 11ch;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: clamp(3.1rem, 9vw, 7.4rem);
+        font-weight: 700;
+      }
+
+      h2 {
+        font-size: clamp(2rem, 4vw, 3.6rem);
+      }
+
+      h3 {
+        font-size: clamp(1.25rem, 2vw, 1.7rem);
+      }
+
+      .hero-copy {
+        max-width: 680px;
+        margin: 24px 0 0;
+        color: var(--muted);
+        font-size: clamp(1.05rem, 2vw, 1.25rem);
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 28px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 46px;
+        border: 1px solid var(--ink);
+        border-radius: 6px;
+        padding: 11px 16px;
+        background: var(--ink);
+        color: #fff;
+        font-weight: 750;
+        text-decoration: none;
+      }
+
+      .button.secondary {
+        background: transparent;
+        color: var(--ink);
+      }
+
+      .plant-card {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      .plant-visual {
+        position: relative;
+        min-height: 360px;
+        background:
+          linear-gradient(160deg, rgba(3, 76, 74, 0.86), rgba(22, 33, 47, 0.78)),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='620' viewBox='0 0 900 620'%3E%3Crect width='900' height='620' fill='%23dbe7ea'/%3E%3Cg fill='none' stroke='%2384a6a5' stroke-width='10' opacity='.65'%3E%3Cpath d='M80 470h720M120 420h210l80-160 120 240 70-110h180'/%3E%3Cpath d='M150 160h160v260H150zM350 230h120v190H350zM520 120h210v300H520z'/%3E%3C/g%3E%3Cg fill='%23f2b84b'%3E%3Ccircle cx='210' cy='210' r='26'/%3E%3Ccircle cx='610' cy='180' r='34'/%3E%3C/g%3E%3C/svg%3E");
+        background-size: cover;
+        color: #fff;
+      }
+
+      .rotor {
+        position: absolute;
+        right: 48px;
+        top: 54px;
+        width: 120px;
+        height: 120px;
+        border: 8px solid rgba(255, 255, 255, 0.72);
+        border-radius: 50%;
+        animation: spin 7s linear infinite;
+      }
+
+      .rotor::before,
+      .rotor::after {
+        content: "";
+        position: absolute;
+        inset: 48px -26px;
+        background: rgba(255, 255, 255, 0.72);
+        border-radius: 999px;
+      }
+
+      .rotor::after {
+        transform: rotate(90deg);
+      }
+
+      .plant-label {
+        position: absolute;
+        left: 24px;
+        bottom: 24px;
+        max-width: 310px;
+        padding: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        border-radius: 8px;
+        background: rgba(22, 33, 47, 0.76);
+      }
+
+      .plant-label p {
+        margin: 8px 0 0;
+        color: rgba(255, 255, 255, 0.82);
+      }
+
+      .section {
+        padding: 54px clamp(18px, 4vw, 56px);
+      }
+
+      .section-grid {
+        display: grid;
+        grid-template-columns: minmax(240px, 0.78fr) minmax(0, 1.22fr);
+        gap: clamp(24px, 4vw, 56px);
+        align-items: start;
+      }
+
+      .section-lede {
+        margin: 14px 0 0;
+        color: var(--muted);
+        font-size: 1.08rem;
+      }
+
+      .metric-grid,
+      .service-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .metric,
+      .service,
+      .notice,
+      .media-panel,
+      .form-panel,
+      .sidebar-panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: 0 8px 26px rgba(22, 33, 47, 0.08);
+      }
+
+      .metric,
+      .service,
+      .notice,
+      .form-panel,
+      .sidebar-panel {
+        padding: 20px;
+      }
+
+      .metric strong {
+        display: block;
+        color: var(--teal-dark);
+        font-size: 2rem;
+        line-height: 1;
+      }
+
+      .metric span,
+      .service p,
+      .notice p,
+      .sidebar-panel p {
+        color: var(--muted);
+      }
+
+      .service img {
+        display: block;
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        margin-bottom: 16px;
+        border-radius: 6px;
+        object-fit: cover;
+      }
+
+      .animated-alert {
+        position: relative;
+        padding-left: 54px;
+      }
+
+      .animated-alert::before {
+        content: "";
+        position: absolute;
+        left: 20px;
+        top: 25px;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--orange);
+        animation: pulse 1.6s ease-in-out infinite;
+      }
+
+      .operations-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 310px;
+        gap: 18px;
+      }
+
+      .media-panel {
+        overflow: hidden;
+      }
+
+      .media-panel img,
+      .media-panel video {
+        display: block;
+        width: 100%;
+      }
+
+      .media-panel video {
+        min-height: 220px;
+        background: #111827;
+      }
+
+      .media-body {
+        padding: 20px;
+      }
+
+      .report-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 16px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+      }
+
+      .report-table th,
+      .report-table td {
+        padding: 12px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+      }
+
+      .report-table th {
+        background: #edf4f3;
+      }
+
+      .status {
+        display: inline-flex;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: rgba(0, 107, 104, 0.12);
+        color: var(--teal-dark);
+        font-size: 0.82rem;
+        font-weight: 800;
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+
+      .field {
+        display: grid;
+        gap: 6px;
+      }
+
+      .field.full {
+        grid-column: 1 / -1;
+      }
+
+      .field label {
+        font-weight: 750;
+      }
+
+      .field input,
+      .field select,
+      .field textarea {
+        width: 100%;
+        border: 1px solid #b8c4cf;
+        border-radius: 6px;
+        padding: 11px 12px;
+        background: #fff;
+        color: var(--ink);
+      }
+
+      .field textarea {
+        min-height: 118px;
+        resize: vertical;
+      }
+
+      .floating-callout {
+        position: fixed;
+        right: 24px;
+        top: 96px;
+        z-index: 5;
+        width: min(280px, calc(100vw - 48px));
+        border: 1px solid rgba(22, 33, 47, 0.18);
+        border-radius: 8px;
+        padding: 16px;
+        background: #fff8ea;
+        box-shadow: var(--shadow);
+      }
+
+      .floating-callout button {
+        border: 0;
+        border-radius: 6px;
+        padding: 8px 10px;
+        background: var(--orange);
+        color: #fff;
+        cursor: pointer;
+      }
+
+      .site-footer {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 20px;
+        padding: 34px clamp(18px, 4vw, 56px);
+        background: var(--ink);
+        color: #fff;
+      }
+
+      .site-footer a {
+        color: #fff;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          transform: scale(0.8);
+          opacity: 0.45;
+        }
+
+        50% {
+          transform: scale(1.28);
+          opacity: 1;
+        }
+      }
+
+      @media (max-width: 920px) {
+        .hero,
+        .section-grid,
+        .operations-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .metric-grid,
+        .service-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .floating-callout {
+          position: static;
+          width: auto;
+          margin: 0 clamp(18px, 4vw, 56px) 18px;
+        }
+      }
+
+      @media (max-width: 680px) {
+        .site-header,
+        .primary-nav,
+        .hero-actions,
+        .site-footer {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .form-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .plant-visual {
+          min-height: 300px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="site-shell">
+      <header id="layout-nav" class="site-header">
+        <a class="brand" href="#top" aria-label="Northstar Grid Works home">
+          <span class="brand-mark" aria-hidden="true">N</span>
+          <span>Northstar Grid Works</span>
+        </a>
+        <nav class="primary-nav" aria-label="Primary navigation">
+          <a href="#services">Services</a>
+          <a href="#operations">Operations</a>
+          <a href="#reports">Reports</a>
+          <a href="#contact">Contact</a>
+          <button class="nav-action" type="button" title="Open the monthly maintenance request queue">
+            Request maintenance
+          </button>
+        </nav>
+      </header>
+
+      <aside id="layout-popup" class="floating-callout" role="dialog" aria-label="Service advisory">
+        <h2>Service Advisory</h2>
+        <p>
+          Planned inverter inspections are scheduled this Friday between 02:00 and 04:00.
+          Critical sites should keep bypass teams on standby.
+        </p>
+        <button type="button">Acknowledge</button>
+      </aside>
+
+      <main id="top">
+        <section class="hero" aria-labelledby="hero-title">
+          <div>
+            <p class="eyebrow">Industrial energy reliability</p>
+            <h1 id="hero-title">Power that stays online.</h1>
+            <p class="hero-copy">
+              Northstar Grid Works maintains solar fields, battery rooms, and industrial distribution systems for
+              factories that cannot afford downtime. This demo page includes dense text, media, forms, tables,
+              animated elements, landmarks, links, and side content so the assist widget can be tested in one place.
+            </p>
+            <div class="hero-actions" aria-label="Primary actions">
+              <a class="button" href="#contact">Plan an inspection</a>
+              <a class="button secondary" href="#reports">View reliability report</a>
+            </div>
+          </div>
+          <figure class="plant-card">
+            <div class="plant-visual" role="img" aria-label="Industrial energy site with solar rows and battery buildings">
+              <div class="rotor" aria-hidden="true"></div>
+              <figcaption class="plant-label">
+                <strong>Site 42, west yard</strong>
+                <p>Live maintenance window, thermal camera sweep, and battery cabinet balancing.</p>
+              </figcaption>
+            </div>
+          </figure>
+        </section>
+
+        <section class="section" aria-labelledby="summary-title">
+          <div class="section-grid">
+            <div>
+              <p class="eyebrow">Operating picture</p>
+              <h2 id="summary-title">A monitored grid estate with real field constraints.</h2>
+              <p class="section-lede">
+                The content below is intentionally varied so text size, spacing, contrast, page structure,
+                magnifier, hints, reading guide, reading mask, page reader, stop animations, hide images,
+                and mute sound can be evaluated without changing pages.
+              </p>
+            </div>
+            <div class="metric-grid" aria-label="Performance metrics">
+              <div class="metric">
+                <strong>99.94%</strong>
+                <span>average uptime across monitored facilities</span>
+              </div>
+              <div class="metric">
+                <strong>18 min</strong>
+                <span>median response time for high-severity alerts</span>
+              </div>
+              <div class="metric">
+                <strong>240 MW</strong>
+                <span>renewable capacity under preventive maintenance</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="services" class="section" aria-labelledby="services-title">
+          <div class="section-grid">
+            <div>
+              <p class="eyebrow">Services</p>
+              <h2 id="services-title">Field teams, diagnostics, and documentation.</h2>
+              <p class="section-lede">
+                Hover images and labels to test hints. Toggle image hiding and magnification to see how the
+                widget handles operational visuals.
+              </p>
+            </div>
+            <div class="service-grid">
+              <article class="service">
+                <img
+                  alt="Technician inspecting a battery cabinet status display"
+                  title="Battery cabinet inspection"
+                  src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='360' viewBox='0 0 640 360'%3E%3Crect width='640' height='360' fill='%23e9f1ef'/%3E%3Crect x='86' y='58' width='190' height='250' rx='16' fill='%2316212f'/%3E%3Crect x='116' y='88' width='130' height='42' rx='6' fill='%23006b68'/%3E%3Ccircle cx='180' cy='210' r='48' fill='%23f2b84b'/%3E%3Cpath d='M360 270l52-168 76 168' fill='none' stroke='%23e0682f' stroke-width='28' stroke-linecap='round'/%3E%3C/svg%3E"
+                >
+                <h3>Battery diagnostics</h3>
+                <p>
+                  Thermal sweep, cabinet balancing, log review, and replacement planning for high-load rooms.
+                </p>
+                <a href="#contact">Schedule diagnostics</a>
+              </article>
+              <article class="service">
+                <img
+                  alt="Solar field rows with string inverter status lines"
+                  title="Solar field telemetry"
+                  src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='360' viewBox='0 0 640 360'%3E%3Crect width='640' height='360' fill='%23dfeceb'/%3E%3Cg fill='%232a63a7'%3E%3Cpath d='M40 250h180l-38 54H2z'/%3E%3Cpath d='M250 220h180l-38 54H212z'/%3E%3Cpath d='M450 190h150l-34 50H416z'/%3E%3C/g%3E%3Ccircle cx='520' cy='82' r='44' fill='%23f2b84b'/%3E%3Cpath d='M80 84h220M110 120h190M160 156h120' stroke='%23006b68' stroke-width='16' stroke-linecap='round'/%3E%3C/svg%3E"
+                >
+                <h3>Solar maintenance</h3>
+                <p>
+                  IV curve tests, string fault triage, dust pattern checks, and inverter firmware windows.
+                </p>
+                <a href="#reports">Read service data</a>
+              </article>
+              <article class="service">
+                <img
+                  alt="Control room dashboard showing alarms and line status"
+                  title="Control room alarm dashboard"
+                  src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='360' viewBox='0 0 640 360'%3E%3Crect width='640' height='360' fill='%2316212f'/%3E%3Crect x='54' y='54' width='532' height='252' rx='18' fill='%23ffffff'/%3E%3Cpath d='M96 238h448' stroke='%23d9e1ea' stroke-width='8'/%3E%3Cpath d='M106 220l84-68 70 34 62-92 78 64 86-84' fill='none' stroke='%23006b68' stroke-width='18' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='486' cy='74' r='24' fill='%23e0682f'/%3E%3C/svg%3E"
+                >
+                <h3>Incident response</h3>
+                <p>
+                  Alarm validation, work-order routing, and field escalation for production-critical sites.
+                </p>
+                <a href="#contact">Start escalation</a>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section id="operations" class="section" aria-labelledby="operations-title">
+          <div class="operations-layout">
+            <div>
+              <p class="eyebrow">Operations</p>
+              <h2 id="operations-title">A live operations block for media and motion checks.</h2>
+              <p class="section-lede">
+                This block includes a video element, audio controls, animated alerts, and long operational copy.
+                It is designed to exercise mute sound, stop animations, text preferences, page reader, and
+                reading overlays in one continuous view.
+              </p>
+              <div class="notice animated-alert" role="status">
+                <h3>Frequency drift watch</h3>
+                <p>
+                  The north feeder is holding within tolerance, but dispatchers should monitor generator handoff
+                  during the next production shift. This animated indicator should stop when Stop Animations is enabled.
+                </p>
+              </div>
+              <div class="media-panel" style="margin-top: 18px;">
+                <video
+                  id="layout-background-video"
+                  controls
+                  loop
+                  title="Muted field inspection video"
+                  src="data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDE="
+                ></video>
+                <div class="media-body">
+                  <h3>Field inspection recording</h3>
+                  <p>
+                    Video and audio controls are included so Mute Sound can be tested against existing media elements.
+                  </p>
+                  <audio
+                    controls
+                    title="Dispatch audio sample"
+                    src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA="
+                  ></audio>
+                </div>
+              </div>
+            </div>
+
+            <aside id="layout-aside" class="sidebar-panel" aria-labelledby="sidebar-title">
+              <h2 id="sidebar-title">Dispatch Notes</h2>
+              <p>
+                Side content gives Reading Mode something meaningful to suppress. It also gives Page Structure
+                a secondary landmark to list.
+              </p>
+              <h3>Shift checklist</h3>
+              <ul>
+                <li>Confirm protective relay status before generator transfer.</li>
+                <li>Review open work orders with site operations.</li>
+                <li>Verify the accessibility widget remains outside reading mode transformations.</li>
+              </ul>
+              <a href="#contact">Send a field note</a>
+            </aside>
+          </div>
+        </section>
+
+        <section id="reports" class="section" aria-labelledby="reports-title">
+          <div class="section-grid">
+            <div>
+              <p class="eyebrow">Reports</p>
+              <h2 id="reports-title">Reliability report with table content.</h2>
+              <p class="section-lede">
+                Tables, status tags, and dense text help verify spacing and contrast settings in enterprise-style content.
+              </p>
+            </div>
+            <div>
+              <table class="report-table">
+                <caption>
+                  Monthly reliability summary
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Facility</th>
+                    <th scope="col">Risk</th>
+                    <th scope="col">Finding</th>
+                    <th scope="col">Owner</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Press Hall A</td>
+                    <td><span class="status">Watch</span></td>
+                    <td>Battery room temperature rose above baseline for 42 minutes.</td>
+                    <td>Electrical maintenance</td>
+                  </tr>
+                  <tr>
+                    <td>Cold Storage</td>
+                    <td><span class="status">Stable</span></td>
+                    <td>Generator exercise completed with no transfer delay.</td>
+                    <td>Facilities</td>
+                  </tr>
+                  <tr>
+                    <td>Solar Yard West</td>
+                    <td><span class="status">Action</span></td>
+                    <td>String 14 underperformed after cleaning cycle.</td>
+                    <td>Renewables team</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="contact" class="section" aria-labelledby="contact-title">
+          <div class="section-grid">
+            <div>
+              <p class="eyebrow">Contact</p>
+              <h2 id="contact-title">Plan a maintenance window.</h2>
+              <p class="section-lede">
+                Form fields are included for focus highlighting, tab order checks, click-to-read values,
+                and magnifier behavior around controls.
+              </p>
+            </div>
+            <form class="form-panel" action="#contact" method="get">
+              <div class="form-grid">
+                <div class="field">
+                  <label for="name">Name</label>
+                  <input id="name" name="name" value="Jordan Lee" autocomplete="name">
+                </div>
+                <div class="field">
+                  <label for="site">Facility type</label>
+                  <select id="site" name="site">
+                    <option>Manufacturing campus</option>
+                    <option>Cold storage</option>
+                    <option>Solar field</option>
+                  </select>
+                </div>
+                <div class="field full">
+                  <label for="priority">Maintenance priority</label>
+                  <input
+                    id="priority"
+                    name="priority"
+                    placeholder="Example: inverter alarms, battery room thermal sweep, generator handoff"
+                  >
+                </div>
+                <div class="field full">
+                  <label for="details">Operational notes</label>
+                  <textarea id="details" name="details">Production cannot stop between 08:00 and 19:00. Please schedule the inspection during the night maintenance window.</textarea>
+                </div>
+              </div>
+              <p>
+                By submitting this sample form, you confirm that this fixture is only for local widget testing.
+              </p>
+              <button class="button" type="submit">Submit sample request</button>
+            </form>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <p>Northstar Grid Works, sample company site for A11yAudit Assist Widget testing.</p>
+        <nav aria-label="Footer navigation">
+          <a href="#top">Back to top</a>
+        </nav>
+      </footer>
+    </div>
+
+    <script src="/a11yaudit-assist.js" data-project="demo" data-position="bottom-right"></script>
+  </body>
+</html>

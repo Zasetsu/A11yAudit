@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Assist Widget Animation Fixture</title>
+    <style>
+      @keyframes drift {
+        from { transform: translateX(0); }
+        to { transform: translateX(30px); }
+      }
+
+      #animated-box {
+        animation: drift 1s linear infinite;
+        width: 80px;
+        height: 80px;
+        background: #4147ea;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Animation Fixture</h1>
+      <div id="animated-box"></div>
+      <div id="transformed-box" style="transform: translateX(20px); transition: transform 200ms ease;">Transformed</div>
+      <div id="dynamic-target"></div>
+    </main>
+    <script>
+      window.addDynamicAnimatedElement = () => {
+        const element = document.createElement("div");
+        element.id = "dynamic-animated-box";
+        element.style.animation = "drift 1s linear infinite";
+        element.style.transform = "scale(1.2)";
+        element.textContent = "Dynamic animated element";
+        document.getElementById("dynamic-target").append(element);
+      };
+    </script>
+  </body>
+</html>

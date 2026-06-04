@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Assist Widget Layout Fixture</title>
+    <style>
+      .grid-layout {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+
+      .flex-layout {
+        display: flex;
+        gap: 16px;
+      }
+
+      .background-video {
+        width: 240px;
+        height: 120px;
+        background: #111827;
+      }
+
+      .popup-like {
+        position: fixed;
+        right: 24px;
+        top: 24px;
+        padding: 16px;
+        background: #fff;
+        border: 1px solid #111827;
+      }
+    </style>
+  </head>
+  <body>
+    <nav id="layout-nav">Navigation content</nav>
+    <aside id="layout-aside">Aside content</aside>
+    <div id="layout-popup" class="popup-like" role="dialog" aria-label="Promotional dialog">Popup content</div>
+    <video id="layout-background-video" class="background-video" muted loop></video>
+    <main>
+      <h1>Layout Fixture</h1>
+      <div class="grid-layout">
+        <p>Grid item one</p>
+        <p>Grid item two</p>
+      </div>
+      <div class="flex-layout">
+        <p>Flex item one</p>
+        <p>Flex item two</p>
+      </div>
+    </main>
+  </body>
+</html>
