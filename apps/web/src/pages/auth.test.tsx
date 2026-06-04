@@ -82,8 +82,14 @@ const newProject = project({
   domain: "new.example.test"
 });
 
+const ROUTE_BASE = "/app";
+
+function withBase(pathname: string) {
+  return pathname === "/" ? ROUTE_BASE : ROUTE_BASE + pathname;
+}
+
 function setPath(pathname: string) {
-  window.history.replaceState(null, "", pathname);
+  window.history.replaceState(null, "", withBase(pathname));
 }
 
 function mockSession(session: AuthSession | null) {
@@ -218,7 +224,7 @@ async function selectOption(container: HTMLElement, label: string, value: string
 
 async function routeTo(pathname: string) {
   await act(async () => {
-    window.history.pushState(null, "", pathname);
+    window.history.pushState(null, "", withBase(pathname));
     window.dispatchEvent(new PopStateEvent("popstate"));
   });
 }
@@ -305,7 +311,7 @@ describe("auth routes", () => {
     const rendered = await renderApp();
     roots.push(rendered.root);
 
-    await waitFor(() => expect(window.location.pathname).toBe("/w/acme/projects"));
+    await waitFor(() => expect(window.location.pathname).toBe(withBase("/w/acme/projects")));
   });
 
   it("redirects unauthenticated workspace routes to login", async () => {
@@ -314,7 +320,7 @@ describe("auth routes", () => {
     const rendered = await renderApp();
     roots.push(rendered.root);
 
-    await waitFor(() => expect(window.location.pathname).toBe("/login"));
+    await waitFor(() => expect(window.location.pathname).toBe(withBase("/login")));
   });
 
   it("redirects multiple-workspace sessions to workspace chooser", async () => {
@@ -322,7 +328,7 @@ describe("auth routes", () => {
     const rendered = await renderApp();
     roots.push(rendered.root);
 
-    await waitFor(() => expect(window.location.pathname).toBe("/workspaces"));
+    await waitFor(() => expect(window.location.pathname).toBe(withBase("/workspaces")));
   });
 
   it("does not instantiate workspace dashboard queries on public or workspace chooser routes", async () => {
@@ -348,7 +354,7 @@ describe("auth routes", () => {
     const workspaceChooser = await renderApp();
     roots.push(workspaceChooser.root);
 
-    await waitFor(() => expect(window.location.pathname).toBe("/workspaces"));
+    await waitFor(() => expect(window.location.pathname).toBe(withBase("/workspaces")));
     expect(dashboardQueryKeys(workspaceChooser)).toEqual([]);
     expect(api.getProjects).not.toHaveBeenCalled();
     expect(api.getScans).not.toHaveBeenCalled();
@@ -368,7 +374,7 @@ describe("auth routes", () => {
     await clickButton(rendered.container, "Sign in");
 
     await waitFor(() => expect(api.login).toHaveBeenCalledWith({ email: "ada@example.test", password: "secret" }));
-    await waitFor(() => expect(window.location.pathname).toBe("/w/acme/projects"));
+    await waitFor(() => expect(window.location.pathname).toBe(withBase("/w/acme/projects")));
   });
 
   it("submits signup and redirects to the workspace route", async () => {
@@ -390,7 +396,7 @@ describe("auth routes", () => {
       password: "secret",
       workspaceName: "Acme"
     }));
-    await waitFor(() => expect(window.location.pathname).toBe("/w/acme/projects"));
+    await waitFor(() => expect(window.location.pathname).toBe(withBase("/w/acme/projects")));
   });
 
   it("submits invite acceptance with token and redirects to the workspace route", async () => {
@@ -410,7 +416,7 @@ describe("auth routes", () => {
       fullName: "Ada Lovelace",
       password: "secret"
     }));
-    await waitFor(() => expect(window.location.pathname).toBe("/w/acme/projects"));
+    await waitFor(() => expect(window.location.pathname).toBe(withBase("/w/acme/projects")));
   });
 
   it("keeps a logged-in user on the invite page instead of redirecting to the dashboard", async () => {
@@ -425,7 +431,7 @@ describe("auth routes", () => {
       );
       expect(acceptButton).toBeTruthy();
     });
-    expect(window.location.pathname).toBe("/invite/token-123");
+    expect(window.location.pathname).toBe(withBase("/invite/token-123"));
   });
 
   it("signs out from the top bar and returns to login", async () => {
@@ -448,7 +454,7 @@ describe("auth routes", () => {
     });
 
     await waitFor(() => expect(api.logout).toHaveBeenCalled());
-    await waitFor(() => expect(window.location.pathname).toBe("/login"));
+    await waitFor(() => expect(window.location.pathname).toBe(withBase("/login")));
   });
 
   it("does not retain new scan state when switching workspace routes", async () => {
@@ -554,7 +560,7 @@ describe("auth routes", () => {
     await clickButtonContaining(rendered.container, "/acme");
     await clickButtonContaining(rendered.container, "/beta");
 
-    await waitFor(() => expect(window.location.pathname).toBe("/w/beta/projects"));
+    await waitFor(() => expect(window.location.pathname).toBe(withBase("/w/beta/projects")));
     await waitFor(() => expect(api.getProjects).toHaveBeenCalledWith("beta"));
     expect(dashboardQueryKeys(rendered)).toContainEqual(["projects", "beta"]);
   });

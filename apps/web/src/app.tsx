@@ -57,19 +57,34 @@ const workspacePages = new Set<Exclude<WorkspacePage, "finding-detail" | "scan-r
   "docs"
 ]);
 
+const ROUTE_BASE = "/app";
+
+function stripRouteBase(pathname: string): string {
+  if (pathname === ROUTE_BASE) return "/";
+  if (pathname.startsWith(ROUTE_BASE + "/")) return pathname.slice(ROUTE_BASE.length) || "/";
+  return pathname; // already un-prefixed (e.g. in tests) — parse as-is
+}
+
+function withRouteBase(p: string): string {
+  // p is an un-prefixed path starting with "/", e.g. "/login" or "/w/x/scan-runs"
+  return p === "/" ? ROUTE_BASE : ROUTE_BASE + p;
+}
+
 function routePath(route: AppRoute): string {
-  if (route.page === "login") return "/login";
-  if (route.page === "signup") return "/signup";
-  if (route.page === "workspaces") return "/workspaces";
-  if (route.page === "invite") return `/invite/${encodeURIComponent(route.token)}`;
-  if (route.page === "finding-detail") {
-    return `/w/${encodeURIComponent(route.workspaceSlug)}/findings/${encodeURIComponent(route.findingId)}`;
-  }
-  if (route.page === "scan-run-detail") {
-    return `/w/${encodeURIComponent(route.workspaceSlug)}/scan-runs/${encodeURIComponent(route.scanRunId)}`;
+  let path: string;
+  if (route.page === "login") path = "/login";
+  else if (route.page === "signup") path = "/signup";
+  else if (route.page === "workspaces") path = "/workspaces";
+  else if (route.page === "invite") path = `/invite/${encodeURIComponent(route.token)}`;
+  else if (route.page === "finding-detail") {
+    path = `/w/${encodeURIComponent(route.workspaceSlug)}/findings/${encodeURIComponent(route.findingId)}`;
+  } else if (route.page === "scan-run-detail") {
+    path = `/w/${encodeURIComponent(route.workspaceSlug)}/scan-runs/${encodeURIComponent(route.scanRunId)}`;
+  } else {
+    path = `/w/${encodeURIComponent(route.workspaceSlug)}/${route.page}`;
   }
 
-  return `/w/${encodeURIComponent(route.workspaceSlug)}/${route.page}`;
+  return withRouteBase(path);
 }
 
 function isWorkspaceRoute(route: AppRoute): route is Route & { workspaceSlug: string } {
@@ -348,7 +363,7 @@ function DashboardApp({
 
 export function App() {
   const { t } = useT();
-  const [appRoute, setAppRoute] = useState<AppRoute>(() => parsePath(window.location.pathname));
+  const [appRoute, setAppRoute] = useState<AppRoute>(() => parsePath(stripRouteBase(window.location.pathname)));
   const [authenticatedSession, setAuthenticatedSession] = useState<AuthSession | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     const storage = globalThis.localStorage;
@@ -402,7 +417,7 @@ export function App() {
 
   useEffect(() => {
     function onPopState() {
-      setAppRoute(parsePath(window.location.pathname));
+      setAppRoute(parsePath(stripRouteBase(window.location.pathname)));
     }
 
     window.addEventListener("popstate", onPopState);
