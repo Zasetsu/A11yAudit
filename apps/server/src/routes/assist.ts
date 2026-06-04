@@ -3,6 +3,8 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import type { FastifyInstance, FastifyReply } from "fastify";
+import type { SqliteDatabase } from "../db/client.js";
+import { getWidgetConfig } from "../repositories/widget-config.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const BUNDLE_RELATIVE = "packages/assist-widget/dist/a11yaudit-assist.js";
@@ -61,7 +63,13 @@ async function serveAsset(
   }
 }
 
-export async function registerAssistRoutes(server: FastifyInstance): Promise<void> {
+export interface AssistRouteOptions {
+  db: SqliteDatabase;
+}
+
+export async function registerAssistRoutes(server: FastifyInstance, options: AssistRouteOptions): Promise<void> {
+  const { db } = options;
+
   server.get("/assist/a11yaudit-assist.js", async (_request, reply) =>
     serveAsset(resolveBundlePath, "", "text/javascript; charset=utf-8", reply)
   );
@@ -69,4 +77,32 @@ export async function registerAssistRoutes(server: FastifyInstance): Promise<voi
   server.get("/assist/a11yaudit-assist.js.map", async (_request, reply) =>
     serveAsset(resolveBundlePath, ".map", "application/json; charset=utf-8", reply)
   );
+
+  // Per-project bundle: inline config prelude + the shared bundle bytes.
+  server.get<{ Params: { projectId: string } }>("/assist/:projectId.js", async (request, reply) => {
+    const { projectId } = request.params;
+    if (projectId === "a11yaudit-assist") {
+      return serveAsset(resolveBundlePath, "", "text/javascript; charset=utf-8", reply);
+    }
+
+    const bundlePath = resolveBundlePath();
+    if (bundlePath === undefined) {
+      return reply.code(404).send({ error: "assist widget bundle not built" });
+    }
+
+    const config = getWidgetConfig(db, projectId);
+    const prelude = `window.__AA_ASSIST_CONFIG__=${JSON.stringify(config)};\n`;
+
+    try {
+      const bundle = await readFile(bundlePath, "utf8");
+      return reply
+        .header("content-type", "text/javascript; charset=utf-8")
+        .header("access-control-allow-origin", "*")
+        .header("access-control-allow-credentials", "false")
+        .header("cache-control", "public, max-age=60")
+        .send(prelude + bundle);
+    } catch {
+      return reply.code(404).send({ error: "assist widget bundle not built" });
+    }
+  });
 }
