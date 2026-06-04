@@ -15,6 +15,7 @@ export interface PanelOptions {
   preferences: AssistPreferences;
   pageStructure?: PageStructure | null;
   enabledSections?: ReadonlySet<AssistSection>;
+  disabledFeatures?: readonly string[];
   strings: WidgetStrings;
   onToggle: (path: PreferencePath) => void;
   onStep: (path: PreferencePath) => void;
@@ -166,6 +167,11 @@ function sectionEnabled(options: PanelOptions, section: AssistSection): boolean 
 }
 
 function appendSection(container: HTMLElement, titleText: string, controls: Control[], options: PanelOptions): void {
+  const disabled = options.disabledFeatures;
+  const visibleControls = disabled?.length
+    ? controls.filter((c) => !disabled.includes(c.path.split(".")[1] ?? ""))
+    : controls;
+
   const section = document.createElement("section");
   section.className = "aa-assist-section";
 
@@ -176,7 +182,7 @@ function appendSection(container: HTMLElement, titleText: string, controls: Cont
   const grid = document.createElement("div");
   grid.className = "aa-assist-grid";
 
-  for (const control of controls) {
+  for (const control of visibleControls) {
     grid.append(renderControl(control, options));
   }
 
@@ -194,6 +200,7 @@ function renderControl(control: Control, options: PanelOptions): HTMLButtonEleme
   button.type = "button";
   button.className = "aa-assist-control";
   button.dataset.aaAssistPath = control.path;
+  button.dataset.aaFeature = control.path.split(".")[1] ?? "";
   button.setAttribute("aria-pressed", String(isPressed));
   button.setAttribute("aria-label", `${localizedLabel} ${value}`);
   button.addEventListener("click", () => {

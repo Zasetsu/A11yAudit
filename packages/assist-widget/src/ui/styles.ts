@@ -37,6 +37,10 @@ export const WIDGET_CSS = `
 }
 
 :host { --aa-acc:#2b56b0; --aa-acc-bg:#eef1fb; }
+:host([data-theme="dark"]) .aa-assist-panel { background:#1b1d22; color:#e8eaed; border-color:#2c2f36; }
+:host([data-theme="dark"]) .aa-assist-control { background:#23262d; color:#e8eaed; border-color:#2c2f36; }
+:host([data-theme="dark"]) .aa-assist-header { border-color:#2c2f36; }
+:host([data-theme="dark"]) .aa-assist-close { background:#23262d; color:#aeb3bb; border-color:#2c2f36; }
 .aa-assist-launcher {
   width:52px;height:52px;border:0;border-radius:14px;background:var(--aa-acc);color:#fff;cursor:pointer;
   display:flex;align-items:center;justify-content:center;box-shadow:0 12px 26px rgba(43,86,176,.34);

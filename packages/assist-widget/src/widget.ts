@@ -1,5 +1,5 @@
 import { ASSIST_SECTIONS, DEFAULT_WIDGET_LOCALE, STORAGE_KEY, type AssistSection, type WidgetLocale } from "./config.js";
-import type { WidgetConfig } from "./widget-config.js";
+import { DEFAULT_WIDGET_CONFIG, type WidgetConfig } from "./widget-config.js";
 import { ClassManager } from "./effects/class-manager.js";
 import { COLOR_CLASSES, COLOR_CSS, colorClassForStep, type ColorStepFeature } from "./effects/color-preferences.js";
 import { FontPreferences } from "./effects/font-preferences.js";
@@ -95,6 +95,33 @@ export function mountAssistWidget(options: AssistWidgetOptions = {}): AssistWidg
   launcherIcon.innerHTML = widgetIcon("launcher");
   launcher.append(launcherIcon);
 
+  // Apply widget config (brand, customCss, disabledFeatures)
+  const config = options.config ?? DEFAULT_WIDGET_CONFIG;
+
+  // accent — inline style on host overrides the :host CSS default
+  root.style.setProperty("--aa-acc", config.brand.accent);
+
+  // theme — attribute the stylesheet dark-mode rules key off
+  root.dataset.theme = config.brand.theme;
+
+  // custom CSS injected into shadow root after base stylesheet (included in every render)
+  let customStyle: HTMLStyleElement | null = null;
+  if (config.customCss) {
+    customStyle = document.createElement("style");
+    customStyle.setAttribute("data-aa-custom", "true");
+    customStyle.textContent = config.customCss;
+  }
+
+  // launcher label override
+  if (config.brand.launcherLabel) {
+    launcher.setAttribute("aria-label", config.brand.launcherLabel);
+  }
+
+  // launcher icon override (pre-sanitized by normalizeWidgetConfig)
+  if (config.brand.launcherIcon && config.brand.launcherIcon !== "default") {
+    launcherIcon.innerHTML = config.brand.launcherIcon;
+  }
+
   const styleManager = new StyleManager();
   const classManager = new ClassManager();
   const resetManager = new ResetManager();
@@ -153,6 +180,7 @@ export function mountAssistWidget(options: AssistWidgetOptions = {}): AssistWidg
         preferences,
         pageStructure,
         enabledSections,
+        disabledFeatures: config.disabledFeatures,
         strings,
         onToggle: updateToggle,
         onStep: updateStep,
@@ -163,7 +191,7 @@ export function mountAssistWidget(options: AssistWidgetOptions = {}): AssistWidg
       panel.setAttribute("lang", locale);
     }
 
-    const children: Node[] = [widgetStyle];
+    const children: Node[] = customStyle ? [widgetStyle, customStyle] : [widgetStyle];
     if (root.dataset.position?.startsWith("top")) {
       children.push(launcher);
       if (panel) children.push(panel);
