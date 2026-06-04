@@ -1,8 +1,10 @@
 import { FormEvent, useState } from "react";
 import { signup, type AuthSession } from "../api/client";
 import { Button, Field, PageHeader, Panel, TextInput } from "../design/ui";
+import { useT } from "../i18n/locale-context.js";
 
 export function SignupPage({ onAuthenticated }: { onAuthenticated: (session: AuthSession) => void }) {
+  const { t } = useT();
   const [error, setError] = useState<string | null>(null);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -18,30 +20,30 @@ export function SignupPage({ onAuthenticated }: { onAuthenticated: (session: Aut
         workspaceName: String(formData.get("workspaceName") ?? "")
       }));
     } catch {
-      setError("Account creation failed. Check the details and try again.");
+      setError(t("auth.signupFailed"));
     }
   }
 
   return (
     <main aria-label="Main content" className="content auth-content">
       <div className="content-inner fadein">
-        <PageHeader icon="shield-check" subtitle="Create an account and workspace." title="Create account" />
-        <Panel title="Account details">
+        <PageHeader icon="shield-check" subtitle={t("auth.createSubtitle")} title={t("auth.createAccount")} />
+        <Panel title={t("auth.accountDetails")}>
           <form className="form-grid" onSubmit={submit}>
-            <Field label="Full name">
+            <Field label={t("auth.fullName")}>
               <TextInput autoComplete="name" name="fullName" required />
             </Field>
-            <Field label="Email">
+            <Field label={t("auth.email")}>
               <TextInput autoComplete="email" name="email" required type="email" />
             </Field>
-            <Field label="Password">
+            <Field label={t("auth.password")}>
               <TextInput autoComplete="new-password" name="password" required type="password" />
             </Field>
-            <Field label="Workspace name">
+            <Field label={t("auth.workspaceName")}>
               <TextInput name="workspaceName" required />
             </Field>
             {error ? <div className="error-text">{error}</div> : null}
-            <Button type="submit" variant="primary">Create account</Button>
+            <Button type="submit" variant="primary">{t("auth.createAccount")}</Button>
           </form>
         </Panel>
       </div>

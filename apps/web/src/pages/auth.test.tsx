@@ -5,7 +5,9 @@ import { createRoot, type Root } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App, parsePath } from "../app";
+import { LoginPage } from "./login";
 import { LocaleProvider } from "../i18n/locale-context.js";
+import { renderWithLocale } from "../test-utils/render-with-locale.js";
 import type { AuthSession } from "../api/client";
 import type { Project, ScanRun } from "../data";
 
@@ -267,6 +269,15 @@ describe("auth routes", () => {
     }
     roots = [];
     document.body.innerHTML = "";
+  });
+
+  it("renders the Turkish sign-in heading when locale is tr", () => {
+    const rendered = renderWithLocale(<LoginPage onAuthenticated={() => {}} />, "tr");
+    try {
+      expect(rendered.container.textContent).toContain("Giriş Yap");
+    } finally {
+      rendered.unmount();
+    }
   });
 
   it("parses public and workspace browser paths", () => {

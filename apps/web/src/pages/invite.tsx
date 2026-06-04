@@ -1,8 +1,10 @@
 import { FormEvent, useState } from "react";
 import { acceptInvite, type AuthSession } from "../api/client";
 import { Button, Field, PageHeader, Panel, TextInput } from "../design/ui";
+import { useT } from "../i18n/locale-context.js";
 
 export function InvitePage({ token, onAuthenticated }: { token: string; onAuthenticated: (session: AuthSession) => void }) {
+  const { t } = useT();
   const [error, setError] = useState<string | null>(null);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -17,27 +19,27 @@ export function InvitePage({ token, onAuthenticated }: { token: string; onAuthen
         password: String(formData.get("password") ?? "")
       }));
     } catch {
-      setError("Invite acceptance failed. Check the invite and try again.");
+      setError(t("auth.inviteFailed"));
     }
   }
 
   return (
     <main aria-label="Main content" className="content auth-content">
       <div className="content-inner fadein">
-        <PageHeader icon="shield-check" subtitle="Join a workspace with your invitation." title="Accept invite" />
-        <Panel title="Account details">
+        <PageHeader icon="shield-check" subtitle={t("auth.acceptSubtitle")} title={t("auth.acceptInvite")} />
+        <Panel title={t("auth.accountDetails")}>
           <form className="form-grid" onSubmit={submit}>
-            <Field label="Full name">
+            <Field label={t("auth.fullName")}>
               <TextInput autoComplete="name" name="fullName" required />
             </Field>
-            <Field label="Email">
+            <Field label={t("auth.email")}>
               <TextInput autoComplete="email" name="email" required type="email" />
             </Field>
-            <Field label="Password">
+            <Field label={t("auth.password")}>
               <TextInput autoComplete="new-password" name="password" required type="password" />
             </Field>
             {error ? <div className="error-text">{error}</div> : null}
-            <Button type="submit" variant="primary">Accept invite</Button>
+            <Button type="submit" variant="primary">{t("auth.acceptInvite")}</Button>
           </form>
         </Panel>
       </div>
