@@ -11,10 +11,34 @@ afterAll(async () => {
   await browser.close();
 });
 
+async function forceEnglish(page: import("playwright").Page): Promise<void> {
+  await page.evaluate(() => {
+    document.documentElement.lang = "en";
+  });
+}
+
 describe("AssistWidget", () => {
+  it("defaults to the Turkish catalog when no language is configured", async () => {
+    const page = await browser.newPage();
+    await page.setContent("<main><p id='copy'>Readable copy</p></main>");
+
+    await page.addScriptTag({ path: "packages/assist-widget/dist/a11yaudit-assist.js" });
+
+    const launcher = page.getByRole("button", { name: "Erişilebilirlik tercihlerini aç" });
+    expect(await launcher.count()).toBe(1);
+
+    await launcher.click();
+
+    const panel = page.getByRole("dialog", { name: "Erişilebilirlik Tercihleri" });
+    expect(await panel.isVisible()).toBe(true);
+    expect(await page.getByRole("button", { name: /Yazı Boyutu/ }).count()).toBe(1);
+    await page.close();
+  });
+
   it("mounts the built bundle, opens the preferences panel, applies line height, and clears it", async () => {
     const page = await browser.newPage();
     await page.setContent("<main><p id='copy'>Readable copy</p></main>");
+    await forceEnglish(page);
 
     await page.addScriptTag({ path: "packages/assist-widget/dist/a11yaudit-assist.js" });
 
@@ -47,6 +71,7 @@ describe("AssistWidget", () => {
       </style>
       <main><p id="copy">Readable copy</p></main>
     `);
+    await forceEnglish(page);
 
     await page.addScriptTag({ path: "packages/assist-widget/dist/a11yaudit-assist.js" });
 
@@ -84,12 +109,13 @@ describe("AssistWidget", () => {
   it("can initialize again after the loader-owned instance is unmounted", async () => {
     const page = await browser.newPage();
     await page.setContent("<main><p>Readable copy</p></main>");
+    await forceEnglish(page);
 
     await page.addScriptTag({ path: "packages/assist-widget/dist/a11yaudit-assist.js" });
 
     await page.evaluate(() => {
       window.__A11Y_AUDIT_ASSIST__?.unmount();
-      window.A11yAuditAssist.initAssistWidget();
+      window.A11yAuditAssist.initAssistWidget({ language: "en" });
     });
 
     const launcher = page.getByRole("button", { name: "Open accessibility preferences" });
@@ -109,6 +135,7 @@ describe("AssistWidget", () => {
         unmount() {}
       };
     });
+    await forceEnglish(page);
 
     await page.addScriptTag({ path: "packages/assist-widget/dist/a11yaudit-assist.js" });
 
@@ -120,10 +147,11 @@ describe("AssistWidget", () => {
     const page = await browser.newPage();
     await page.setContent("<main><p>Readable copy</p></main>");
 
+    await forceEnglish(page);
     await page.addScriptTag({ path: "packages/assist-widget/dist/a11yaudit-assist.js" });
     await page.evaluate(() => {
       window.__A11Y_AUDIT_ASSIST__?.unmount();
-      window.A11yAuditAssist.initAssistWidget({ enabledSections: ["color"] });
+      window.A11yAuditAssist.initAssistWidget({ language: "en", enabledSections: ["color"] });
     });
 
     await page.getByRole("button", { name: "Open accessibility preferences" }).click();
@@ -146,6 +174,7 @@ describe("AssistWidget", () => {
       });
     });
     await page.goto("http://a11yaudit-assist.test/");
+    await forceEnglish(page);
     await page.evaluate(() => {
       window.localStorage.setItem(
         "aa-assist-preferences",

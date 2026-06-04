@@ -29,6 +29,7 @@ import {
   type StepPreference,
   type TogglePreference
 } from "./state.js";
+import { widgetIcon } from "./ui/icons.js";
 import { renderPanel, type PreferencePath } from "./ui/panel.js";
 import { resolveWidgetStrings } from "./ui/messages.js";
 import { PAGE_EFFECT_CSS, WIDGET_CSS } from "./ui/styles.js";
@@ -86,9 +87,11 @@ export function mountAssistWidget(options: AssistWidgetOptions = {}): AssistWidg
   const launcher = document.createElement("button");
   launcher.type = "button";
   launcher.className = "aa-assist-launcher";
-  launcher.setAttribute("aria-label", "Open accessibility preferences");
+  launcher.setAttribute("aria-label", strings.launcherOpen);
   launcher.setAttribute("aria-expanded", "false");
-  launcher.textContent = "Aa";
+  const launcherIcon = document.createElement("span");
+  launcherIcon.innerHTML = widgetIcon("launcher");
+  launcher.append(launcherIcon);
 
   const styleManager = new StyleManager();
   const classManager = new ClassManager();

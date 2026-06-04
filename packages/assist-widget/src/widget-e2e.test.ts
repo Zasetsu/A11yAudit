@@ -213,6 +213,11 @@ async function navigateToFixture(page: Page, fixtureName: string): Promise<void>
 }
 
 async function injectBundle(page: Page): Promise<void> {
+  // The widget defaults to Turkish; force English so the English-string
+  // assertions below resolve via the loader's <html lang> fallback.
+  await page.evaluate(() => {
+    document.documentElement.lang = "en";
+  });
   await page.addScriptTag({ path: bundlePath });
 }
 

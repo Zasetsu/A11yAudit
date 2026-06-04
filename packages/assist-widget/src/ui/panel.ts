@@ -1,12 +1,15 @@
 import type { PageStructure } from "../managers/page-structure.js";
 import type { AssistPreferences, StepPreference, TogglePreference } from "../state.js";
 import type { AssistSection } from "../config.js";
+import { widgetIcon } from "./icons.js";
 import type { WidgetStrings } from "./messages.js";
 
 type SectionName = "content" | "navigation" | "color";
 type PreferenceName = string;
 
 export type PreferencePath = `${SectionName}.${PreferenceName}`;
+
+type StepValueKind = "step" | "pageReader" | "fonts" | "alignment";
 
 export interface PanelOptions {
   preferences: AssistPreferences;
@@ -22,45 +25,42 @@ export interface PanelOptions {
 
 type ToggleControl = {
   kind: "toggle";
-  label: string;
   path: PreferencePath;
   preference: TogglePreference;
 };
 
 type StepControl = {
   kind: "step";
-  label: string;
   path: PreferencePath;
   preference: StepPreference;
-  valueLabel?: (step: StepPreference["step"]) => string;
+  valueKind: StepValueKind;
 };
 
 type Control = ToggleControl | StepControl;
 
-const defaultStepLabel = (step: StepPreference["step"]): string => (step === 0 ? "off" : `step ${step}`);
+function stepValue(control: StepControl, strings: WidgetStrings): string {
+  const step = control.preference.step;
+  if (step === 0) return strings.values.stepOff;
+  switch (control.valueKind) {
+    case "pageReader":
+      return strings.values.pageReader[step - 1] ?? strings.values.step(step);
+    case "fonts":
+      return strings.values.fonts[step - 1] ?? strings.values.step(step);
+    case "alignment":
+      return strings.values.alignment[step - 1] ?? strings.values.step(step);
+    default:
+      return strings.values.step(step);
+  }
+}
 
-const pageReaderLabel = (step: StepPreference["step"]): string => {
-  if (step === 1) return "slow";
-  if (step === 2) return "normal";
-  if (step === 3) return "fast";
-  return "off";
-};
-
-const fontLabel = (step: StepPreference["step"]): string => {
-  if (step === 1) return "dyslexia";
-  if (step === 2) return "readable";
-  if (step === 3) return "bionic";
-  return "off";
-};
-
-const alignmentLabel = (step: StepPreference["step"]): string => {
-  if (step === 1) return "start";
-  if (step === 2) return "center";
-  if (step === 3) return "end";
-  return "off";
-};
+function controlValue(control: Control, strings: WidgetStrings): string {
+  if (control.kind === "step") return stepValue(control, strings);
+  return control.preference.enabled ? strings.values.on : strings.values.off;
+}
 
 export function renderPanel(options: PanelOptions): HTMLElement {
+  const { strings } = options;
+
   const panel = document.createElement("section");
   panel.className = "aa-assist-panel";
   panel.setAttribute("role", "dialog");
@@ -70,63 +70,79 @@ export function renderPanel(options: PanelOptions): HTMLElement {
   const header = document.createElement("div");
   header.className = "aa-assist-header";
 
+  const headerLeft = document.createElement("div");
+  headerLeft.className = "aa-assist-header-left";
+
+  const badge = document.createElement("span");
+  badge.className = "aa-assist-header-badge";
+  badge.innerHTML = widgetIcon("header");
+
   const title = document.createElement("h2");
   title.id = "aa-assist-title";
   title.className = "aa-assist-title";
-  title.textContent = "Accessibility Preferences";
+  title.textContent = strings.title;
+
+  headerLeft.append(badge, title);
 
   const close = document.createElement("button");
   close.type = "button";
   close.className = "aa-assist-close";
-  close.setAttribute("aria-label", "Close accessibility preferences");
-  close.textContent = "x";
+  close.setAttribute("aria-label", strings.closeAria);
   close.dataset.aaAssistAction = "close";
+  const closeIcon = document.createElement("span");
+  closeIcon.innerHTML = widgetIcon("close");
+  close.append(closeIcon);
   close.addEventListener("click", options.onClose);
 
-  header.append(title, close);
+  header.append(headerLeft, close);
   panel.append(header);
 
+  const body = document.createElement("div");
+  body.className = "aa-assist-body";
+
   if (sectionEnabled(options, "content")) {
-    appendSection(panel, "Content Settings", [
-      step("Line Height", "content.lineHeight", options.preferences.content.lineHeight),
-      step("Text Size", "content.textSize", options.preferences.content.textSize),
-      toggle("Large Cursor", "content.largeCursor", options.preferences.content.largeCursor),
-      toggle("Hide Images", "content.hideImages", options.preferences.content.hideImages),
-      toggle("Stop Animations", "content.stopAnimations", options.preferences.content.stopAnimations),
-      toggle("Hints", "content.hints", options.preferences.content.hints),
-      step("Fonts", "content.fonts", options.preferences.content.fonts, fontLabel),
-      step("Text Spacing", "content.textSpacing", options.preferences.content.textSpacing),
-      step("Text Alignment", "content.textAlignment", options.preferences.content.textAlignment, alignmentLabel),
-      toggle("Magnifier", "content.magnifier", options.preferences.content.magnifier)
+    appendSection(body, strings.sections.content, [
+      step("content.lineHeight", options.preferences.content.lineHeight),
+      step("content.textSize", options.preferences.content.textSize),
+      toggle("content.largeCursor", options.preferences.content.largeCursor),
+      toggle("content.hideImages", options.preferences.content.hideImages),
+      toggle("content.stopAnimations", options.preferences.content.stopAnimations),
+      toggle("content.hints", options.preferences.content.hints),
+      step("content.fonts", options.preferences.content.fonts, "fonts"),
+      step("content.textSpacing", options.preferences.content.textSpacing),
+      step("content.textAlignment", options.preferences.content.textAlignment, "alignment"),
+      toggle("content.magnifier", options.preferences.content.magnifier)
     ], options);
   }
 
   if (sectionEnabled(options, "navigation")) {
-    appendSection(panel, "Reading and Navigation", [
-      step("Page Reader", "navigation.pageReader", options.preferences.navigation.pageReader, pageReaderLabel),
-      toggle("Reading Guide", "navigation.readingGuide", options.preferences.navigation.readingGuide),
-      toggle("Reading Mask", "navigation.readingMask", options.preferences.navigation.readingMask),
-      toggle("Highlight Links", "navigation.highlightLinks", options.preferences.navigation.highlightLinks),
-      toggle("Reading Mode", "navigation.readingMode", options.preferences.navigation.readingMode),
-      toggle("Mute Sound", "navigation.muteSound", options.preferences.navigation.muteSound),
-      toggle("Highlight Focus", "navigation.highlightFocus", options.preferences.navigation.highlightFocus),
-      toggle("Page Structure", "navigation.pageStructure", options.preferences.navigation.pageStructure)
+    appendSection(body, strings.sections.navigation, [
+      step("navigation.pageReader", options.preferences.navigation.pageReader, "pageReader"),
+      toggle("navigation.readingGuide", options.preferences.navigation.readingGuide),
+      toggle("navigation.readingMask", options.preferences.navigation.readingMask),
+      toggle("navigation.highlightLinks", options.preferences.navigation.highlightLinks),
+      toggle("navigation.readingMode", options.preferences.navigation.readingMode),
+      toggle("navigation.muteSound", options.preferences.navigation.muteSound),
+      toggle("navigation.highlightFocus", options.preferences.navigation.highlightFocus),
+      toggle("navigation.pageStructure", options.preferences.navigation.pageStructure)
     ], options);
   }
 
   if (sectionEnabled(options, "navigation") && options.preferences.navigation.pageStructure.enabled && options.pageStructure) {
-    panel.append(renderStructure(options.pageStructure, options.onStructureJump));
+    body.append(renderStructure(options.pageStructure, strings, options.onStructureJump));
   }
 
   if (sectionEnabled(options, "color")) {
-    appendSection(panel, "Color", [
-      toggle("Monochrome", "color.monochrome", options.preferences.color.monochrome),
-      step("Saturation", "color.saturation", options.preferences.color.saturation),
-      step("Smart Contrast", "color.smartContrast", options.preferences.color.smartContrast),
-      step("Brightness", "color.brightness", options.preferences.color.brightness),
-      step("Contrast", "color.contrast", options.preferences.color.contrast)
+    appendSection(body, strings.sections.color, [
+      toggle("color.monochrome", options.preferences.color.monochrome),
+      step("color.saturation", options.preferences.color.saturation),
+      step("color.smartContrast", options.preferences.color.smartContrast),
+      step("color.brightness", options.preferences.color.brightness),
+      step("color.contrast", options.preferences.color.contrast)
     ], options);
   }
+
+  panel.append(body);
 
   const footer = document.createElement("div");
   footer.className = "aa-assist-footer";
@@ -134,9 +150,9 @@ export function renderPanel(options: PanelOptions): HTMLElement {
   const clear = document.createElement("button");
   clear.type = "button";
   clear.className = "aa-assist-clear";
-  clear.setAttribute("aria-label", "Clear Preferences");
+  clear.setAttribute("aria-label", strings.clear);
   clear.dataset.aaAssistAction = "clear";
-  clear.textContent = "Clear Preferences";
+  clear.textContent = strings.clear;
   clear.addEventListener("click", options.onClear);
 
   footer.append(clear);
@@ -149,7 +165,7 @@ function sectionEnabled(options: PanelOptions, section: AssistSection): boolean 
   return options.enabledSections?.has(section) ?? true;
 }
 
-function appendSection(panel: HTMLElement, titleText: string, controls: Control[], options: PanelOptions): void {
+function appendSection(container: HTMLElement, titleText: string, controls: Control[], options: PanelOptions): void {
   const section = document.createElement("section");
   section.className = "aa-assist-section";
 
@@ -165,19 +181,21 @@ function appendSection(panel: HTMLElement, titleText: string, controls: Control[
   }
 
   section.append(title, grid);
-  panel.append(section);
+  container.append(section);
 }
 
 function renderControl(control: Control, options: PanelOptions): HTMLButtonElement {
+  const { strings } = options;
   const isPressed = control.preference.enabled;
-  const value = control.kind === "step" ? (control.valueLabel ?? defaultStepLabel)(control.preference.step) : isPressed ? "on" : "off";
+  const value = controlValue(control, strings);
+  const localizedLabel = strings.controls[control.path] ?? control.path;
 
   const button = document.createElement("button");
   button.type = "button";
   button.className = "aa-assist-control";
   button.dataset.aaAssistPath = control.path;
   button.setAttribute("aria-pressed", String(isPressed));
-  button.setAttribute("aria-label", `${control.label} ${value}`);
+  button.setAttribute("aria-label", `${localizedLabel} ${value}`);
   button.addEventListener("click", () => {
     if (control.kind === "step") {
       options.onStep(control.path);
@@ -186,26 +204,35 @@ function renderControl(control: Control, options: PanelOptions): HTMLButtonEleme
     }
   });
 
-  const label = document.createElement("span");
-  label.className = "aa-assist-control-label";
-  label.textContent = control.label;
+  const top = document.createElement("div");
+  top.className = "aa-assist-control-top";
+
+  const chip = document.createElement("span");
+  chip.className = "aa-assist-control-chip";
+  chip.innerHTML = widgetIcon(control.path);
 
   const status = document.createElement("span");
   status.className = "aa-assist-control-value";
   status.textContent = value;
 
-  button.append(label, status);
+  top.append(chip, status);
+
+  const label = document.createElement("span");
+  label.className = "aa-assist-control-label";
+  label.textContent = localizedLabel;
+
+  button.append(top, label);
   return button;
 }
 
-function renderStructure(structure: PageStructure, onStructureJump: (id: string) => void): HTMLElement {
+function renderStructure(structure: PageStructure, strings: WidgetStrings, onStructureJump: (id: string) => void): HTMLElement {
   const wrapper = document.createElement("section");
   wrapper.className = "aa-assist-structure";
-  wrapper.setAttribute("aria-label", "Page Structure");
+  wrapper.setAttribute("aria-label", strings.structure.aria);
 
-  appendStructureGroup(wrapper, "Headings", structure.headings, onStructureJump);
-  appendStructureGroup(wrapper, "Links", structure.links, onStructureJump);
-  appendStructureGroup(wrapper, "Landmarks", structure.landmarks, onStructureJump);
+  appendStructureGroup(wrapper, strings.structure.headings, structure.headings, onStructureJump);
+  appendStructureGroup(wrapper, strings.structure.links, structure.links, onStructureJump);
+  appendStructureGroup(wrapper, strings.structure.landmarks, structure.landmarks, onStructureJump);
 
   return wrapper;
 }
@@ -241,15 +268,10 @@ function appendStructureGroup(
   wrapper.append(group);
 }
 
-function toggle(label: string, path: PreferencePath, preference: TogglePreference): ToggleControl {
-  return { kind: "toggle", label, path, preference };
+function toggle(path: PreferencePath, preference: TogglePreference): ToggleControl {
+  return { kind: "toggle", path, preference };
 }
 
-function step(
-  label: string,
-  path: PreferencePath,
-  preference: StepPreference,
-  valueLabel?: (step: StepPreference["step"]) => string
-): StepControl {
-  return { kind: "step", label, path, preference, valueLabel };
+function step(path: PreferencePath, preference: StepPreference, valueKind: StepValueKind = "step"): StepControl {
+  return { kind: "step", path, preference, valueKind };
 }
