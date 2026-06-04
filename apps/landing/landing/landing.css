@@ -404,7 +404,6 @@ html.theme-light .hero-mock-glow{background:radial-gradient(60% 100% at 50% 0%, 
 /* ============ responsive ============ */
 @media (max-width:980px){
   .nav-links{display:none;}
-  .nav-app{display:none;}
   .nav-toggle{display:flex;}
   .hero-B .split{grid-template-columns:1fr;gap:38px;}
   .assist-demo{grid-template-columns:1fr;}
