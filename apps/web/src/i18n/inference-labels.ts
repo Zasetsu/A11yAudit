@@ -33,8 +33,10 @@ export function areaLabel(area: string, locale: Locale): string {
 }
 
 // CMS hint is optional enrichment (e.g. Elementor/WordPress, proper nouns kept as-is).
-// When the engine found no CMS signal it returns "none" — show a neutral dash instead.
-export function cmsLabel(cms: string): string {
-  if (cms === "none") return "—";
+// When the engine found no CMS signal it returns "none"; show a localized "absent" label.
+const CMS_NONE: Record<Locale, string> = { tr: "Yok", en: "None" };
+
+export function cmsLabel(cms: string, locale: Locale): string {
+  if (cms === "none") return CMS_NONE[locale];
   return cms;
 }

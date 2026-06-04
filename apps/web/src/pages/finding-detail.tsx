@@ -47,7 +47,7 @@ export function FindingDetailPage({ workspaceSlug, findings, issues, findingId, 
               <div className="kv"><span>{t("finding.occurrences")}</span><strong className="tnum">{issue.occurrences}</strong></div>
               <div className="kv"><span>{t("finding.likelyScope")}</span><strong>{scopeLabel(issue.likelyScope, locale)}</strong></div>
               <div className="kv"><span>{t("finding.componentArea")}</span><strong>{areaLabel(issue.componentArea, locale)}</strong></div>
-              <div className="kv"><span>{t("finding.cmsHint")}</span><strong>{cmsLabel(issue.cmsHint)}</strong></div>
+              <div className="kv"><span>{t("finding.cmsHint")}</span><strong>{cmsLabel(issue.cmsHint, locale)}</strong></div>
               <div className="kv"><span>{t("finding.confidence")}</span><strong>{confidenceLabel(issue.confidence, t)}</strong></div>
               <div className="kv"><span>{t("finding.representativeUrl")}</span><strong className="mono break-text">{issue.representativeUrl}</strong></div>
               <div className="kv"><span>{t("finding.representativeSelector")}</span><strong className="mono break-text">{issue.representativeSelector ?? t("common.notCaptured")}</strong></div>

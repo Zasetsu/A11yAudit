@@ -99,7 +99,7 @@ export function FindingsPage({ issues, project, navigate }: PageProps) {
                     <div className="table-sub">{confidenceLabel(issue.confidence, t)}</div>
                   </td>
                   <td>{areaLabel(issue.componentArea, locale)}</td>
-                  <td>{cmsLabel(issue.cmsHint)}</td>
+                  <td>{cmsLabel(issue.cmsHint, locale)}</td>
                   <td className="num tnum">{issue.affectedPages}</td>
                   <td className="num tnum">{issue.occurrences}</td>
                 </tr>

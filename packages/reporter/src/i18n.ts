@@ -62,7 +62,7 @@ const STRINGS: Record<ReportLocale, ReportStrings> = {
     changesOngoing: "devam eden",
     changesResolved: "çözüldü",
     changesResolvedList: "Çözülen sorunlar",
-    changesFirstAudit: "İlk denetim — karşılaştırılacak önceki tarama yok."
+    changesFirstAudit: "İlk denetim: karşılaştırılacak önceki tarama yok."
   },
   en: {
     reportTitle: "Accessibility Audit Report",
@@ -93,7 +93,7 @@ const STRINGS: Record<ReportLocale, ReportStrings> = {
     changesOngoing: "ongoing",
     changesResolved: "resolved",
     changesResolvedList: "Resolved issues",
-    changesFirstAudit: "First audit — no prior scan to compare."
+    changesFirstAudit: "First audit: no prior scan to compare."
   }
 };
 

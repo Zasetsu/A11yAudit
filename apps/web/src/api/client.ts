@@ -157,7 +157,7 @@ type ServerIssue = Partial<Omit<Issue, "severity" | "source" | "certainty" | "co
   sampleUrls?: unknown;
 };
 
-export const CSRF_COOKIE_MISSING_ERROR = "CSRF cookie missing — check cookie/domain configuration";
+export const CSRF_COOKIE_MISSING_ERROR = "CSRF cookie missing: check cookie/domain configuration";
 
 class CsrfCookieMissingError extends Error {
   constructor() {
