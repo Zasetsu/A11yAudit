@@ -80,6 +80,51 @@ describe("renderReportHtml", () => {
     expect(html).toContain("data:image/png;base64,AAA");     // embedded screenshot
   });
 
+  it("renders a Changes-since-last-scan summary in Turkish", () => {
+    const html = renderReportHtml({
+      projectName: "x", domain: "x", score: 75, pagesAudited: 1, findingsTotal: 0,
+      uniqueIssues: 0, totalOccurrences: 0, generatedAt: "2026-06-03T09:14:00.000Z",
+      findings: [], issues: [], pages: [], targetUrl: "https://x", mode: "single_url",
+      locale: "tr", problems: [],
+      diffSummary: { counts: { new: 2, ongoing: 3, resolved: 1 }, resolvedTitles: ["Eski sorun"], hasBaseline: true }
+    });
+    expect(html).toContain("Geçen taramadan beri");
+    expect(html).toContain("çözüldü");
+    expect(html).toContain("Eski sorun");
+  });
+
+  it("renders a first-audit note when there is no baseline", () => {
+    const html = renderReportHtml({
+      projectName: "x", domain: "x", score: 75, pagesAudited: 1, findingsTotal: 0,
+      uniqueIssues: 0, totalOccurrences: 0, generatedAt: "2026-06-03T09:14:00.000Z",
+      findings: [], issues: [], pages: [], targetUrl: "https://x", mode: "single_url",
+      locale: "tr", problems: [],
+      diffSummary: { counts: { new: 5, ongoing: 0, resolved: 0 }, resolvedTitles: [], hasBaseline: false }
+    });
+    expect(html).toContain("İlk denetim");
+  });
+
+  it("renders the English changes title", () => {
+    const html = renderReportHtml({
+      projectName: "x", domain: "x", score: 75, pagesAudited: 1, findingsTotal: 0,
+      uniqueIssues: 0, totalOccurrences: 0, generatedAt: "2026-06-03T09:14:00.000Z",
+      findings: [], issues: [], pages: [], targetUrl: "https://x", mode: "single_url",
+      locale: "en", problems: [],
+      diffSummary: { counts: { new: 1, ongoing: 0, resolved: 0 }, resolvedTitles: [], hasBaseline: true }
+    });
+    expect(html).toContain("Changes since last scan");
+  });
+
+  it("omits the changes section when there is no diffSummary", () => {
+    const html = renderReportHtml({
+      projectName: "x", domain: "x", score: 75, pagesAudited: 1, findingsTotal: 0,
+      uniqueIssues: 0, totalOccurrences: 0, generatedAt: "2026-06-03T09:14:00.000Z",
+      findings: [], issues: [], pages: [], targetUrl: "https://x", mode: "single_url",
+      locale: "tr", problems: []
+    });
+    expect(html).not.toContain("Geçen taramadan beri");
+  });
+
   it("renders a fallback card (generic prose + W3C index link) when the criterion has no content", () => {
     const html = renderReportHtml({
       projectName: "x", domain: "x", score: 50, pagesAudited: 1, findingsTotal: 1,

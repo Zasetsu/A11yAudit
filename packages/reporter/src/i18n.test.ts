@@ -21,4 +21,15 @@ describe("report i18n", () => {
   it("formats the date for the locale", () => {
     expect(formatReportDate("2026-06-03T09:00:00.000Z", "tr")).toContain("2026");
   });
+
+  it("keeps tr and en string keys at parity", () => {
+    const tr = Object.keys(reportStrings("tr")).sort();
+    const en = Object.keys(reportStrings("en")).sort();
+    expect(tr).toEqual(en);
+  });
+
+  it("provides localized changes strings", () => {
+    expect(reportStrings("tr").changesTitle).toBe("Geçen taramadan beri değişiklikler");
+    expect(reportStrings("en").changesTitle).toBe("Changes since last scan");
+  });
 });
