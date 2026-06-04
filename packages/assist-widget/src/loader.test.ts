@@ -19,13 +19,24 @@ describe("parseLoaderOptions", () => {
     });
   });
 
+  it("resolves an explicit Turkish language", () => {
+    const script = {
+      dataset: {
+        project: "project-123",
+        language: "tr"
+      }
+    } as HTMLScriptElement;
+
+    expect(parseLoaderOptions(script).language).toBe("tr");
+  });
+
   it("uses safe defaults when optional dataset values are missing", () => {
     const script = { dataset: { project: "project-123" } } as HTMLScriptElement;
 
     expect(parseLoaderOptions(script)).toEqual({
       projectId: "project-123",
       position: "bottom-right",
-      language: "en",
+      language: "tr",
       enabledSections: ["content", "navigation", "color"]
     });
   });

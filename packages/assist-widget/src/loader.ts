@@ -1,12 +1,12 @@
 import { mountAssistWidget, type AssistWidgetInstance, type AssistWidgetOptions } from "./widget.js";
-import { ASSIST_SECTIONS, type AssistSection } from "./config.js";
+import { ASSIST_SECTIONS, DEFAULT_WIDGET_LOCALE, type AssistSection, type WidgetLocale } from "./config.js";
 
 export type WidgetPosition = "bottom-right" | "bottom-left" | "top-right" | "top-left";
 
 export interface LoaderOptions {
   projectId: string;
   position: WidgetPosition;
-  language: "en";
+  language: WidgetLocale;
   enabledSections: AssistSection[];
 }
 
@@ -26,9 +26,17 @@ export function parseLoaderOptions(script: HTMLScriptElement): LoaderOptions {
   return {
     projectId,
     position: rawPosition && POSITIONS.has(rawPosition) ? rawPosition : "bottom-right",
-    language: "en",
+    language: resolveLanguage(script),
     enabledSections: parseEnabledSections(script.dataset.enabledSections)
   };
+}
+
+function resolveLanguage(script: HTMLScriptElement): WidgetLocale {
+  const explicit = script.dataset.language;
+  if (explicit === "tr" || explicit === "en") return explicit;
+  const htmlLang = (typeof document !== "undefined" ? document.documentElement.lang : "").toLowerCase();
+  if (htmlLang.startsWith("en")) return "en";
+  return DEFAULT_WIDGET_LOCALE;
 }
 
 export function initAssistWidget(options: Partial<LoaderOptions> & AssistWidgetOptions = {}): AssistWidgetInstance | undefined {
@@ -39,7 +47,7 @@ export function initAssistWidget(options: Partial<LoaderOptions> & AssistWidgetO
   const mountedInstance = mountAssistWidget({
     projectId: options.projectId,
     position: options.position,
-    language: "en",
+    language: options.language ?? DEFAULT_WIDGET_LOCALE,
     enabledSections: options.enabledSections
   });
   const instance: AssistWidgetInstance = {

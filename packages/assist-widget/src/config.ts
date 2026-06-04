@@ -35,3 +35,7 @@ export type AssistSection = (typeof ASSIST_SECTIONS)[number];
 
 export const STORAGE_KEY = "aa-assist-preferences";
 export const WIDGET_PREFIX = "aa-assist";
+
+export const WIDGET_LOCALES = ["tr", "en"] as const;
+export type WidgetLocale = (typeof WIDGET_LOCALES)[number];
+export const DEFAULT_WIDGET_LOCALE: WidgetLocale = "tr";

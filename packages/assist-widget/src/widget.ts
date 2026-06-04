@@ -1,4 +1,4 @@
-import { ASSIST_SECTIONS, STORAGE_KEY, type AssistSection } from "./config.js";
+import { ASSIST_SECTIONS, DEFAULT_WIDGET_LOCALE, STORAGE_KEY, type AssistSection, type WidgetLocale } from "./config.js";
 import { ClassManager } from "./effects/class-manager.js";
 import { COLOR_CLASSES, COLOR_CSS, colorClassForStep, type ColorStepFeature } from "./effects/color-preferences.js";
 import { FontPreferences } from "./effects/font-preferences.js";
@@ -30,6 +30,7 @@ import {
   type TogglePreference
 } from "./state.js";
 import { renderPanel, type PreferencePath } from "./ui/panel.js";
+import { resolveWidgetStrings } from "./ui/messages.js";
 import { PAGE_EFFECT_CSS, WIDGET_CSS } from "./ui/styles.js";
 
 export type AssistWidgetPosition = "bottom-right" | "bottom-left" | "top-right" | "top-left";
@@ -37,7 +38,7 @@ export type AssistWidgetPosition = "bottom-right" | "bottom-left" | "top-right" 
 export interface AssistWidgetOptions {
   projectId?: string;
   position?: AssistWidgetPosition;
-  language?: "en";
+  language?: WidgetLocale;
   enabledSections?: readonly AssistSection[];
 }
 
@@ -71,6 +72,9 @@ const COLOR_STEP_FEATURES = ["saturation", "smartContrast", "brightness", "contr
 
 export function mountAssistWidget(options: AssistWidgetOptions = {}): AssistWidgetInstance {
   ensurePageEffectStyles();
+
+  const locale: WidgetLocale = options.language ?? DEFAULT_WIDGET_LOCALE;
+  const strings = resolveWidgetStrings(locale);
 
   const root = document.createElement("div");
   root.id = ROOT_ID;
@@ -144,12 +148,14 @@ export function mountAssistWidget(options: AssistWidgetOptions = {}): AssistWidg
         preferences,
         pageStructure,
         enabledSections,
+        strings,
         onToggle: updateToggle,
         onStep: updateStep,
         onClear: clearPreferences,
         onClose: closePanel,
         onStructureJump: (id) => pageStructureManager.jumpTo(id)
       });
+      panel.setAttribute("lang", locale);
     }
 
     const children: Node[] = [widgetStyle];

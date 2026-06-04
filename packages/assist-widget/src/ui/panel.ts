@@ -1,6 +1,7 @@
 import type { PageStructure } from "../managers/page-structure.js";
 import type { AssistPreferences, StepPreference, TogglePreference } from "../state.js";
 import type { AssistSection } from "../config.js";
+import type { WidgetStrings } from "./messages.js";
 
 type SectionName = "content" | "navigation" | "color";
 type PreferenceName = string;
@@ -11,6 +12,7 @@ export interface PanelOptions {
   preferences: AssistPreferences;
   pageStructure?: PageStructure | null;
   enabledSections?: ReadonlySet<AssistSection>;
+  strings: WidgetStrings;
   onToggle: (path: PreferencePath) => void;
   onStep: (path: PreferencePath) => void;
   onClear: () => void;
