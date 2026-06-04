@@ -114,10 +114,18 @@ function toBaselineIssue(row: IssueRow): BaselineIssue {
   };
 }
 
-export function getBaselineIssues(
+export interface BaselineContext {
+  // A prior completed scan exists — distinct from whether it had any issues. A clean
+  // prior scan (0 issues) still means "not the first audit", so the report must not
+  // fall back to its first-audit copy just because `issues` is empty.
+  hasBaselineRun: boolean;
+  issues: BaselineIssue[];
+}
+
+export function getBaselineContext(
   db: SqliteDatabase,
   params: { projectId: string; excludeScanRunId: string }
-): BaselineIssue[] {
+): BaselineContext {
   const priorRun = db
     .select({ id: scanRuns.id })
     .from(scanRuns)
@@ -131,16 +139,25 @@ export function getBaselineIssues(
     .get();
 
   if (!priorRun) {
-    return [];
+    return { hasBaselineRun: false, issues: [] };
   }
 
   // Exclude resolved carry-over rows from the baseline. They are not "live" issues:
   // including them would re-resolve an already-fixed issue on every subsequent scan
   // (sticky resolved) and would mislabel a regressed issue as "ongoing" instead of "new".
-  return db
+  const baselineIssues = db
     .select({ issue: issues })
     .from(issues)
     .where(and(eq(issues.scanRunId, priorRun.id), ne(issues.status, "resolved")))
     .all()
     .map((row) => toBaselineIssue(row.issue));
+
+  return { hasBaselineRun: true, issues: baselineIssues };
+}
+
+export function getBaselineIssues(
+  db: SqliteDatabase,
+  params: { projectId: string; excludeScanRunId: string }
+): BaselineIssue[] {
+  return getBaselineContext(db, params).issues;
 }

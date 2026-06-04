@@ -71,6 +71,10 @@ export interface RunScanInput {
   storage: StorageAdapter;
   onProgress?: (event: ScanProgressEvent) => Promise<void> | void;
   baselineIssues?: BaselineIssue[];
+  // Whether a prior completed scan exists. Distinct from baselineIssues.length: a clean
+  // prior scan has 0 baseline issues but still means "not the first audit". Defaults to
+  // baselineIssues.length > 0 when omitted (callers that have a baseline run pass true).
+  hasBaseline?: boolean;
 }
 
 export async function runScan(input: RunScanInput): Promise<CompletedScanResult> {
@@ -212,7 +216,7 @@ export async function runScan(input: RunScanInput): Promise<CompletedScanResult>
     diffSummary: {
       counts: diff.counts,
       resolvedTitles: diff.resolved.map((r) => r.title),
-      hasBaseline: (input.baselineIssues ?? []).length > 0
+      hasBaseline: input.hasBaseline ?? (input.baselineIssues ?? []).length > 0
     }
   });
 

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { createDb, initializeDb, type DbClient } from "../db/client.js";
 import { issues, projects, scanRuns, workspaces } from "../db/schema.js";
-import { getBaselineIssues } from "./issues.js";
+import { getBaselineContext, getBaselineIssues } from "./issues.js";
 
 function issueFixture(
   overrides: Partial<typeof issues.$inferInsert> = {}
@@ -167,6 +167,27 @@ describe("getBaselineIssues", () => {
     const keys = getBaselineIssues(client.db, { projectId: "P", excludeScanRunId: "S_new" }).map((b) => b.issueKey);
     expect(keys).toContain("k2");
     expect(keys).not.toContain("k-resolved");
+  });
+
+  it("getBaselineContext reports hasBaselineRun true with empty issues when the prior scan was clean", () => {
+    // Project R: a prior completed scan (RS1) with NO issues, then RS2.
+    client.db.insert(projects).values({
+      id: "R", workspaceId: "ws", name: "Project R",
+      url: "https://r.example.com", domain: "r.example.com",
+      createdAt: "2026-05-31T00:00:00.000Z"
+    }).run();
+    client.db.insert(scanRuns).values(scanRunFixture({ id: "RS1", projectId: "R", finishedAt: "2026-05-31T01:00:00.000Z" })).run();
+    client.db.insert(scanRuns).values(scanRunFixture({ id: "RS2", projectId: "R", finishedAt: "2026-05-31T02:00:00.000Z" })).run();
+
+    const ctx = getBaselineContext(client.db, { projectId: "R", excludeScanRunId: "RS2" });
+    expect(ctx.hasBaselineRun).toBe(true); // a prior scan existed — NOT a first audit
+    expect(ctx.issues).toEqual([]);        // ...even though it had no issues
+  });
+
+  it("getBaselineContext reports hasBaselineRun false when there is no prior completed scan", () => {
+    const ctx = getBaselineContext(client.db, { projectId: "Q", excludeScanRunId: "QS1" });
+    expect(ctx.hasBaselineRun).toBe(false);
+    expect(ctx.issues).toEqual([]);
   });
 
   it("maps wcagCriteria and sampleUrls onto the BaselineIssue shape", () => {

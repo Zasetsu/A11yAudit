@@ -229,14 +229,21 @@ function DashboardApp({
     () => latestScanForProject(scansQuery.data, selectedProject.id),
     [scansQuery.data, selectedProject.id]
   );
+  // On the scan-run detail route, fetch that specific run's issues (workspace-scoped by
+  // scanRunId) so its diff summary is correct even for an older run or a run of a project
+  // other than the currently selected one. Elsewhere, scope to the selected project's
+  // latest scan.
+  const issuesFilter = appRoute.page === "scan-run-detail"
+    ? { scanRunId: appRoute.scanRunId }
+    : selectedScan === undefined
+      ? { projectId: selectedProject.id }
+      : { projectId: selectedProject.id, scanRunId: selectedScan.id };
+  const issuesQueryKey = appRoute.page === "scan-run-detail"
+    ? `run:${appRoute.scanRunId}`
+    : `proj:${selectedProject.id}:${selectedScan?.id ?? "none"}`;
   const issuesQuery = useQuery({
-    queryKey: ["issues", currentWorkspaceSlug, selectedProject.id, selectedScan?.id ?? null],
-    queryFn: () => fetchIssues(
-      currentWorkspaceSlug,
-      selectedScan === undefined
-        ? { projectId: selectedProject.id }
-        : { projectId: selectedProject.id, scanRunId: selectedScan.id }
-    ),
+    queryKey: ["issues", currentWorkspaceSlug, issuesQueryKey],
+    queryFn: () => fetchIssues(currentWorkspaceSlug, issuesFilter),
     refetchInterval: hasActiveScans(scansQuery.data) ? 3_000 : false
   });
   const reportsQuery = useQuery({

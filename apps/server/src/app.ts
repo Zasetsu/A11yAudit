@@ -10,7 +10,7 @@ import { getTrustedBrowserOrigin, readAuthFromRequest, validateCsrf } from "./au
 import { createDb, initializeDb, type DbClient } from "./db/client.js";
 import { evidenceArtifacts, findings, issues, reports, scanRuns } from "./db/schema.js";
 import { LocalJobRunner } from "./jobs/local-job-runner.js";
-import { getBaselineIssues } from "./repositories/issues.js";
+import { getBaselineContext } from "./repositories/issues.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerFindingRoutes } from "./routes/findings.js";
 import { registerArtifactRoutes } from "./routes/artifacts.js";
@@ -71,14 +71,15 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
       ? undefined
       : async (job) => {
         try {
-          let baselineIssues: ReturnType<typeof getBaselineIssues>;
+          let baselineContext: ReturnType<typeof getBaselineContext>;
           try {
-            baselineIssues = getBaselineIssues(dbClient.db, {
+            baselineContext = getBaselineContext(dbClient.db, {
               projectId: job.payload.projectId,
               excludeScanRunId: job.id
             });
           } catch {
-            baselineIssues = []; // degrade gracefully — a baseline read failure must not fail the scan
+            // degrade gracefully — a baseline read failure must not fail the scan
+            baselineContext = { hasBaselineRun: false, issues: [] };
           }
 
           const result = await runScan({
@@ -106,7 +107,8 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
                 .where(eq(scanRuns.id, job.id))
                 .run();
             },
-            baselineIssues
+            baselineIssues: baselineContext.issues,
+            hasBaseline: baselineContext.hasBaselineRun
           });
 
           const completedAt = result.finishedAt;
