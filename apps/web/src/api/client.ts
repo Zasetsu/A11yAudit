@@ -1,4 +1,9 @@
 import {
+  DEFAULT_WIDGET_CONFIG,
+  normalizeWidgetConfig,
+  type WidgetConfig
+} from "@a11yaudit/assist-widget/widget-config";
+import {
   demoFindings,
   demoIssues,
   demoProjects,
@@ -812,4 +817,31 @@ export async function regenerateInvitation(
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Could not regenerate invitation" };
   }
+}
+
+export async function getWidgetConfig(workspaceSlug: string, projectId: string): Promise<WidgetConfig> {
+  const res = await apiFetch(
+    `/api/workspaces/${encodeURIComponent(workspaceSlug)}/projects/${encodeURIComponent(projectId)}/widget-config`,
+    { method: "GET" }
+  );
+  if (!res) return DEFAULT_WIDGET_CONFIG;
+  const body = (await res.json()) as { config?: unknown };
+  return normalizeWidgetConfig(body.config);
+}
+
+export async function updateWidgetConfig(
+  workspaceSlug: string,
+  projectId: string,
+  input: Partial<WidgetConfig>
+): Promise<WidgetConfig> {
+  const res = await apiFetch(
+    `/api/workspaces/${encodeURIComponent(workspaceSlug)}/projects/${encodeURIComponent(projectId)}/widget-config`,
+    {
+      method: "PUT",
+      body: JSON.stringify(input)
+    }
+  );
+  if (!res) throw new Error("Widget config update failed");
+  const body = (await res.json()) as { config?: unknown };
+  return normalizeWidgetConfig(body.config);
 }

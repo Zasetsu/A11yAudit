@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_WIDGET_CONFIG } from "@a11yaudit/assist-widget/widget-config";
 import type { WorkspaceInvitation } from "./client";
 import { CSRF_COOKIE_MISSING_ERROR } from "./client";
 
@@ -485,5 +486,38 @@ describe("api client", () => {
         ]
       }
     ]);
+  });
+
+  it("getWidgetConfig issues GET to widget-config endpoint and returns parsed config", async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({ config: DEFAULT_WIDGET_CONFIG })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { getWidgetConfig } = await importClient("https://api.example.test/");
+
+    const result = await getWidgetConfig("acme", "p1");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.test/api/workspaces/acme/projects/p1/widget-config",
+      expect.objectContaining({ credentials: "include", method: "GET" })
+    );
+    expect(result.position).toBe("bottom-right");
+  });
+
+  it("updateWidgetConfig issues PUT to widget-config endpoint and returns saved config", async () => {
+    vi.stubGlobal("document", { cookie: "a11yaudit_csrf=csrf-token" });
+    const savedConfig = { ...DEFAULT_WIDGET_CONFIG, position: "top-left" as const };
+    const fetchMock = vi.fn(async () => jsonResponse({ config: savedConfig }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { updateWidgetConfig } = await importClient("https://api.example.test/");
+
+    const result = await updateWidgetConfig("acme", "p1", { position: "top-left" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.test/api/workspaces/acme/projects/p1/widget-config",
+      expect.objectContaining({ credentials: "include", method: "PUT" })
+    );
+    expect(requestOptions(fetchMock).method).toBe("PUT");
+    expect(result.position).toBe("top-left");
   });
 });

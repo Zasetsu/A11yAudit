@@ -4,6 +4,16 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./widget-config": {
+      "types": "./dist/widget-config.d.ts",
+      "default": "./dist/widget-config.js"
+    }
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json && vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit"
