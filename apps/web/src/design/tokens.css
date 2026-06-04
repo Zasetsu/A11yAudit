@@ -182,6 +182,14 @@ h3 {
   text-decoration: underline;
 }
 
+tr.row-clickable {
+  cursor: pointer;
+}
+
+tr.row-clickable:hover {
+  background: var(--accent-bg);
+}
+
 .app {
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);

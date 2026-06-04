@@ -145,9 +145,9 @@ export function OverviewPage({ project, scans, issues, navigate }: PageProps) {
               <thead><tr><th>{t("table.run")}</th><th>{t("table.status")}</th><th>{t("table.started")}</th><th className="num">{t("table.occurrences")}</th></tr></thead>
               <tbody>
                 {projectScans.slice(0, 4).map((scan) => (
-                  <tr key={scan.id}>
+                  <tr className="row-clickable" key={scan.id} onClick={() => navigate({ page: "scan-run-detail", scanRunId: scan.id })}>
                     <td className="mono">
-                      <button className="link-button" onClick={() => navigate({ page: "scan-run-detail", scanRunId: scan.id })} title={t("run.viewDetail")(scan.id)} type="button">{scan.id}</button>
+                      <button className="link-button" onClick={(event) => { event.stopPropagation(); navigate({ page: "scan-run-detail", scanRunId: scan.id }); }} title={t("run.viewDetail")(scan.id)} type="button">{scan.id}</button>
                     </td>
                     <td><RunStatusBadge status={scan.status} /></td>
                     <td>{formatDate(scan.createdAt, locale, t("common.notAvailable"))}</td>
