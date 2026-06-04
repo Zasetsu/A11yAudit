@@ -12,6 +12,7 @@ import {
   type WorkspaceMember
 } from "../api/client";
 import { Button, Icon, PageHeader, Panel } from "../design/ui";
+import { useT } from "../i18n/locale-context.js";
 import { isWorkspaceOwner, type PageProps } from "./page-props";
 
 function inviteLink(inviteUrl: string): string {
@@ -19,6 +20,7 @@ function inviteLink(inviteUrl: string): string {
 }
 
 export function MembersPage({ workspaceSlug, workspaceRole }: PageProps) {
+  const { t, locale } = useT();
   const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -112,9 +114,9 @@ export function MembersPage({ workspaceSlug, workspaceRole }: PageProps) {
   if (!canManage) {
     return (
       <div className="content-inner fadein">
-        <PageHeader icon="shield-check" subtitle="Workspace membership" title="Members" />
-        <Panel title="Owner access required">
-          <div className="note"><Icon name="info" size={14} /> Only workspace owners can manage members and invitations.</div>
+        <PageHeader icon="shield-check" subtitle={t("members.workspaceMembership")} title={t("nav.members")} />
+        <Panel title={t("members.ownerRequired")}>
+          <div className="note"><Icon name="info" size={14} /> {t("members.ownerRequiredBody")}</div>
         </Panel>
       </div>
     );
@@ -125,13 +127,13 @@ export function MembersPage({ workspaceSlug, workspaceRole }: PageProps) {
 
   return (
     <div className="content-inner fadein">
-      <PageHeader icon="shield-check" subtitle="Manage who can access this workspace" title="Members" />
+      <PageHeader icon="shield-check" subtitle={t("members.manage")} title={t("nav.members")} />
 
       {error !== null ? (
         <div className="note"><Icon name="alert-triangle" size={14} /> {error}</div>
       ) : null}
 
-      <Panel title="Invite a member">
+      <Panel title={t("members.invite")}>
         <form
           className="form-grid"
           onSubmit={(event) => {
@@ -140,19 +142,19 @@ export function MembersPage({ workspaceSlug, workspaceRole }: PageProps) {
           }}
         >
           <label>
-            <span>Email</span>
+            <span>{t("table.email")}</span>
             <input
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="teammate@example.com"
+              placeholder={t("members.emailPlaceholder")}
               type="email"
               value={email}
             />
           </label>
-          <Button icon="plus" type="submit" variant="primary">Send invite</Button>
+          <Button icon="plus" type="submit" variant="primary">{t("members.sendInvite")}</Button>
         </form>
         {latestLink !== null ? (
           <div className="note">
-            <Icon name="info" size={14} /> Invite link (copy now, it is shown once):
+            <Icon name="info" size={14} /> {t("members.inviteOnce")}
             <code className="mono"> {latestLink}</code>
             <Button
               icon="arrow-right"
@@ -163,16 +165,16 @@ export function MembersPage({ workspaceSlug, workspaceRole }: PageProps) {
               }}
               variant="ghost"
             >
-              Copy
+              {t("common.copy")}
             </Button>
           </div>
         ) : null}
       </Panel>
 
-      <Panel title="Members">
+      <Panel title={t("nav.members")}>
         <table className="data-table">
           <thead>
-            <tr><th>Name</th><th>Email</th><th>Role</th><th>Actions</th></tr>
+            <tr><th>{t("table.name")}</th><th>{t("table.email")}</th><th>{t("table.role")}</th><th>{t("table.actions")}</th></tr>
           </thead>
           <tbody>
             {members.map((member) => (
@@ -181,12 +183,12 @@ export function MembersPage({ workspaceSlug, workspaceRole }: PageProps) {
                 <td className="mono">{member.email}</td>
                 <td>
                   <select
-                    aria-label={`Role for ${member.email}`}
+                    aria-label={t("members.roleFor")(member.email)}
                     onChange={(event) => roleMutation.mutate({ userId: member.userId, role: event.target.value as "owner" | "member" })}
                     value={member.role}
                   >
-                    <option value="owner">owner</option>
-                    <option value="member">member</option>
+                    <option value="owner">{t("members.roleOwner")}</option>
+                    <option value="member">{t("members.roleMember")}</option>
                   </select>
                 </td>
                 <td>
@@ -195,7 +197,7 @@ export function MembersPage({ workspaceSlug, workspaceRole }: PageProps) {
                     onClick={() => removeMutation.mutate(member.userId)}
                     variant="ghost"
                   >
-                    Remove
+                    {t("common.remove")}
                   </Button>
                 </td>
               </tr>
@@ -204,22 +206,22 @@ export function MembersPage({ workspaceSlug, workspaceRole }: PageProps) {
         </table>
       </Panel>
 
-      <Panel title="Pending invitations">
+      <Panel title={t("members.pending")}>
         {invitations.length === 0 ? (
-          <div className="note"><Icon name="info" size={14} /> No pending invitations.</div>
+          <div className="note"><Icon name="info" size={14} /> {t("members.pendingEmpty")}</div>
         ) : (
           <table className="data-table">
             <thead>
-              <tr><th>Email</th><th>Expires</th><th>Actions</th></tr>
+              <tr><th>{t("table.email")}</th><th>{t("table.expires")}</th><th>{t("table.actions")}</th></tr>
             </thead>
             <tbody>
               {invitations.map((invitation) => (
                 <tr key={invitation.id}>
                   <td className="mono">{invitation.email}</td>
-                  <td>{new Date(invitation.expiresAt).toLocaleDateString()}</td>
+                  <td>{new Date(invitation.expiresAt).toLocaleDateString(locale === "tr" ? "tr-TR" : "en-GB")}</td>
                   <td>
-                    <Button icon="arrow-right" onClick={() => regenerateMutation.mutate(invitation.id)} variant="ghost">Regenerate link</Button>
-                    <Button icon="alert-octagon" onClick={() => revokeMutation.mutate(invitation.id)} variant="ghost">Revoke</Button>
+                    <Button icon="arrow-right" onClick={() => regenerateMutation.mutate(invitation.id)} variant="ghost">{t("members.regenerate")}</Button>
+                    <Button icon="alert-octagon" onClick={() => revokeMutation.mutate(invitation.id)} variant="ghost">{t("members.revoke")}</Button>
                   </td>
                 </tr>
               ))}

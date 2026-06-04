@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { scanProgressLabel, scanProgressTone, scanProgressValue, scanRunMessage, scanRunMessageClass } from "./scan-runs";
+import { MESSAGES } from "../i18n/messages.js";
 import type { ScanRun } from "../data";
+
+const t = (<K extends keyof typeof MESSAGES.en>(key: K) => MESSAGES.en[key]);
 
 function scan(overrides: Partial<ScanRun>): ScanRun {
   return {
@@ -37,7 +40,7 @@ describe("scan run presentation", () => {
 
     expect(scanProgressValue(failed)).toBe(100);
     expect(scanProgressTone(failed)).toBe("var(--critical)");
-    expect(scanProgressLabel(failed)).toBe("Failed after 102/102 pages");
+    expect(scanProgressLabel(failed, t)).toBe("Failed after 102/102 pages");
     expect(scanRunMessageClass(failed)).toBe("error-text");
     expect(scanRunMessage(failed)).toBe("too many SQL variables");
   });
@@ -50,7 +53,7 @@ describe("scan run presentation", () => {
 
     expect(scanProgressValue(completedWithWarning)).toBe(100);
     expect(scanProgressTone(completedWithWarning)).toBe("var(--accent)");
-    expect(scanProgressLabel(completedWithWarning)).toBe("10/10 pages");
+    expect(scanProgressLabel(completedWithWarning, t)).toBe("10/10 pages");
     expect(scanRunMessageClass(completedWithWarning)).toBe("warning-text");
     expect(scanRunMessage(completedWithWarning)).toContain("PDF report failed");
   });

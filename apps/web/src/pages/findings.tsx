@@ -1,7 +1,11 @@
 import { useMemo, useState } from "react";
 import { severityMeta, type Issue, type Severity } from "../data";
 import { Button, PageHeader, Panel, SeverityBadge } from "../design/ui";
+import { useT } from "../i18n/locale-context.js";
+import type { Messages } from "../i18n/messages.js";
 import type { PageProps } from "./page-props";
+
+type TFn = <K extends keyof Messages>(key: K) => Messages[K];
 
 const severityOptions: Array<Severity | "all"> = ["all", "critical", "serious", "moderate", "minor"];
 
@@ -14,11 +18,13 @@ export function sortIssuesForTriage(issues: Issue[]): Issue[] {
   );
 }
 
-function confidenceLabel(confidence: Issue["confidence"]): string {
-  return `${confidence[0].toUpperCase()}${confidence.slice(1)} confidence`;
+function confidenceLabel(confidence: Issue["confidence"], t: TFn): string {
+  const key = confidence === "high" ? "finding.confidenceHigh" : confidence === "medium" ? "finding.confidenceMedium" : "finding.confidenceLow";
+  return t(key);
 }
 
 export function FindingsPage({ issues, project, navigate }: PageProps) {
+  const { t } = useT();
   const [severity, setSeverity] = useState<Severity | "all">("all");
   const projectIssues = useMemo(() => {
     return sortIssuesForTriage(
@@ -32,38 +38,38 @@ export function FindingsPage({ issues, project, navigate }: PageProps) {
     <div className="content-inner fadein">
       <PageHeader
         icon="list"
-        subtitle="Grouped accessibility issues with WCAG references and evidence pointers."
-        title="Findings"
+        subtitle={t("findings.subtitle")}
+        title={t("nav.findings")}
       />
       <Panel
-        action={<Button disabled icon="check-circle" size="sm" title="Mark Resolved is outside the MVP">Mark Resolved</Button>}
-        title="Issue groups"
-        subtitle="CSV export is not included in this MVP."
+        action={<Button disabled icon="check-circle" size="sm" title={t("findings.markResolvedDisabled")}>{t("findings.markResolved")}</Button>}
+        title={t("findings.issueGroups")}
+        subtitle={t("findings.csvDisabled")}
       >
         <div className="filter-bar">
           <select className="input" onChange={(event) => setSeverity(event.target.value as Severity | "all")} value={severity}>
-            {severityOptions.map((value) => <option key={value} value={value}>{value === "all" ? "All severities" : severityMeta[value].label}</option>)}
+            {severityOptions.map((value) => <option key={value} value={value}>{value === "all" ? t("findings.allSeverities") : (t(severityMeta[value].labelKey) as string)}</option>)}
           </select>
         </div>
         <div className="table-wrap">
           <table className="table">
             <thead>
               <tr>
-                <th>Severity</th>
-                <th>Issue</th>
-                <th>WCAG</th>
-                <th>Likely scope</th>
-                <th>Component</th>
-                <th>CMS hint</th>
-                <th className="num">Pages</th>
-                <th className="num">Occurrences</th>
+                <th>{t("table.severity")}</th>
+                <th>{t("table.issue")}</th>
+                <th>{t("table.wcag")}</th>
+                <th>{t("table.likelyScope")}</th>
+                <th>{t("table.component")}</th>
+                <th>{t("table.cmsHint")}</th>
+                <th className="num">{t("table.pages")}</th>
+                <th className="num">{t("table.occurrences")}</th>
               </tr>
             </thead>
             <tbody>
               {projectIssues.length === 0 ? (
                 <tr>
                   <td colSpan={8}>
-                    <div className="note">No grouped issues match the current filters.</div>
+                    <div className="note">{t("findings.empty")}</div>
                   </td>
                 </tr>
               ) : null}
@@ -89,7 +95,7 @@ export function FindingsPage({ issues, project, navigate }: PageProps) {
                   <td><span className="wcag">{issue.wcagCriteria}</span></td>
                   <td>
                     {issue.likelyScope}
-                    <div className="table-sub">{confidenceLabel(issue.confidence)}</div>
+                    <div className="table-sub">{confidenceLabel(issue.confidence, t)}</div>
                   </td>
                   <td>{issue.componentArea}</td>
                   <td>{issue.cmsHint}</td>

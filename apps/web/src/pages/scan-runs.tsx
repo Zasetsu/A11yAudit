@@ -1,7 +1,11 @@
 import { formatDate } from "../data";
 import { Button, PageHeader, Panel, Progress, RunStatusBadge } from "../design/ui";
+import { useT } from "../i18n/locale-context.js";
+import type { Messages } from "../i18n/messages.js";
 import type { PageProps } from "./page-props";
 import type { ScanRun } from "../data";
+
+type TFn = <K extends keyof Messages>(key: K) => Messages[K];
 
 export function scanProgressValue(scan: ScanRun): number {
   return (scan.pagesScanned / Math.max(scan.pagesQueued, 1)) * 100;
@@ -11,9 +15,9 @@ export function scanProgressTone(scan: ScanRun): string {
   return scan.status === "failed" ? "var(--critical)" : "var(--accent)";
 }
 
-export function scanProgressLabel(scan: ScanRun): string {
-  const pages = `${scan.pagesScanned}/${scan.pagesQueued} pages`;
-  return scan.status === "failed" ? `Failed after ${pages}` : pages;
+export function scanProgressLabel(scan: ScanRun, t: TFn): string {
+  const pages = `${scan.pagesScanned}/${scan.pagesQueued} ${t("runs.pagesWord")}`;
+  return scan.status === "failed" ? `${t("runs.failedAfter")} ${pages}` : pages;
 }
 
 export function scanRunMessage(scan: ScanRun): string | null {
@@ -25,33 +29,36 @@ export function scanRunMessageClass(scan: ScanRun): string {
 }
 
 export function ScanRunsPage({ scans, navigate }: PageProps) {
+  const { t, locale } = useT();
   return (
     <div className="content-inner fadein">
       <PageHeader
-        actions={<Button icon="scan-search" onClick={() => navigate({ page: "new-scan" })} variant="primary">New Scan</Button>}
+        actions={<Button icon="scan-search" onClick={() => navigate({ page: "new-scan" })} variant="primary">{t("common.newScan")}</Button>}
         icon="activity"
-        subtitle="Manual public URL scan runs from the local instance."
-        title="Scan Runs"
+        subtitle={t("runs.subtitle")}
+        title={t("nav.scanRuns")}
       />
-      <Panel title="Runs">
+      <Panel title={t("runs.runs")}>
         <div className="table-wrap">
           <table className="table">
             <thead>
               <tr>
-                <th>Run</th>
-                <th>Project</th>
-                <th>Status</th>
-                <th>Profile</th>
-                <th>Target</th>
-                <th>Progress</th>
-                <th className="num">Occurrences</th>
-                <th>Started</th>
+                <th>{t("table.run")}</th>
+                <th>{t("table.project")}</th>
+                <th>{t("table.status")}</th>
+                <th>{t("table.profile")}</th>
+                <th>{t("table.target")}</th>
+                <th>{t("table.progress")}</th>
+                <th className="num">{t("table.occurrences")}</th>
+                <th>{t("table.started")}</th>
               </tr>
             </thead>
             <tbody>
               {scans.map((scan) => (
-                <tr key={scan.id}>
-                  <td className="mono">{scan.id}</td>
+                <tr className="row-clickable" key={scan.id} onClick={() => navigate({ page: "scan-run-detail", scanRunId: scan.id })}>
+                  <td className="mono">
+                    <button className="link-button" onClick={(event) => { event.stopPropagation(); navigate({ page: "scan-run-detail", scanRunId: scan.id }); }} title={t("run.viewDetail")(scan.id)} type="button">{scan.id}</button>
+                  </td>
                   <td>{scan.projectName}</td>
 	                  <td>
 	                    <RunStatusBadge status={scan.status} />
@@ -60,16 +67,16 @@ export function ScanRunsPage({ scans, navigate }: PageProps) {
 	                    ) : null}
 	                  </td>
                   <td>
-                    <strong>{scan.mode === "same_domain_crawl" ? "Full site" : "Single URL"}</strong>
-                    <div className="table-sub">{scan.viewports} · {scan.maxPages} pages · depth {scan.maxDepth}</div>
+                    <strong>{scan.mode === "same_domain_crawl" ? t("runs.fullSite") : t("runs.singleUrl")}</strong>
+                    <div className="table-sub">{t("runs.profileMeta")(scan.viewports, scan.maxPages, scan.maxDepth)}</div>
                   </td>
                   <td className="url-cell">{scan.url}</td>
                   <td style={{ minWidth: 150 }}>
                     <Progress color={scanProgressTone(scan)} value={scanProgressValue(scan)} />
-                    <div className={`table-sub ${scan.status === "failed" ? "error-text" : ""}`}>{scanProgressLabel(scan)}</div>
+                    <div className={`table-sub ${scan.status === "failed" ? "error-text" : ""}`}>{scanProgressLabel(scan, t)}</div>
                   </td>
                   <td className="num tnum">{scan.findingsTotal}</td>
-                  <td>{formatDate(scan.createdAt)}</td>
+                  <td>{formatDate(scan.createdAt, locale, t("common.notAvailable"))}</td>
                 </tr>
               ))}
             </tbody>

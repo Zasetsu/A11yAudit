@@ -4,64 +4,65 @@ import { Button, Icon, type IconName } from "./ui";
 import type { Navigate, Route } from "../app";
 import type { AuthSession } from "../api/client";
 import { isWorkspaceOwner, type WorkspaceRole } from "../pages/page-props";
+import { useT } from "../i18n/locale-context.js";
+import type { Messages } from "../i18n/messages.js";
 
-type TopLevelPage = Exclude<Route["page"], "finding-detail">;
+type TopLevelPage = Exclude<Route["page"], "finding-detail" | "scan-run-detail">;
 
-const navItems: Array<{ id: TopLevelPage; label: string; icon: IconName }> = [
-  { id: "overview", label: "Overview", icon: "layout-dashboard" },
-  { id: "projects", label: "Projects", icon: "folder" },
-  { id: "new-scan", label: "New Scan", icon: "scan-search" },
-  { id: "scan-runs", label: "Scan Runs", icon: "activity" },
-  { id: "findings", label: "Findings", icon: "list" },
-  { id: "reports", label: "Reports", icon: "file-text" }
+type StringMessageKey = { [K in keyof Messages]: Messages[K] extends string ? K : never }[keyof Messages];
+
+const navItems: Array<{ id: TopLevelPage; labelKey: StringMessageKey; icon: IconName }> = [
+  { id: "overview", labelKey: "nav.overview", icon: "layout-dashboard" },
+  { id: "projects", labelKey: "nav.projects", icon: "folder" },
+  { id: "new-scan", labelKey: "nav.newScan", icon: "scan-search" },
+  { id: "scan-runs", labelKey: "nav.scanRuns", icon: "activity" },
+  { id: "findings", labelKey: "nav.findings", icon: "list" },
+  { id: "reports", labelKey: "nav.reports", icon: "file-text" }
 ];
 
-const configItems: Array<{ id: TopLevelPage; label: string; icon: IconName }> = [
-  { id: "settings", label: "Settings", icon: "settings" },
-  { id: "docs", label: "Documentation", icon: "book-open" }
+const configItems: Array<{ id: TopLevelPage; labelKey: StringMessageKey; icon: IconName }> = [
+  { id: "settings", labelKey: "nav.settings", icon: "settings" }
 ];
 
 function isActive(route: Route, id: Route["page"]): boolean {
-  return route.page === id || (id === "findings" && route.page === "finding-detail");
+  return route.page === id
+    || (id === "findings" && route.page === "finding-detail")
+    || (id === "scan-runs" && route.page === "scan-run-detail");
 }
 
-function NavButton({ item, route, navigate }: { item: { id: TopLevelPage; label: string; icon: IconName }; route: Route; navigate: Navigate }) {
+function NavButton({ item, route, navigate }: { item: { id: TopLevelPage; labelKey: StringMessageKey; icon: IconName }; route: Route; navigate: Navigate }) {
+  const { t } = useT();
   const active = isActive(route, item.id);
   return (
     <button aria-current={active ? "page" : undefined} className={active ? "on" : ""} onClick={() => navigate({ page: item.id })} type="button">
       <Icon name={item.icon} size={16} />
-      <span>{item.label}</span>
+      <span>{t(item.labelKey)}</span>
     </button>
   );
 }
 
 export function Sidebar({ route, navigate, workspaceRole }: { route: Route; navigate: Navigate; workspaceRole: WorkspaceRole }) {
+  const { t } = useT();
   return (
-    <nav aria-label="Primary" className="sidebar">
+    <nav aria-label={t("shell.primaryNav")} className="sidebar">
       <div className="brand">
-        <div className="logo"><Icon name="shield-check" size={16} /></div>
-        <div className="name">A11yAudit<small>WCAG 2.2 Console</small></div>
+        <img alt="" className="brand-mark" height={28} src="/favicon.svg" width={28} />
+        <div className="name">Audera</div>
       </div>
       <div className="nav-list">
         {navItems.map((item) => <NavButton item={item} key={item.id} navigate={navigate} route={route} />)}
-        <div className="nav-section">Configure</div>
+        <div className="nav-section">{t("nav.configure")}</div>
         {isWorkspaceOwner(workspaceRole) ? (
-          <NavButton item={{ id: "members", label: "Members", icon: "shield-check" }} navigate={navigate} route={route} />
+          <NavButton item={{ id: "members", labelKey: "nav.members", icon: "shield-check" }} navigate={navigate} route={route} />
         ) : null}
         {configItems.map((item) => <NavButton item={item} key={item.id} navigate={navigate} route={route} />)}
-      </div>
-      <div className="sidebar-foot">
-        <span className="health-dot" />
-        <div>
-          <div className="foot-title">Self-hosted instance</div>
-          <div className="mono foot-copy">local API · v0.1.0</div>
-        </div>
       </div>
     </nav>
   );
 }
 
 function ProjectSelector({ project, projects, onSelect }: { project: Project; projects: Project[]; onSelect: (project: Project) => void }) {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -88,7 +89,7 @@ function ProjectSelector({ project, projects, onSelect }: { project: Project; pr
       </button>
       {open ? (
         <div className="project-menu" role="listbox">
-          <div className="menu-label">Switch project</div>
+          <div className="menu-label">{t("shell.switchProject")}</div>
           {projects.map((candidate) => (
             <button
               aria-selected={candidate.id === project.id}
@@ -124,6 +125,7 @@ function WorkspaceSelector({
   workspaces: AuthSession["workspaces"];
   onSelect: (workspaceSlug: string) => void;
 }) {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const currentWorkspace = workspaces.find((workspace) => workspace.slug === currentWorkspaceSlug) ?? workspaces[0];
@@ -153,7 +155,7 @@ function WorkspaceSelector({
       </button>
       {open ? (
         <div className="project-menu" role="listbox">
-          <div className="menu-label">Switch workspace</div>
+          <div className="menu-label">{t("shell.switchWorkspace")}</div>
           {workspaces.map((workspace) => (
             <button
               aria-selected={workspace.slug === currentWorkspace.slug}
@@ -203,25 +205,35 @@ export function TopBar({
   toggleTheme: () => void;
   onLogout: () => void;
 }) {
+  const { t, locale, setLocale } = useT();
   const selectedProject = project ?? activeProject();
 
   return (
     <header className="topbar">
       <WorkspaceSelector currentWorkspaceSlug={currentWorkspaceSlug} onSelect={onSelectWorkspace} workspaces={workspaces} />
       <ProjectSelector onSelect={onSelectProject} project={selectedProject} projects={projects} />
-      <Button className="topbar-scan" icon="scan-search" onClick={() => navigate({ page: "new-scan" })} variant="primary">New Scan</Button>
+      <Button className="topbar-scan" icon="scan-search" onClick={() => navigate({ page: "new-scan" })} variant="primary">{t("common.newScan")}</Button>
       <label className="global-search">
-        <span className="sr-only">Search findings, URLs, and WCAG criteria</span>
+        <span className="sr-only">{t("shell.searchLabel")}</span>
         <Icon name="search" size={15} />
-        <input placeholder="Search findings, URLs, WCAG criteria..." type="search" />
+        <input placeholder={t("shell.searchPlaceholder")} type="search" />
       </label>
       <div className="top-spacer" />
-      <Button aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`} className="topbar-theme" icon={theme === "light" ? "moon" : "sun"} onClick={toggleTheme} variant="ghost" />
-      <button aria-label="Repository link is not configured" className="icon-link" disabled title="Repository link is not configured" type="button">
-        <Icon name="github" size={17} />
-      </button>
-      <Button aria-label="Sign out" className="topbar-logout" icon="log-out" onClick={onLogout} variant="ghost" />
-      <div className="local-status"><span className="health-dot" /> Local</div>
+      <div className="lang-switch" role="group" aria-label={t("shell.language")}>
+        {(["tr", "en"] as const).map((code) => (
+          <button
+            key={code}
+            type="button"
+            aria-pressed={locale === code}
+            className={locale === code ? "on" : ""}
+            onClick={() => setLocale(code)}
+          >
+            {code.toUpperCase()}
+          </button>
+        ))}
+      </div>
+      <Button aria-label={theme === "light" ? t("shell.switchThemeDark") : t("shell.switchThemeLight")} className="topbar-theme" icon={theme === "light" ? "moon" : "sun"} onClick={toggleTheme} variant="ghost" />
+      <Button aria-label={t("shell.signOut")} className="topbar-logout" icon="log-out" onClick={onLogout} variant="ghost" />
     </header>
   );
 }

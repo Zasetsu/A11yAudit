@@ -1,38 +1,40 @@
 import { Field, Icon, PageHeader, Panel, SelectInput, TextInput, Toggle } from "../design/ui";
+import { useT } from "../i18n/locale-context.js";
 import type { PageProps } from "./page-props";
 
 export function SettingsPage({ project }: PageProps) {
+  const { t } = useT();
   return (
     <div className="content-inner fadein">
       <PageHeader
         icon="settings"
-        subtitle="Local instance controls for the self-hosted MVP."
-        title="Settings"
+        subtitle={t("settings.subtitle")}
+        title={t("nav.settings")}
       />
       <div className="split-grid two">
-        <Panel title="Scan defaults">
+        <Panel title={t("settings.scanDefaults")}>
           <div className="form-grid">
-            <Field label="Default project URL">
+            <Field label={t("settings.defaultUrl")}>
               <TextInput className="input mono" readOnly value={project.url} />
             </Field>
-            <Field label="Crawl limit">
+            <Field label={t("settings.crawlLimit")}>
               <TextInput min={1} type="number" value={project.crawlLimit} readOnly />
             </Field>
-            <Field label="Report format">
+            <Field label={t("settings.reportFormat")}>
               <SelectInput disabled value="html-pdf">
-                <option value="html-pdf">HTML + PDF</option>
+                <option value="html-pdf">{t("settings.reportFormatValue")}</option>
               </SelectInput>
             </Field>
-            <Field label="Artifact output">
-              <TextInput className="input mono" readOnly value="Local server storage" />
+            <Field label={t("settings.artifactOutput")}>
+              <TextInput className="input mono" readOnly value={t("settings.artifactOutputValue")} />
             </Field>
           </div>
         </Panel>
-        <Panel title="Evidence retention">
-          <Toggle checked disabled label="Store HTML snippets" onChange={() => undefined} description="Keeps selector context for technical review." />
-          <Toggle checked disabled label="Store screenshots" onChange={() => undefined} description="Screenshots are attached to finding detail pages when findings exist." />
-          <Toggle checked={false} disabled label="Authenticated scan storage" onChange={() => undefined} description="Not supported in the MVP." />
-          <div className="note"><Icon name="info" size={14} /> The CLI --out option maps to local CLI storage. The web UI uses the server artifact store and exposes downloads through Reports and Finding evidence.</div>
+        <Panel title={t("settings.evidenceRetention")}>
+          <Toggle checked disabled label={t("settings.storeSnippets")} onChange={() => undefined} description={t("settings.storeSnippetsHint")} />
+          <Toggle checked disabled label={t("settings.storeScreenshots")} onChange={() => undefined} description={t("settings.storeScreenshotsHint")} />
+          <Toggle checked={false} disabled label={t("settings.authStorage")} onChange={() => undefined} description={t("settings.authStorageHint")} />
+          <div className="note"><Icon name="info" size={14} /> {t("settings.storageNote")}</div>
         </Panel>
       </div>
     </div>
