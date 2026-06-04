@@ -1,6 +1,4 @@
-import type { ReportLocale } from "@a11yaudit/core";
-
-export type Locale = ReportLocale; // "tr" | "en"
+export type Locale = "tr" | "en";
 
 export interface Messages {
   // common
