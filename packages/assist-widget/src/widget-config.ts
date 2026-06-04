@@ -71,6 +71,10 @@ function sanitizeLauncherIcon(value: unknown): "default" | string {
   if (/<script/i.test(trimmed)) return "default";
   if (/\son\w+\s*=/i.test(trimmed)) return "default";
   if (/javascript:/i.test(trimmed)) return "default";
+  // A launcher icon is decorative geometry only — no links or external refs.
+  // Block href/xlink:href (e.g. <a xlink:href="javascript:…">) and data: URIs.
+  if (/(?:xlink:)?href\s*=/i.test(trimmed)) return "default";
+  if (/data:/i.test(trimmed)) return "default";
   return trimmed;
 }
 

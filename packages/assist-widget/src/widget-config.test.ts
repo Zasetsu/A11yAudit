@@ -53,6 +53,12 @@ describe("normalizeWidgetConfig", () => {
     expect(normalizeWidgetConfig({ brand: { launcherIcon: "<svg><path d=\"M0 0\"/></svg>" } }).brand.launcherIcon).toBe("<svg><path d=\"M0 0\"/></svg>");
   });
 
+  it("rejects an svg launcher icon with href/xlink:href or a data: uri", () => {
+    expect(normalizeWidgetConfig({ brand: { launcherIcon: "<svg><a xlink:href=\"https://evil\"><text>x</text></a></svg>" } }).brand.launcherIcon).toBe("default");
+    expect(normalizeWidgetConfig({ brand: { launcherIcon: "<svg><a href=\"https://evil\"></a></svg>" } }).brand.launcherIcon).toBe("default");
+    expect(normalizeWidgetConfig({ brand: { launcherIcon: "<svg><image href=\"data:image/png;base64,x\"/></svg>" } }).brand.launcherIcon).toBe("default");
+  });
+
   it("rejects an oversized svg launcher icon", () => {
     const huge = "<svg>" + "x".repeat(20001) + "</svg>";
     expect(normalizeWidgetConfig({ brand: { launcherIcon: huge } }).brand.launcherIcon).toBe("default");
