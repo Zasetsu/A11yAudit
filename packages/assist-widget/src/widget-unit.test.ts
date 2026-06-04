@@ -23,7 +23,10 @@ it("applies accent, custom css, launcher label and hides disabled features", () 
   expect((shadow.host as HTMLElement).style.getPropertyValue("--aa-acc")).toBe("#123456");
   expect(shadow.querySelector("style[data-aa-custom]")?.textContent).toContain("aa-custom-probe");
   expect(shadow.querySelector(".aa-assist-launcher")?.getAttribute("aria-label")).toBe("Erişilebilirlik");
+  // Open the panel so feature controls are rendered
+  (shadow.querySelector(".aa-assist-launcher") as HTMLButtonElement).click();
   expect(shadow.querySelector('[data-aa-feature="magnifier"]')).toBeNull();
+  expect(shadow.querySelector('[data-aa-feature="textSize"]')).not.toBeNull();
   instance.unmount();
 });
 
