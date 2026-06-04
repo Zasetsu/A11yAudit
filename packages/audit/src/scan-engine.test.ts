@@ -5,7 +5,13 @@ import { join } from "node:path";
 import { DEFAULT_VIEWPORTS, type BaselineIssue, type ScanRequest } from "@a11yaudit/core";
 import { LocalStorageAdapter } from "@a11yaudit/storage";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { captureElementCropEvidence, collectScreenshotDataUris, runScan } from "./scan-engine.js";
+import {
+  captureElementCropEvidence,
+  collectScreenshotDataUris,
+  dedupeFindingsByFingerprint,
+  runScan
+} from "./scan-engine.js";
+import type { ScanFinding } from "@a11yaudit/core";
 
 const crawlerSafety = vi.hoisted(() => ({
   assertSafeResolvedUrl: vi.fn(),
@@ -477,5 +483,66 @@ describe("runScan", () => {
     expect(captured).not.toBeNull();
     expect(captured.x + captured.width).toBeLessThanOrEqual(1440);
     expect(captured.y + captured.height).toBeLessThanOrEqual(900);
+  });
+});
+
+describe("dedupeFindingsByFingerprint", () => {
+  function makeFinding(overrides: Partial<ScanFinding> = {}): ScanFinding {
+    return {
+      id: "finding-x",
+      title: "Buttons must have discernible text",
+      severity: "serious",
+      status: "new",
+      source: "axe",
+      certainty: "automatic_violation",
+      origin: "unknown",
+      wcagCriteria: ["4.1.2"],
+      ruleId: "button-name",
+      description: "desc",
+      recommendation: "fix",
+      pageUrl: "https://example.com/",
+      viewport: "desktop",
+      selector: "button",
+      htmlSnippet: "<button></button>",
+      visibleText: null,
+      helpUrl: null,
+      fingerprint: "fp-1",
+      evidence: [],
+      instances: 1,
+      ...overrides
+    } as ScanFinding;
+  }
+
+  it("collapses same-fingerprint findings into one and sums instances", () => {
+    const result = dedupeFindingsByFingerprint([
+      makeFinding({ fingerprint: "fp-1", instances: 1 }),
+      makeFinding({ fingerprint: "fp-1", instances: 2 }),
+      makeFinding({ fingerprint: "fp-2", instances: 1 })
+    ]);
+
+    expect(result).toHaveLength(2);
+    const first = result.find((f) => f.fingerprint === "fp-1");
+    expect(first?.instances).toBe(3);
+  });
+
+  it("keeps the first finding but backfills evidence when it had none", () => {
+    const evidence = [{ kind: "element_screenshot", artifactKey: "k", mimeType: "image/png" }] as ScanFinding["evidence"];
+    const result = dedupeFindingsByFingerprint([
+      makeFinding({ fingerprint: "fp-1", title: "first", evidence: [] }),
+      makeFinding({ fingerprint: "fp-1", title: "second", evidence })
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].title).toBe("first");
+    expect(result[0].evidence).toHaveLength(1);
+  });
+
+  it("leaves distinct fingerprints untouched", () => {
+    const result = dedupeFindingsByFingerprint([
+      makeFinding({ fingerprint: "a" }),
+      makeFinding({ fingerprint: "b" }),
+      makeFinding({ fingerprint: "c" })
+    ]);
+    expect(result.map((f) => f.fingerprint)).toEqual(["a", "b", "c"]);
   });
 });

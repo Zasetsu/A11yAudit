@@ -77,10 +77,34 @@ export interface RunScanInput {
   hasBaseline?: boolean;
 }
 
+/**
+ * Collapse occurrences that share a fingerprint into one finding, summing
+ * `instances`. The fingerprint is a finding's identity (normalized URL +
+ * viewport + rule + WCAG + element signature), so two findings with the same
+ * fingerprint are the same occurrence detected twice — keep one row and carry
+ * the combined instance count. The first finding wins; later evidence backfills
+ * only when the kept finding captured none.
+ */
+export function dedupeFindingsByFingerprint(findings: ScanFinding[]): ScanFinding[] {
+  const byFingerprint = new Map<string, ScanFinding>();
+  for (const finding of findings) {
+    const existing = byFingerprint.get(finding.fingerprint);
+    if (existing === undefined) {
+      byFingerprint.set(finding.fingerprint, { ...finding });
+      continue;
+    }
+    existing.instances += finding.instances;
+    if (existing.evidence.length === 0 && finding.evidence.length > 0) {
+      existing.evidence = finding.evidence;
+    }
+  }
+  return Array.from(byFingerprint.values());
+}
+
 export async function runScan(input: RunScanInput): Promise<CompletedScanResult> {
   const startedAt = new Date().toISOString();
   const pages: AuditedPage[] = [];
-  const findings: ScanFinding[] = [];
+  const rawFindings: ScanFinding[] = [];
   const cropCapWarnings: string[] = [];
   let browser: Browser | null = null;
 
@@ -168,7 +192,7 @@ export async function runScan(input: RunScanInput): Promise<CompletedScanResult>
               ...(pageScreenshot ? [pageScreenshot] : []),
               ...snippet
             ];
-            findings.push({ ...finding, evidence });
+            rawFindings.push({ ...finding, evidence });
           }
           if (cropsSkippedByCap > 0) {
             const warning = `Per-page element screenshot ceiling (${MAX_ELEMENT_CROPS_PER_PAGE}) reached on ${normalizedUrl} (${viewport.name}): ${cropsSkippedByCap} displayed element(s) shown without a crop.`;
@@ -182,7 +206,7 @@ export async function runScan(input: RunScanInput): Promise<CompletedScanResult>
           await context.close().catch(() => undefined);
         }
 
-        await emitProgress(input, "auditing", pagesQueued, pages.length, findings.length);
+        await emitProgress(input, "auditing", pagesQueued, pages.length, rawFindings.length);
       }
     }
   } finally {
@@ -193,6 +217,13 @@ export async function runScan(input: RunScanInput): Promise<CompletedScanResult>
     throw new Error("No pages were audited successfully");
   }
 
+  // Collapse duplicate occurrences (same fingerprint) into a single finding,
+  // summing instances. Duplicates arise when the crawl audits two raw URLs that
+  // normalize identically (trailing slash, query, fragment) or when a rule emits
+  // repeated element signatures on one page. Without this, the persistence key
+  // (runId + findingId, derived from the fingerprint) collides → SQLite
+  // "UNIQUE constraint failed: findings.id".
+  const findings = dedupeFindingsByFingerprint(rawFindings);
   const currentIssues = aggregateScanIssues(findings, { auditedPages: pages });
   const diff = diffScanIssues(currentIssues, input.baselineIssues ?? []);
 
