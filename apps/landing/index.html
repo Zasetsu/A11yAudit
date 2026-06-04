@@ -69,7 +69,6 @@
         <a class="btn btn-primary btn-lg" href="#iletisim">İletişime geçin</a>
         <a class="btn btn-ghost btn-lg" href="#urun">Ürünü inceleyin →</a>
       </div>
-      <p class="hero-trust"><span class="dot"></span> Kamu kurumları, bankalar, e-ticaret ve kurumsal ekipler için.</p>
     </div>
 
     <div class="hero-mock reveal">
@@ -208,65 +207,12 @@
       <p class="lead">Erişilebilirlik yalnızca otomatik testlerden geçmek değildir. Gerçek kullanıcılar siteleri farklı görme, okuma, odaklanma, hareket ve bilişsel ihtiyaçlarla deneyimler. Audera Assist, ziyaretçilerin site deneyimini kendi ihtiyaçlarına göre uyarlamasını sağlayan, kullanıcı kontrollü bir destek katmanıdır.</p>
     </div>
 
-    <!-- interactive demo -->
+    <!-- live demo: real widget in an iframe -->
     <div class="assist-demo reveal">
       <div class="demo-stage">
-        <div class="demo-toolbar"><div class="dots"><i></i><i></i><i></i></div><div class="u">örnek-site.com</div></div>
-        <div class="reading-mask" id="maskTop" style="top:42px;height:0"></div>
-        <div class="reading-mask" id="maskBottom" style="bottom:0;height:0"></div>
-        <div class="reading-guide" id="readGuide"></div>
-        <article id="assistSample">
-          <div class="kicker">Belediye Hizmetleri</div>
-          <h3 id="sampleHeading">Su ve atık yönetimi başvuruları artık çevrim içi</h3>
-          <p>Vatandaşlarımız, su aboneliği ve atık toplama hizmetlerine ilişkin başvurularını artık tek bir formdan tamamlayabiliyor. Başvuru sırasında gerekli belgeleri yükleyebilir, durumunuzu gerçek zamanlı olarak takip edebilirsiniz.</p>
-          <p>Daha fazla bilgi için <a href="#assist">hizmet rehberini inceleyin</a> veya çağrı merkezimizle iletişime geçin. Bu sayfadaki ayarları sağdaki Audera Assist panelinden değiştirerek deneyiminizi kendinize göre uyarlayabilirsiniz.</p>
-          <div class="media" data-media="true">görsel / kampanya banner'ı</div>
-          <div class="btnrow">
-            <span class="sbtn">Başvuru oluştur</span>
-            <span class="sbtn sec">Hizmet rehberi</span>
-          </div>
-        </article>
+        <div class="demo-toolbar"><div class="dots"><i></i><i></i><i></i></div><div class="u">ornek-belediye.gov.tr</div></div>
+        <iframe class="demo-frame" src="/demo/ornek-site.html" title="Audera Assist canlı demo" loading="lazy" style="width:100%;height:420px;border:0;display:block;background:#fff"></iframe>
       </div>
-
-      <!-- control panel -->
-      <aside class="assist-panel" aria-label="Audera Assist tercih paneli">
-        <div class="ap-head">
-          <span class="ai"><svg width="18" height="18" viewBox="0 0 64 64" fill="none" aria-hidden="true"><path d="M16 41 L32 19 L48 41" fill="none" stroke="#0a0a0c" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><path d="M22.5 45.5 L32 32 L41.5 45.5" fill="none" stroke="#0a0a0c" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/></svg></span>
-          <span class="t">Erişilebilirlik tercihleri<small>Canlı demo — deneyin</small></span>
-          <button class="reset" id="assistReset">Sıfırla</button>
-        </div>
-        <div class="ap-body">
-          <div class="ap-group">
-            <div class="gh">Okuma konforu</div>
-            <div class="ap-row"><span class="lbl">Metin boyutu</span><div class="step-ctrl" data-step="fontSize"><button data-dir="-1" aria-label="Metni küçült">−</button><span class="val">100%</span><button data-dir="1" aria-label="Metni büyüt">+</button></div></div>
-            <div class="ap-row"><span class="lbl">Satır yüksekliği</span><div class="step-ctrl" data-step="lineHeight"><button data-dir="-1" aria-label="Azalt">−</button><span class="val">1.7</span><button data-dir="1" aria-label="Artır">+</button></div></div>
-            <div class="ap-row"><span class="lbl">Harf aralığı</span><div class="step-ctrl" data-step="letterSpacing"><button data-dir="-1" aria-label="Azalt">−</button><span class="val">0</span><button data-dir="1" aria-label="Artır">+</button></div></div>
-            <div class="ap-row"><span class="lbl">Disleksi dostu font</span><button class="tgl" role="switch" aria-checked="false" data-toggle="dyslexia"><i></i></button></div>
-            <div class="ap-row"><span class="lbl">Bionic okuma</span><button class="tgl" role="switch" aria-checked="false" data-toggle="bionic"><i></i></button></div>
-          </div>
-          <div class="ap-group">
-            <div class="gh">Görsel algı ve kontrast</div>
-            <div class="ap-row"><span class="lbl">Yüksek kontrast</span><button class="tgl" role="switch" aria-checked="false" data-toggle="contrast"><i></i></button></div>
-            <div class="ap-row"><span class="lbl">Gri tonlama</span><button class="tgl" role="switch" aria-checked="false" data-toggle="grayscale"><i></i></button></div>
-            <div class="ap-row"><span class="lbl">Doygunluğu azalt</span><button class="tgl" role="switch" aria-checked="false" data-toggle="lowsat"><i></i></button></div>
-          </div>
-          <div class="ap-group">
-            <div class="gh">Gezinme ve odak</div>
-            <div class="ap-row"><span class="lbl">Linkleri belirginleştir</span><button class="tgl" role="switch" aria-checked="false" data-toggle="links"><i></i></button></div>
-            <div class="ap-row"><span class="lbl">Büyük imleç</span><button class="tgl" role="switch" aria-checked="false" data-toggle="cursor"><i></i></button></div>
-          </div>
-          <div class="ap-group">
-            <div class="gh">Okuma ve dikkat</div>
-            <div class="ap-row"><span class="lbl">Okuma maskesi</span><button class="tgl" role="switch" aria-checked="false" data-toggle="mask"><i></i></button></div>
-            <div class="ap-row"><span class="lbl">Okuma kılavuzu</span><button class="tgl" role="switch" aria-checked="false" data-toggle="guide"><i></i></button></div>
-          </div>
-          <div class="ap-group">
-            <div class="gh">Hareket ve medya</div>
-            <div class="ap-row"><span class="lbl">Animasyonları durdur</span><button class="tgl" role="switch" aria-checked="false" data-toggle="stopmotion"><i></i></button></div>
-            <div class="ap-row"><span class="lbl">Görselleri gizle</span><button class="tgl" role="switch" aria-checked="false" data-toggle="hideimg"><i></i></button></div>
-          </div>
-        </div>
-      </aside>
     </div>
 
     <!-- category cards -->
@@ -507,5 +453,6 @@
 </footer>
 
 <script src="landing/landing.js"></script>
+<script src="/assist/a11yaudit-assist.js" data-position="bottom-right" data-language="tr" data-project="audera-site" defer></script>
 </body>
 </html>
