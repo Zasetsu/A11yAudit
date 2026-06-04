@@ -17,6 +17,7 @@ import { SignupPage } from "./pages/signup";
 import { InvitePage } from "./pages/invite";
 import { WorkspacesPage } from "./pages/workspaces";
 import { Button, Icon, PageHeader, Panel } from "./design/ui";
+import { useT } from "./i18n/locale-context.js";
 
 export type Route =
   | { page: "overview" }
@@ -143,21 +144,22 @@ function latestScanForProject(scans: ScanRun[] | undefined, projectId: string): 
 }
 
 function DocsPage() {
+  const { t } = useT();
   return (
     <div className="content-inner fadein">
       <PageHeader
         icon="book-open"
-        subtitle="Operator notes for this open-source, self-hosted MVP."
-        title="Documentation"
+        subtitle={t("docs.subtitle")}
+        title={t("nav.docs")}
       />
-      <Panel title="MVP scope">
+      <Panel title={t("docs.mvpScope")}>
         <div className="doc-grid">
-          <div className="note"><Icon name="info" size={14} /> A11yAudit scans public HTTP and HTTPS targets only. Authenticated scans, scheduled scans, CSV exports, and resolved-state workflows are outside this MVP.</div>
+          <div className="note"><Icon name="info" size={14} /> {t("docs.scopeBody")}</div>
           <ul className="doc-list">
-            <li>Create or select a public website project.</li>
-            <li>Run a single URL scan or a same-domain crawl with max page, max depth, desktop, and mobile controls.</li>
-            <li>Review findings grouped by WCAG criterion, severity, viewport, selector, screenshot, and snippet evidence.</li>
-            <li>Download HTML and PDF report artifacts from completed scans.</li>
+            <li>{t("docs.bullet1")}</li>
+            <li>{t("docs.bullet2")}</li>
+            <li>{t("docs.bullet3")}</li>
+            <li>{t("docs.bullet4")}</li>
           </ul>
         </div>
       </Panel>
@@ -187,6 +189,7 @@ function DashboardApp({
   setTheme: (setValue: (value: "light" | "dark") => "light" | "dark") => void;
   onLogout: () => void;
 }) {
+  const { t } = useT();
   const contentRef = useRef<HTMLElement>(null);
   const projectsQuery = useQuery({
     queryKey: ["projects", currentWorkspaceSlug],
@@ -299,15 +302,15 @@ function DashboardApp({
           toggleTheme={() => setTheme((value) => (value === "light" ? "dark" : "light"))}
           onLogout={onLogout}
         />
-        <main aria-label="Main content" className="content" ref={contentRef}>
+        <main aria-label={t("app.mainContent")} className="content" ref={contentRef}>
           {projectsQuery.isError || scansQuery.isError || findingsQuery.isError || issuesQuery.isError || reportsQuery.isError ? (
             <div className="content-inner" style={{ paddingBottom: 0 }}>
-              <div className="note"><Icon name="info" size={14} /> API data is unavailable, so the interface is showing local demo data.</div>
+              <div className="note"><Icon name="info" size={14} /> {t("app.demoBanner")}</div>
             </div>
           ) : null}
           {view}
           <div className="mobile-only" style={{ padding: "0 14px 18px" }}>
-            <Button icon="scan-search" onClick={() => navigate({ page: "new-scan" })} variant="primary">New Scan</Button>
+            <Button icon="scan-search" onClick={() => navigate({ page: "new-scan" })} variant="primary">{t("common.newScan")}</Button>
           </div>
         </main>
       </div>
@@ -316,6 +319,7 @@ function DashboardApp({
 }
 
 export function App() {
+  const { t } = useT();
   const [appRoute, setAppRoute] = useState<AppRoute>(() => parsePath(window.location.pathname));
   const [authenticatedSession, setAuthenticatedSession] = useState<AuthSession | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">(() => {
@@ -414,7 +418,7 @@ export function App() {
     return (
       <main aria-label="Main content" className="content auth-content">
         <div className="content-inner fadein">
-          <Panel title="Loading">Preparing your session.</Panel>
+          <Panel title={t("common.loading")}>{t("app.preparingSession")}</Panel>
         </div>
       </main>
     );
