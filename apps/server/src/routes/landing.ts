@@ -114,7 +114,7 @@ export async function registerLandingRoutes(server: FastifyInstance): Promise<vo
   }
 
   // `wildcard: false` registers one route per file/dir (e.g. `/`, `/index.html`,
-  // `/landing/*`, `/assets/*`, `/demo/*`) instead of a single `/*` catch-all,
+  // `/landing/*`, `/assist/*`) instead of a single `/*` catch-all,
   // so the static plugin never shadows `/api`, `/assist`, `/health`, or `/app`.
   await server.register(fastifyStatic, {
     root,

@@ -207,12 +207,66 @@
       <p class="lead">Erişilebilirlik yalnızca otomatik testlerden geçmek değildir. Gerçek kullanıcılar siteleri farklı görme, okuma, odaklanma, hareket ve bilişsel ihtiyaçlarla deneyimler. Audera Assist, ziyaretçilerin site deneyimini kendi ihtiyaçlarına göre uyarlamasını sağlayan, kullanıcı kontrollü bir destek katmanıdır.</p>
     </div>
 
-    <!-- live demo: real widget in an iframe -->
+    <!-- interactive demo -->
     <div class="assist-demo reveal">
       <div class="demo-stage">
-        <div class="demo-toolbar"><div class="dots"><i></i><i></i><i></i></div><div class="u">ornek-belediye.gov.tr</div></div>
-        <iframe class="demo-frame" src="/demo/ornek-site.html" title="Audera Assist canlı demo" loading="lazy" style="width:100%;height:420px;border:0;display:block;background:#fff"></iframe>
+        <div class="demo-toolbar"><div class="dots"><i></i><i></i><i></i></div><div class="u">örnek-site.com</div></div>
+        <div class="reading-mask" id="maskTop" style="top:42px;height:0"></div>
+        <div class="reading-mask" id="maskBottom" style="bottom:0;height:0"></div>
+        <div class="reading-guide" id="readGuide"></div>
+        <article id="assistSample">
+          <div class="kicker">Erişilebilirlik Mevzuatı</div>
+          <h3 id="sampleHeading">Web Siteleri ve Mobil Uygulamaların Erişilebilirliği İzleme Sistemi Kuruluyor</h3>
+          <span class="live-badge"><i></i> İzleme aktif</span>
+          <p>Aile ve Sosyal Hizmetler Bakanlığı bünyesinde "Web Siteleri ve Mobil Uygulamaların Erişilebilirliği <a href="#assist">İzleme Komisyonu</a>" kurularak web siteleri ve mobil uygulamaların erişilebilirlik durumu izlenecek. Aile ve Sosyal Hizmetler Bakanının başkanı olduğu Komisyon, Bakanlık tarafından her yıl yayımlayacak olan "Web Siteleri ve Mobil Uygulamaların Erişilebilirliği <a href="#assist">İzleme Planı</a>"na göre izlemeyi gerçekleştirecek.</p>
+          <p>İzleme Komisyonunun yanında Genelge ile ayrıca "Web Siteleri ve Mobil Uygulamaların Erişilebilirliği Danışma Komisyonu" da kuruluyor. Bu Komisyon, İçişleri ile Ulaştırma ve Altyapı Bakanlıkları, Türkiye Bilimsel ve Teknolojik Araştırma Kurumu, TÜRKSAT A.Ş. ve engellilik alanında faaliyet gösteren ulusal düzeyde en çok temsil gücünü haiz iki konfederasyonun temsilcilerinden oluşacak ve ihtiyaç halinde ilgili diğer kamu kurum ve kuruluşları ile üniversiteler, meslek kuruluşları, sivil toplum kuruluşları ve özel sektör temsilcileri çalışmalara davet edilecek. İzleme Komisyonunun çalışmalarında ortaya çıkan tereddütlü hususların karara bağlanması ve İzleme Planı oluşturulmasında destek vermesi beklenen Komisyon, aynı zamanda ilgili tarafların erişilebilirliğin sağlanması sürecinde işbirliğini de hedefliyor.</p>
+          <img class="media" data-media="true" alt="Erişilebilirlik izleme görseli" src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='520'%20height='140'%20viewBox='0%200%20520%20140'%3E%3Crect%20width='520'%20height='140'%20rx='12'%20fill='%23eef2f8'/%3E%3Crect%20x='20'%20y='24'%20width='300'%20height='16'%20rx='8'%20fill='%23c3cdde'/%3E%3Crect%20x='20'%20y='54'%20width='220'%20height='12'%20rx='6'%20fill='%23d7deea'/%3E%3Crect%20x='20'%20y='78'%20width='260'%20height='12'%20rx='6'%20fill='%23d7deea'/%3E%3Ccircle%20cx='440'%20cy='70'%20r='42'%20fill='%23b9c6dd'/%3E%3Cpath%20d='M422%2070%20l12%2012%20l24%20-26'%20fill='none'%20stroke='%23eef2f8'%20stroke-width='6'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3C/svg%3E">
+          <div class="btnrow">
+            <span class="sbtn">Başvuru oluştur</span>
+            <span class="sbtn sec">Hizmet rehberi</span>
+          </div>
+        </article>
       </div>
+
+      <!-- control panel -->
+      <aside class="assist-panel" aria-label="Audera Assist tercih paneli">
+        <div class="ap-head">
+          <span class="ai"><svg width="18" height="18" viewBox="0 0 64 64" fill="none" aria-hidden="true"><path d="M16 41 L32 19 L48 41" fill="none" stroke="#0a0a0c" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><path d="M22.5 45.5 L32 32 L41.5 45.5" fill="none" stroke="#0a0a0c" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/></svg></span>
+          <span class="t">Erişilebilirlik tercihleri<small>Canlı demo — deneyin</small></span>
+          <button class="reset" id="assistReset">Sıfırla</button>
+        </div>
+        <div class="ap-body">
+          <div class="ap-group">
+            <div class="gh">Okuma konforu</div>
+            <div class="ap-row"><span class="lbl">Metin boyutu</span><div class="step-ctrl" data-step="fontSize"><button data-dir="-1" aria-label="Metni küçült">−</button><span class="val">100%</span><button data-dir="1" aria-label="Metni büyüt">+</button></div></div>
+            <div class="ap-row"><span class="lbl">Satır yüksekliği</span><div class="step-ctrl" data-step="lineHeight"><button data-dir="-1" aria-label="Azalt">−</button><span class="val">1.7</span><button data-dir="1" aria-label="Artır">+</button></div></div>
+            <div class="ap-row"><span class="lbl">Harf aralığı</span><div class="step-ctrl" data-step="letterSpacing"><button data-dir="-1" aria-label="Azalt">−</button><span class="val">0</span><button data-dir="1" aria-label="Artır">+</button></div></div>
+            <div class="ap-row"><span class="lbl">Disleksi dostu font</span><button class="tgl" role="switch" aria-checked="false" data-toggle="dyslexia"><i></i></button></div>
+            <div class="ap-row"><span class="lbl">Bionic okuma</span><button class="tgl" role="switch" aria-checked="false" data-toggle="bionic"><i></i></button></div>
+          </div>
+          <div class="ap-group">
+            <div class="gh">Görsel algı ve kontrast</div>
+            <div class="ap-row"><span class="lbl">Yüksek kontrast</span><button class="tgl" role="switch" aria-checked="false" data-toggle="contrast"><i></i></button></div>
+            <div class="ap-row"><span class="lbl">Gri tonlama</span><button class="tgl" role="switch" aria-checked="false" data-toggle="grayscale"><i></i></button></div>
+            <div class="ap-row"><span class="lbl">Doygunluğu azalt</span><button class="tgl" role="switch" aria-checked="false" data-toggle="lowsat"><i></i></button></div>
+          </div>
+          <div class="ap-group">
+            <div class="gh">Gezinme ve odak</div>
+            <div class="ap-row"><span class="lbl">Linkleri belirginleştir</span><button class="tgl" role="switch" aria-checked="false" data-toggle="links"><i></i></button></div>
+            <div class="ap-row"><span class="lbl">Büyük imleç</span><button class="tgl" role="switch" aria-checked="false" data-toggle="cursor"><i></i></button></div>
+          </div>
+          <div class="ap-group">
+            <div class="gh">Okuma ve dikkat</div>
+            <div class="ap-row"><span class="lbl">Okuma maskesi</span><button class="tgl" role="switch" aria-checked="false" data-toggle="mask"><i></i></button></div>
+            <div class="ap-row"><span class="lbl">Okuma kılavuzu</span><button class="tgl" role="switch" aria-checked="false" data-toggle="guide"><i></i></button></div>
+          </div>
+          <div class="ap-group">
+            <div class="gh">Hareket ve medya</div>
+            <div class="ap-row"><span class="lbl">Animasyonları durdur</span><button class="tgl" role="switch" aria-checked="false" data-toggle="stopmotion"><i></i></button></div>
+            <div class="ap-row"><span class="lbl">Görselleri gizle</span><button class="tgl" role="switch" aria-checked="false" data-toggle="hideimg"><i></i></button></div>
+          </div>
+        </div>
+      </aside>
     </div>
 
     <!-- category cards -->
