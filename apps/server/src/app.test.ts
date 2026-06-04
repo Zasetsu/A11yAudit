@@ -4185,6 +4185,7 @@ describe("assist widget bundle route", () => {
         expect(res.statusCode).toBe(200);
         expect(res.headers["content-type"]).toContain("text/javascript");
         expect(res.headers["access-control-allow-origin"]).toBe("*");
+        expect(res.headers["access-control-allow-credentials"]).toBe("false");
         expect(res.headers["cache-control"]).toContain("max-age");
       } finally {
         await app.close();
@@ -4200,6 +4201,7 @@ describe("assist widget bundle route", () => {
         expect(res.statusCode).toBe(200);
         expect(res.headers["content-type"]).toContain("application/json");
         expect(res.headers["access-control-allow-origin"]).toBe("*");
+        expect(res.headers["access-control-allow-credentials"]).toBe("false");
       } finally {
         await app.close();
       }

@@ -53,6 +53,7 @@ async function serveAsset(
     reply
       .header("content-type", contentType)
       .header("access-control-allow-origin", "*")
+      .header("access-control-allow-credentials", "false")
       .header("cache-control", "public, max-age=3600")
       .send(body);
   } catch {
