@@ -63,7 +63,7 @@
 
     var top =
       '<div class="c-top">' +
-      '<div class="c-chip"><span class="pl">Ö</span>Örnek Belediye Portalı</div>' +
+      '<div class="c-chip"><span class="pl">K</span>Kontent</div>' +
       '<div class="c-newbtn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#faf8f5" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Yeni Tarama</div>' +
       '<div class="c-search">Bulgu, URL veya WCAG kriteri ara…</div></div>';
 
@@ -96,8 +96,8 @@
 
     var body =
       '<div class="c-body">' +
-      '<div class="c-ptitle">Örnek Belediye Portalı</div>' +
-      '<div class="c-pdom">ornekbelediye.gov.tr · son tarama 3 Haz 2026</div>' +
+      '<div class="c-ptitle">Kontent</div>' +
+      '<div class="c-pdom">kontent.com.tr · son tarama 3 Haz 2026</div>' +
       '<div class="c-cards">' + scoreCard + '<div class="c-stats">' + stats + '</div></div>' +
       severityCard;
 

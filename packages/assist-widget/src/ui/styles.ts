@@ -45,7 +45,11 @@ export const WIDGET_CSS = `
 .aa-assist-launcher:focus-visible,.aa-assist-control:focus-visible,.aa-assist-clear:focus-visible,
 .aa-assist-close:focus-visible,.aa-assist-structure-item:focus-visible { outline:3px solid #111827; outline-offset:3px; }
 .aa-assist-panel {
-  width:min(420px,calc(100vw - 32px));max-height:min(720px,calc(100vh - 32px));overflow:auto;margin-bottom:10px;
+  width:min(420px,calc(100vw - 32px));overflow:auto;margin-bottom:10px;
+  /* reserve launcher (52px) + gaps + host inset so the panel never clips off-screen;
+     dvh override handles the iOS dynamic URL bar where supported */
+  max-height:min(720px,calc(100vh - 96px));
+  max-height:min(720px,calc(100dvh - 96px));
   background:#fff;color:#111827;border:1px solid #e6e7eb;border-radius:16px;box-shadow:0 20px 50px rgba(17,24,39,.18);
 }
 :host([data-position^="top"]) .aa-assist-panel { margin-top:10px;margin-bottom:0; }
