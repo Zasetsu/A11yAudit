@@ -85,6 +85,30 @@ GET  /api/workspaces/:workspaceSlug/reports
 
 Workspace-scoped routes require an authenticated session and membership in the workspace identified by `:workspaceSlug`.
 
+## Accessibility widget (embeddable)
+
+The server serves the built accessibility widget bundle at:
+
+```text
+GET /assist/a11yaudit-assist.js
+GET /assist/a11yaudit-assist.js.map
+```
+
+These are **public, unauthenticated, CSRF-exempt** GETs with `Access-Control-Allow-Origin: *` (and `Access-Control-Allow-Credentials: false`, spec-valid for `*`) and a `public, max-age=3600` cache. The route requires the widget package to be built (`pnpm build` produces `packages/assist-widget/dist/a11yaudit-assist.js`); if the bundle is missing the route returns `404`.
+
+Customers embed the widget with one script tag pointing at the Audera server origin:
+
+```html
+<script src="https://<A11YAUDIT_SERVER_URL>/assist/a11yaudit-assist.js"
+        data-project="<projectId>"
+        data-position="bottom-right"
+        data-language="tr"
+        defer></script>
+```
+
+- `data-language` is `tr` or `en` and **defaults to `tr`** (falls back to the host page's `<html lang>` when not set, then `tr`).
+- `data-position` (`bottom-right` default), `data-enabled-sections` (e.g. `content navigation color`), and `data-project` are optional. The widget is fully client-side (preferences in `localStorage`); `data-project` is an embedded label only — no server calls.
+
 ## Operational Boundaries
 
 A11yAudit scans public HTTP/HTTPS targets and keeps the same SSRF-sensitive safety boundary described in `SECURITY.md`: localhost, private-network, link-local, unsupported protocol, and unsafe redirect targets are blocked.
