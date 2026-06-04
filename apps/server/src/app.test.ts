@@ -1,7 +1,9 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { fileURLToPath } from "node:url";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { buildServer, readServerDbPath } from "./app.js";
 import { csrfCookieName, sessionCookieName } from "./auth/cookies.js";
 import { createSession } from "./auth/session.js";
@@ -4114,6 +4116,92 @@ describe("rate limiting", () => {
           });
           expect(response.statusCode).toBe(401);
         }
+      } finally {
+        await app.close();
+      }
+    });
+  });
+});
+
+describe("assist widget bundle route", () => {
+  // Resolve the bundle path the same way the route does: walk up from this
+  // test module until we find packages/assist-widget/dist/a11yaudit-assist.js.
+  function resolveBundlePath(): string | undefined {
+    let dir = dirname(fileURLToPath(import.meta.url));
+    for (let i = 0; i < 12; i += 1) {
+      const candidate = join(dir, "packages/assist-widget/dist/a11yaudit-assist.js");
+      if (existsSync(candidate)) return candidate;
+      const parent = dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+    return undefined;
+  }
+
+  // The bundle is built in earlier tasks, but to make this test deterministic
+  // regardless of build state we synthesize a fixture bundle + sourcemap at the
+  // resolved path when it is missing, and remove only what we created.
+  let createdBundle = false;
+  let createdMap = false;
+  let fixtureDir: string | undefined;
+
+  beforeAll(async () => {
+    if (resolveBundlePath() !== undefined) return;
+    // No build present: create the dist dir and fixture files at the expected
+    // location (repo root, since the search anchors on the bundle existing).
+    let dir = dirname(fileURLToPath(import.meta.url));
+    // Walk up to the repo root (nearest ancestor containing a packages dir).
+    for (let i = 0; i < 12; i += 1) {
+      if (existsSync(join(dir, "packages"))) break;
+      const parent = dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+    fixtureDir = join(dir, "packages/assist-widget/dist");
+    await mkdir(fixtureDir, { recursive: true });
+    const bundle = join(fixtureDir, "a11yaudit-assist.js");
+    const map = join(fixtureDir, "a11yaudit-assist.js.map");
+    if (!existsSync(bundle)) {
+      await writeFile(bundle, "/* assist widget fixture */\n", "utf8");
+      createdBundle = true;
+    }
+    if (!existsSync(map)) {
+      await writeFile(map, JSON.stringify({ version: 3, sources: [], mappings: "" }), "utf8");
+      createdMap = true;
+    }
+  });
+
+  afterAll(async () => {
+    if (fixtureDir === undefined) return;
+    if (createdBundle) await rm(join(fixtureDir, "a11yaudit-assist.js"), { force: true });
+    if (createdMap) await rm(join(fixtureDir, "a11yaudit-assist.js.map"), { force: true });
+  });
+
+  it("serves the assist widget bundle: 200, text/javascript, CORS *, no auth", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const res = await app.inject({ method: "GET", url: "/assist/a11yaudit-assist.js" });
+        expect(res.statusCode).toBe(200);
+        expect(res.headers["content-type"]).toContain("text/javascript");
+        expect(res.headers["access-control-allow-origin"]).toBe("*");
+        expect(res.headers["access-control-allow-credentials"]).toBe("false");
+        expect(res.headers["cache-control"]).toContain("max-age");
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("serves the assist widget sourcemap as JSON with CORS *", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const res = await app.inject({ method: "GET", url: "/assist/a11yaudit-assist.js.map" });
+        expect(res.statusCode).toBe(200);
+        expect(res.headers["content-type"]).toContain("application/json");
+        expect(res.headers["access-control-allow-origin"]).toBe("*");
+        expect(res.headers["access-control-allow-credentials"]).toBe("false");
       } finally {
         await app.close();
       }

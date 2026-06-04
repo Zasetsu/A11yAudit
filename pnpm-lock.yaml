@@ -58,7 +58,7 @@ importers:
         specifier: workspace:*
         version: link:../../packages/storage
       '@fastify/rate-limit':
-        specifier: ^9
+        specifier: ^9.1.0
         version: 9.1.0
       better-sqlite3:
         specifier: ^12.10.0
@@ -116,6 +116,15 @@ importers:
       happy-dom:
         specifier: ^20.9.0
         version: 20.9.0
+
+  packages/assist-widget:
+    devDependencies:
+      playwright:
+        specifier: ^1.44.0
+        version: 1.60.0
+      vite:
+        specifier: ^5.2.11
+        version: 5.4.21(@types/node@20.19.41)
 
   packages/audit:
     dependencies:

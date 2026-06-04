@@ -14,6 +14,7 @@ import { getBaselineContext } from "./repositories/issues.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerFindingRoutes } from "./routes/findings.js";
 import { registerArtifactRoutes } from "./routes/artifacts.js";
+import { registerAssistRoutes } from "./routes/assist.js";
 import { registerIssueRoutes } from "./routes/issues.js";
 import { registerProjectRoutes } from "./routes/projects.js";
 import { registerReportRoutes } from "./routes/reports.js";
@@ -346,6 +347,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   await registerIssueRoutes(app, { db: dbClient.db });
   await registerReportRoutes(app, { db: dbClient.db, storage });
   await registerArtifactRoutes(app, { db: dbClient.db, storage });
+  await registerAssistRoutes(app);
 
   return app;
 }
