@@ -134,6 +134,8 @@ export interface Messages {
   "runs.fullSite": string;
   "runs.singleUrl": string;
   "runs.profileMeta": (viewports: string, maxPages: number, maxDepth: number) => string;
+  "runs.pagesWord": string;
+  "runs.failedAfter": string;
   // findings
   "findings.subtitle": string;
   "findings.markResolved": string;
@@ -412,6 +414,8 @@ export const MESSAGES: Record<Locale, Messages> = {
     "runs.fullSite": "Tüm site",
     "runs.singleUrl": "Tek URL",
     "runs.profileMeta": (viewports, maxPages, maxDepth) => `${viewports} · ${maxPages} sayfa · derinlik ${maxDepth}`,
+    "runs.pagesWord": "sayfa",
+    "runs.failedAfter": "Şu kadar sonra başarısız:",
     "findings.subtitle": "WCAG referansları ve kanıt işaretçileriyle gruplanmış erişilebilirlik sorunları.",
     "findings.markResolved": "Çözüldü İşaretle",
     "findings.markResolvedDisabled": "Çözüldü işaretleme MVP dışındadır",
@@ -673,6 +677,8 @@ export const MESSAGES: Record<Locale, Messages> = {
     "runs.fullSite": "Full site",
     "runs.singleUrl": "Single URL",
     "runs.profileMeta": (viewports, maxPages, maxDepth) => `${viewports} · ${maxPages} pages · depth ${maxDepth}`,
+    "runs.pagesWord": "pages",
+    "runs.failedAfter": "Failed after",
     "findings.subtitle": "Grouped accessibility issues with WCAG references and evidence pointers.",
     "findings.markResolved": "Mark Resolved",
     "findings.markResolvedDisabled": "Mark Resolved is outside the MVP",

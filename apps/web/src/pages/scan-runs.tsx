@@ -1,8 +1,11 @@
 import { formatDate } from "../data";
 import { Button, PageHeader, Panel, Progress, RunStatusBadge } from "../design/ui";
 import { useT } from "../i18n/locale-context.js";
+import type { Messages } from "../i18n/messages.js";
 import type { PageProps } from "./page-props";
 import type { ScanRun } from "../data";
+
+type TFn = <K extends keyof Messages>(key: K) => Messages[K];
 
 export function scanProgressValue(scan: ScanRun): number {
   return (scan.pagesScanned / Math.max(scan.pagesQueued, 1)) * 100;
@@ -12,9 +15,9 @@ export function scanProgressTone(scan: ScanRun): string {
   return scan.status === "failed" ? "var(--critical)" : "var(--accent)";
 }
 
-export function scanProgressLabel(scan: ScanRun): string {
-  const pages = `${scan.pagesScanned}/${scan.pagesQueued} pages`;
-  return scan.status === "failed" ? `Failed after ${pages}` : pages;
+export function scanProgressLabel(scan: ScanRun, t: TFn): string {
+  const pages = `${scan.pagesScanned}/${scan.pagesQueued} ${t("runs.pagesWord")}`;
+  return scan.status === "failed" ? `${t("runs.failedAfter")} ${pages}` : pages;
 }
 
 export function scanRunMessage(scan: ScanRun): string | null {
@@ -68,7 +71,7 @@ export function ScanRunsPage({ scans, navigate }: PageProps) {
                   <td className="url-cell">{scan.url}</td>
                   <td style={{ minWidth: 150 }}>
                     <Progress color={scanProgressTone(scan)} value={scanProgressValue(scan)} />
-                    <div className={`table-sub ${scan.status === "failed" ? "error-text" : ""}`}>{scanProgressLabel(scan)}</div>
+                    <div className={`table-sub ${scan.status === "failed" ? "error-text" : ""}`}>{scanProgressLabel(scan, t)}</div>
                   </td>
                   <td className="num tnum">{scan.findingsTotal}</td>
                   <td>{formatDate(scan.createdAt, locale, t("common.notAvailable"))}</td>
