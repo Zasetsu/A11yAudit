@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../app";
+import { LocaleProvider } from "../i18n/locale-context.js";
 import type { AuthSession } from "../api/client";
 
 const api = vi.hoisted(() => ({
@@ -48,9 +49,11 @@ async function renderApp() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 0 } } });
   await act(async () => {
     root.render(
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>
+      <LocaleProvider>
+        <QueryClientProvider client={queryClient}>
+          <App />
+        </QueryClientProvider>
+      </LocaleProvider>
     );
   });
   return { container, root };
@@ -104,6 +107,7 @@ describe("members page", () => {
   let roots: Root[] = [];
 
   beforeEach(() => {
+    localStorage.setItem("a11yaudit-locale", "en");
     vi.clearAllMocks();
     api.getProjects.mockResolvedValue([]);
     api.getScans.mockResolvedValue([]);

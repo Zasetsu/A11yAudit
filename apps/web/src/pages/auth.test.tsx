@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App, parsePath } from "../app";
+import { LocaleProvider } from "../i18n/locale-context.js";
 import type { AuthSession } from "../api/client";
 import type { Project, ScanRun } from "../data";
 
@@ -127,9 +128,11 @@ async function renderApp() {
 
   await act(async () => {
     root.render(
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>
+      <LocaleProvider>
+        <QueryClientProvider client={queryClient}>
+          <App />
+        </QueryClientProvider>
+      </LocaleProvider>
     );
   });
 
@@ -252,6 +255,7 @@ describe("auth routes", () => {
   let roots: Root[] = [];
 
   beforeEach(() => {
+    localStorage.setItem("a11yaudit-locale", "en");
     vi.clearAllMocks();
     setupQueryMocks();
     setPath("/login");
