@@ -44,6 +44,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@a11yaudit/assist-widget':
+        specifier: workspace:*
+        version: link:../../packages/assist-widget
       '@a11yaudit/audit':
         specifier: workspace:*
         version: link:../../packages/audit

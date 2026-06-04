@@ -12,6 +12,7 @@
     "db:migrate": "tsx src/db/migrate.ts"
   },
   "dependencies": {
+    "@a11yaudit/assist-widget": "workspace:*",
     "@a11yaudit/audit": "workspace:*",
     "@a11yaudit/core": "workspace:*",
     "@a11yaudit/crawler": "workspace:*",
