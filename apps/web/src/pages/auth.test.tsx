@@ -272,7 +272,7 @@ describe("auth routes", () => {
   });
 
   it("renders the Turkish sign-in heading when locale is tr", () => {
-    const rendered = renderWithLocale(<LoginPage onAuthenticated={() => {}} />, "tr");
+    const rendered = renderWithLocale(<LoginPage onAuthenticated={() => {}} onSignup={() => {}} />, "tr");
     try {
       expect(rendered.container.textContent).toContain("Giriş Yap");
     } finally {

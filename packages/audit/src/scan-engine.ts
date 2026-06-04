@@ -13,14 +13,48 @@ import {
   type ScanFinding,
   type ScanRequest
 } from "@a11yaudit/core";
-import { buildAuditReportModel, renderPdfFromHtml, renderReportHtml } from "@a11yaudit/reporter";
+import { buildAuditReportModel, MAX_ELEMENTS_PER_CARD, renderPdfFromHtml, renderReportHtml } from "@a11yaudit/reporter";
 import { auditPage } from "@a11yaudit/rules";
 import { createArtifactKey, type StorageAdapter } from "@a11yaudit/storage";
-import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import { chromium, type Browser, type BrowserContext, type ElementHandle, type Page } from "playwright";
 import { calculateScore } from "./score.js";
 
 const PDF_DETAILED_FINDING_LIMIT = 500;
 const PDF_EVIDENCE_ROW_LIMIT = 500;
+// Crop capture is aligned to what the report actually displays: each problem card
+// shows at most MAX_ELEMENTS_PER_CARD elements, so we capture a crop only for the
+// first MAX_ELEMENTS_PER_CARD findings of each rule on a page (the displayed ones),
+// bounded by a per-page ceiling so pathological pages with many rules stay fast.
+const MAX_ELEMENT_CROPS_PER_PAGE = 80;
+const CROP_CONTEXT_PADDING = 24;
+
+export async function collectScreenshotDataUris(
+  findings: ScanFinding[],
+  storage: StorageAdapter
+): Promise<Map<string, string>> {
+  const keys = new Map<string, string>(); // artifactKey -> mimeType
+  for (const finding of findings) {
+    for (const evidence of finding.evidence) {
+      // Only element crops are embedded inline. Full-page screenshots stay as
+      // downloadable artifacts — inlining them duplicated a multi-MB image per
+      // element and bloated the report to hundreds of MB (PDF render then crashed).
+      if (evidence.kind === "element_screenshot") {
+        keys.set(evidence.artifactKey, evidence.mimeType);
+      }
+    }
+  }
+
+  const result = new Map<string, string>();
+  for (const [key, mimeType] of keys) {
+    try {
+      const bytes = await storage.get(key);
+      result.set(key, `data:${mimeType};base64,${bytes.toString("base64")}`);
+    } catch {
+      // missing artifact -> skip; the report renders that element without an image
+    }
+  }
+  return result;
+}
 
 export interface ScanProgressEvent {
   status: "crawling" | "auditing" | "reporting";
@@ -39,6 +73,7 @@ export async function runScan(input: RunScanInput): Promise<CompletedScanResult>
   const startedAt = new Date().toISOString();
   const pages: AuditedPage[] = [];
   const findings: ScanFinding[] = [];
+  const cropCapWarnings: string[] = [];
   let browser: Browser | null = null;
 
   await emitProgress(input, "crawling", 0, 0, 0);
@@ -89,12 +124,48 @@ export async function runScan(input: RunScanInput): Promise<CompletedScanResult>
             })
             : null;
 
+          let cropsThisPage = 0;
+          let cropsSkippedByCap = 0;
+          const cropsByRule = new Map<string, number>();
           for (const finding of auditResult.findings) {
+            let elementCrop: EvidenceArtifact | null = null;
+            // Only capture a crop if this element will actually be displayed: within
+            // the first MAX_ELEMENTS_PER_CARD findings of its rule (the per-card limit).
+            const ruleCropCount = cropsByRule.get(finding.ruleId) ?? 0;
+            const willBeDisplayed = Boolean(finding.selector) && ruleCropCount < MAX_ELEMENTS_PER_CARD;
+            if (willBeDisplayed && cropsThisPage < MAX_ELEMENT_CROPS_PER_PAGE) {
+              const handle = await page.$(finding.selector!).catch(() => null);
+              if (handle) {
+                elementCrop = await captureElementCropEvidence({
+                  runId: input.request.runId,
+                  page,
+                  element: handle,
+                  fingerprint: finding.fingerprint,
+                  storage: input.storage
+                });
+                await handle.dispose().catch(() => undefined);
+                if (elementCrop) {
+                  cropsThisPage += 1;
+                  cropsByRule.set(finding.ruleId, ruleCropCount + 1);
+                }
+              }
+            } else if (willBeDisplayed && cropsThisPage >= MAX_ELEMENT_CROPS_PER_PAGE) {
+              // A displayed element missed its crop only because the per-page ceiling
+              // was hit — this is the meaningful loss worth surfacing.
+              cropsSkippedByCap += 1;
+            }
             const snippet = await captureSnippetEvidence(input.request.runId, finding, input.storage);
-            findings.push({
-              ...finding,
-              evidence: pageScreenshot ? [pageScreenshot, ...snippet] : snippet
-            });
+            const evidence = [
+              ...(elementCrop ? [elementCrop] : []),
+              ...(pageScreenshot ? [pageScreenshot] : []),
+              ...snippet
+            ];
+            findings.push({ ...finding, evidence });
+          }
+          if (cropsSkippedByCap > 0) {
+            const warning = `Per-page element screenshot ceiling (${MAX_ELEMENT_CROPS_PER_PAGE}) reached on ${normalizedUrl} (${viewport.name}): ${cropsSkippedByCap} displayed element(s) shown without a crop.`;
+            cropCapWarnings.push(warning);
+            console.warn(`[scan-engine] ${warning}`);
           }
         } catch (error) {
           pages.push(createFailedPage(url, viewport.name, error));
@@ -130,7 +201,7 @@ export async function runScan(input: RunScanInput): Promise<CompletedScanResult>
     pages,
     findings,
     reports,
-    reportWarnings,
+    reportWarnings: [...cropCapWarnings, ...reportWarnings],
     score,
     startedAt,
     finishedAt: new Date().toISOString()
@@ -276,6 +347,64 @@ async function captureSnippetEvidence(
   ];
 }
 
+export async function captureElementCropEvidence(input: {
+  runId: string;
+  page: Page;
+  element: ElementHandle<Element>;
+  fingerprint: string;
+  storage: StorageAdapter;
+}): Promise<EvidenceArtifact | null> {
+  try {
+    await input.element.evaluate((node) => {
+      const el = node as HTMLElement;
+      el.dataset.aaPrevOutline = el.style.outline;
+      el.dataset.aaPrevOutlineOffset = el.style.outlineOffset;
+      el.style.outline = "3px solid #e11d48";
+      el.style.outlineOffset = "2px";
+    });
+
+    const box = await input.element.boundingBox();
+    if (!box) {
+      await clearCropHighlight(input.element);
+      return null;
+    }
+
+    const viewport = input.page.viewportSize() ?? { width: box.x + box.width, height: box.y + box.height };
+    const clipX = Math.max(0, box.x - CROP_CONTEXT_PADDING);
+    const clipY = Math.max(0, box.y - CROP_CONTEXT_PADDING);
+    const clip = {
+      x: clipX,
+      y: clipY,
+      width: Math.max(1, Math.min(viewport.width - clipX, box.width + CROP_CONTEXT_PADDING * 2)),
+      height: Math.max(1, Math.min(viewport.height - clipY, box.height + CROP_CONTEXT_PADDING * 2))
+    };
+    const png = await input.page.screenshot({ type: "png", clip });
+    await clearCropHighlight(input.element);
+
+    const key = createArtifactKey({
+      runId: input.runId,
+      kind: "screenshot",
+      name: `${input.fingerprint}:crop`,
+      extension: "png"
+    });
+    const stored = await input.storage.put(key, Buffer.from(png), "image/png");
+    return { kind: "element_screenshot", artifactKey: stored.key, mimeType: stored.mimeType, sizeBytes: stored.sizeBytes };
+  } catch {
+    await clearCropHighlight(input.element).catch(() => undefined);
+    return null;
+  }
+}
+
+async function clearCropHighlight(element: ElementHandle<Element>): Promise<void> {
+  await element.evaluate((node) => {
+    const el = node as HTMLElement;
+    el.style.outline = el.dataset.aaPrevOutline ?? "";
+    el.style.outlineOffset = el.dataset.aaPrevOutlineOffset ?? "";
+    delete el.dataset.aaPrevOutline;
+    delete el.dataset.aaPrevOutlineOffset;
+  });
+}
+
 async function validateFinalNavigation(requestedUrl: string, finalUrl: string): Promise<void> {
   await validateSafeAuditUrl(finalUrl);
 
@@ -295,12 +424,15 @@ async function storeReports(
   reportInput: { score: number; pages: AuditedPage[]; findings: ScanFinding[] }
 ): Promise<{ reports: CompletedScanResult["reports"]; reportWarnings: string[] }> {
   const generatedAt = new Date().toISOString();
+  const screenshotDataUris = await collectScreenshotDataUris(reportInput.findings, input.storage);
   const report = buildAuditReportModel({
     request: input.request,
     pages: reportInput.pages,
     findings: reportInput.findings,
     score: reportInput.score,
-    generatedAt
+    generatedAt,
+    locale: "tr",
+    screenshotDataUris
   });
   const html = renderReportHtml(report);
   const htmlArtifact = await input.storage.put(

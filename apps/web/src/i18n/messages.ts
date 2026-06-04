@@ -248,6 +248,8 @@ export interface Messages {
   "auth.signInFailed": string;
   "auth.signupFailed": string;
   "auth.inviteFailed": string;
+  "auth.noAccount": string;
+  "auth.haveAccount": string;
   // workspaces
   "workspaces.title": string;
   "workspaces.subtitle": string;
@@ -538,6 +540,8 @@ export const MESSAGES: Record<Locale, Messages> = {
     "auth.signInFailed": "Giriş başarısız. E-postanızı ve parolanızı kontrol edin.",
     "auth.signupFailed": "Hesap oluşturma başarısız. Bilgileri kontrol edip tekrar deneyin.",
     "auth.inviteFailed": "Davet kabulü başarısız. Daveti kontrol edip tekrar deneyin.",
+    "auth.noAccount": "Hesabınız yok mu?",
+    "auth.haveAccount": "Zaten hesabınız var mı?",
     "workspaces.title": "Çalışma Alanları",
     "workspaces.subtitle": "Açmak istediğiniz çalışma alanını seçin.",
     "workspaces.your": "Çalışma alanlarınız",
@@ -817,6 +821,8 @@ export const MESSAGES: Record<Locale, Messages> = {
     "auth.signInFailed": "Sign in failed. Check your email and password.",
     "auth.signupFailed": "Account creation failed. Check the details and try again.",
     "auth.inviteFailed": "Invite acceptance failed. Check the invite and try again.",
+    "auth.noAccount": "No account yet?",
+    "auth.haveAccount": "Already have an account?",
     "workspaces.title": "Workspaces",
     "workspaces.subtitle": "Choose the workspace you want to open.",
     "workspaces.your": "Your workspaces",

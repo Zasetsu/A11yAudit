@@ -3,7 +3,7 @@ import { login, type AuthSession } from "../api/client";
 import { Button, Field, PageHeader, Panel, TextInput } from "../design/ui";
 import { useT } from "../i18n/locale-context.js";
 
-export function LoginPage({ onAuthenticated }: { onAuthenticated: (session: AuthSession) => void }) {
+export function LoginPage({ onAuthenticated, onSignup }: { onAuthenticated: (session: AuthSession) => void; onSignup: () => void }) {
   const { t } = useT();
   const [error, setError] = useState<string | null>(null);
 
@@ -38,6 +38,10 @@ export function LoginPage({ onAuthenticated }: { onAuthenticated: (session: Auth
             <Button type="submit" variant="primary">{t("auth.signIn")}</Button>
           </form>
         </Panel>
+        <div className="note">
+          {t("auth.noAccount")}
+          <Button onClick={onSignup} type="button" variant="ghost">{t("auth.createAccount")}</Button>
+        </div>
       </div>
     </main>
   );
