@@ -4,24 +4,50 @@
 (function () {
   "use strict";
 
-  /* ---------- console mockup builder ---------- */
+  /* ---------- console mockup builder ----------
+     Static, inert replica of the Audera dashboard Overview page.
+     No live data — mirrors apps/web/src/pages/overview.tsx visually. */
+
+  // Severity palette mirrors the web app overview severity colors.
+  var SEV = { critical: "#c0392b", serious: "#e67e22", moderate: "#d4a017", minor: "#7f8c8d" };
+
   function ringSVG(score, size) {
     var r = (size - 9) / 2, c = 2 * Math.PI * r, off = c * (1 - score / 100);
-    var color = score >= 85 ? "#2f7c4d" : score >= 70 ? "#a37d10" : score >= 50 ? "#bf5e16" : "#be3525";
-    var grade = score >= 90 ? "A" : score >= 80 ? "B" : score >= 70 ? "C" : score >= 60 ? "D" : "E";
-    return '<div style="position:relative;width:' + size + 'px;height:' + size + 'px;flex:none">' +
+    // Score band: amber for the "needs improvement" range (>=70), green high, red low.
+    var color = score >= 85 ? "#2f7c4d" : score >= 70 ? "#c97a00" : score >= 50 ? "#bf5e16" : "#c0392b";
+    return '<div class="c-ring" style="width:' + size + 'px;height:' + size + 'px">' +
       '<svg width="' + size + '" height="' + size + '" style="transform:rotate(-90deg)">' +
       '<circle cx="' + size/2 + '" cy="' + size/2 + '" r="' + r + '" fill="none" stroke="#efebe4" stroke-width="9"/>' +
       '<circle cx="' + size/2 + '" cy="' + size/2 + '" r="' + r + '" fill="none" stroke="' + color + '" stroke-width="9" stroke-linecap="round" stroke-dasharray="' + c + '" stroke-dashoffset="' + off + '"/>' +
       '</svg>' +
-      '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">' +
-      '<span style="font-size:' + (size*0.3) + 'px;font-weight:600;letter-spacing:-0.03em;line-height:1;color:#1d1b18">' + score + '</span>' +
-      '<span style="font-size:9px;color:#8b867d;font-weight:600;margin-top:2px">NOT ' + grade + '</span></div></div>';
+      '<div class="c-ring-c">' +
+      '<span class="c-ring-n" style="font-size:' + (size*0.3) + 'px">' + score + '</span>' +
+      '<span class="c-ring-max">/100</span></div></div>';
   }
 
   var navItems = [
     { l: "Genel Bakış", on: true }, { l: "Projeler" }, { l: "Yeni Tarama" },
     { l: "Bulgular" }, { l: "Raporlar" }
+  ];
+
+  var severityRows = [
+    { l: "Kritik", n: 8, k: "critical" },
+    { l: "Ciddi", n: 14, k: "serious" },
+    { l: "Orta", n: 9, k: "moderate" },
+    { l: "Düşük", n: 5, k: "minor" }
+  ];
+
+  var statCards = [
+    { l: "Benzersiz sorun", v: 36 },
+    { l: "Etkilenen sayfa", v: 11 },
+    { l: "Tekrar", v: 248 },
+    { l: "Kritik", v: 8, crit: true }
+  ];
+
+  var recentRuns = [
+    { id: "run-7f3a", st: "Tamamlandı", on: "done", date: "3 Haz 2026", occ: 248 },
+    { id: "run-6b1c", st: "Tamamlandı", on: "done", date: "27 May 2026", occ: 271 },
+    { id: "run-5d09", st: "Denetleniyor", on: "running", date: "20 May 2026", occ: 263 }
   ];
 
   function buildConsole(el, full) {
@@ -41,34 +67,54 @@
       '<div class="c-newbtn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#faf8f5" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Yeni Tarama</div>' +
       '<div class="c-search">Bulgu, URL veya WCAG kriteri ara…</div></div>';
 
+    var stats = statCards.map(function (s) {
+      return '<div class="c-st"><div class="l">' + s.l + '</div><div class="v' + (s.crit ? " crit" : "") + '">' + s.v + '</div></div>';
+    }).join("");
+
+    var scoreCard =
+      '<div class="c-card c-score">' + ringSVG(73, 92) +
+      '<div class="c-score-meta">' +
+      '<div class="l">Erişilebilirlik skoru</div>' +
+      '<div class="c-band">Geliştirilmeli</div>' +
+      '<div class="c-score-sub">Otomatik denetlenebilir kriterlere dayalı teknik skor.</div>' +
+      '</div></div>';
+
+    var severityCard =
+      '<div class="c-card c-sevcard">' +
+      '<div class="c-cap">Önem dağılımı</div>' +
+      '<div class="c-meter">' +
+      severityRows.map(function (r, i) {
+        var w = [16, 28, 18, 10][i];
+        return '<i style="width:' + w + '%;background:' + SEV[r.k] + '"></i>';
+      }).join("") +
+      '</div>' +
+      '<div class="c-sevrows">' +
+      severityRows.map(function (r) {
+        return '<span class="c-sev-pill"><span class="dot" style="background:' + SEV[r.k] + '"></span>' + r.l + ' <b>' + r.n + '</b></span>';
+      }).join("") +
+      '</div></div>';
+
     var body =
       '<div class="c-body">' +
       '<div class="c-ptitle">Örnek Belediye Portalı</div>' +
-      '<div class="c-pdom">ornekbelediye.gov.tr · skor 74 · 248 sayfa</div>' +
-      '<div class="c-cards">' +
-        '<div class="c-card c-ring-wrap">' + ringSVG(74, 84) + '</div>' +
-        '<div class="c-stats">' +
-          '<div class="c-st"><div class="l">Toplam bulgu</div><div class="v">613</div></div>' +
-          '<div class="c-st"><div class="l">Kritik</div><div class="v crit">42</div></div>' +
-          '<div class="c-st"><div class="l">Yeni</div><div class="v">58</div></div>' +
-        '</div>' +
-      '</div>' +
-      '<div class="c-meter"><i style="width:7%;background:#be3525"></i><i style="width:31%;background:#bf5e16"></i><i style="width:47%;background:#a37d10"></i><i style="width:15%;background:#566f8c"></i></div>' +
-      '<div class="c-legend">' +
-        '<span class="c-lg"><span class="sq" style="background:#be3525"></span>Kritik 42</span>' +
-        '<span class="c-lg"><span class="sq" style="background:#bf5e16"></span>Ciddi 189</span>' +
-        '<span class="c-lg"><span class="sq" style="background:#a37d10"></span>Orta 291</span>' +
-        '<span class="c-lg"><span class="sq" style="background:#566f8c"></span>Küçük 91</span>' +
-      '</div>';
+      '<div class="c-pdom">ornekbelediye.gov.tr · son tarama 3 Haz 2026</div>' +
+      '<div class="c-cards">' + scoreCard + '<div class="c-stats">' + stats + '</div></div>' +
+      severityCard;
 
     if (full) {
       body +=
+        '<div class="c-runs">' +
+        '<div class="c-cap">Son taramalar</div>' +
         '<div class="c-table">' +
-        '<div class="c-tr h"><span>En çok tekrar eden sorun</span><span>WCAG</span><span>Örnek</span></div>' +
-        '<div class="c-tr"><span class="c-sev"><span class="sq" style="background:#bf5e16"></span>Yetersiz metin kontrastı</span><span class="mono">1.4.3</span><span>214</span></div>' +
-        '<div class="c-tr"><span class="c-sev"><span class="sq" style="background:#be3525"></span>Form alanı etiketsiz</span><span class="mono">1.3.1</span><span>118</span></div>' +
-        '<div class="c-tr"><span class="c-sev"><span class="sq" style="background:#be3525"></span>Simge butonun erişilebilir adı yok</span><span class="mono">4.1.2</span><span>73</span></div>' +
-        '</div>';
+        '<div class="c-tr h"><span>Tarama</span><span>Durum</span><span>Tarih</span><span class="num">Tekrar</span></div>' +
+        recentRuns.map(function (r) {
+          return '<div class="c-tr">' +
+            '<span class="mono">' + r.id + '</span>' +
+            '<span><span class="c-badge ' + r.on + '">' + r.st + '</span></span>' +
+            '<span class="c-date">' + r.date + '</span>' +
+            '<span class="num mono">' + r.occ + '</span></div>';
+        }).join("") +
+        '</div></div>';
     }
     body += '</div>';
 
