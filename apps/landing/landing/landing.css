@@ -336,9 +336,6 @@ html.theme-light .hero-mock-glow{background:radial-gradient(60% 100% at 50% 0%, 
 .whocard .ic{width:42px;height:42px;border-radius:11px;background:var(--panel-2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--accent-2);}
 .whocard h3{font-size:18px;font-weight:600;letter-spacing:-0.02em;margin-top:18px;}
 .whocard p{font-size:14px;color:var(--fg-2);margin-top:9px;line-height:1.55;}
-.sectors{display:flex;flex-wrap:wrap;gap:9px;margin-top:36px;justify-content:center;}
-.sector{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border:1px solid var(--line-2);border-radius:100px;font-size:14px;color:var(--fg-2);background:var(--panel);}
-.sector .d{width:6px;height:6px;border-radius:50%;background:var(--accent);}
 
 /* ============ FAQ ============ */
 .faq{max-width:780px;margin:52px auto 0;border-top:1px solid var(--line);}
