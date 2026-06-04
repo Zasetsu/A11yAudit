@@ -2,7 +2,10 @@ import { useMemo, useState } from "react";
 import { severityMeta, type Issue, type Severity } from "../data";
 import { Button, PageHeader, Panel, SeverityBadge } from "../design/ui";
 import { useT } from "../i18n/locale-context.js";
+import type { Messages } from "../i18n/messages.js";
 import type { PageProps } from "./page-props";
+
+type TFn = <K extends keyof Messages>(key: K) => Messages[K];
 
 const severityOptions: Array<Severity | "all"> = ["all", "critical", "serious", "moderate", "minor"];
 
@@ -15,8 +18,9 @@ export function sortIssuesForTriage(issues: Issue[]): Issue[] {
   );
 }
 
-function confidenceLabel(confidence: Issue["confidence"]): string {
-  return `${confidence[0].toUpperCase()}${confidence.slice(1)} confidence`;
+function confidenceLabel(confidence: Issue["confidence"], t: TFn): string {
+  const key = confidence === "high" ? "finding.confidenceHigh" : confidence === "medium" ? "finding.confidenceMedium" : "finding.confidenceLow";
+  return t(key);
 }
 
 export function FindingsPage({ issues, project, navigate }: PageProps) {
@@ -91,7 +95,7 @@ export function FindingsPage({ issues, project, navigate }: PageProps) {
                   <td><span className="wcag">{issue.wcagCriteria}</span></td>
                   <td>
                     {issue.likelyScope}
-                    <div className="table-sub">{confidenceLabel(issue.confidence)}</div>
+                    <div className="table-sub">{confidenceLabel(issue.confidence, t)}</div>
                   </td>
                   <td>{issue.componentArea}</td>
                   <td>{issue.cmsHint}</td>
