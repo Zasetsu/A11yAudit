@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App } from "./app";
+import { LocaleProvider } from "./i18n/locale-context.js";
 import "./design/tokens.css";
 
 const queryClient = new QueryClient({
@@ -21,8 +22,10 @@ if (root === null) {
 
 createRoot(root).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
+    <LocaleProvider>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </LocaleProvider>
   </React.StrictMode>
 );
