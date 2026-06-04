@@ -60,6 +60,12 @@ export const projects = sqliteTable("projects", {
   workspaceDomainUnique: uniqueIndex("projects_workspace_domain_unique").on(table.workspaceId, table.domain)
 }));
 
+export const widgetConfigs = sqliteTable("widget_configs", {
+  projectId: text("project_id").primaryKey().references(() => projects.id, { onDelete: "cascade" }),
+  config: text("config").notNull(),
+  updatedAt: text("updated_at").notNull()
+});
+
 export const scanRuns = sqliteTable("scan_runs", {
   id: text("id").primaryKey(),
   projectId: text("project_id")

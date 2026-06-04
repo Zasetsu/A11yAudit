@@ -190,6 +190,12 @@ export function initializeDb(sqlite: Database.Database): void {
       created_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS widget_configs (
+      project_id TEXT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+      config TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_projects_domain ON projects(domain);
     CREATE UNIQUE INDEX IF NOT EXISTS projects_workspace_domain_unique ON projects(workspace_id, domain);
     CREATE UNIQUE INDEX IF NOT EXISTS workspace_members_workspace_user_unique ON workspace_members(workspace_id, user_id);
