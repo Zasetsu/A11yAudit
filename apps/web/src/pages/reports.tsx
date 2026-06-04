@@ -2,7 +2,10 @@ import { getReportDownloadUrl } from "../api/client";
 import { formatBytes, formatDate } from "../data";
 import { Button, Icon, PageHeader, Panel, RunStatusBadge } from "../design/ui";
 import { useT } from "../i18n/locale-context.js";
+import type { Messages } from "../i18n/messages.js";
 import type { PageProps } from "./page-props";
+
+type Translate = <K extends keyof Messages>(key: K) => Messages[K];
 
 export function reportActionLabel(report: PageProps["reports"][number]): string {
   const kind = report.kind.trim();
@@ -13,9 +16,9 @@ export function reportDownloadUrl(report: PageProps["reports"][number], workspac
   return report.status === "ready" ? getReportDownloadUrl(workspaceSlug, report.id) : null;
 }
 
-export function reportDownloadTitle(report: PageProps["reports"][number]): string {
+export function reportDownloadTitle(report: PageProps["reports"][number], t: Translate): string {
   const actionLabel = reportActionLabel(report);
-  return report.status === "ready" ? `Download ${actionLabel} report` : `${actionLabel} report is still generating`;
+  return report.status === "ready" ? t("reports.downloadTitle")(actionLabel) : t("reports.generatingTitle")(actionLabel);
 }
 
 export function ReportsPage({ workspaceSlug, reports, scans, navigate }: PageProps) {
@@ -60,9 +63,9 @@ export function ReportsPage({ workspaceSlug, reports, scans, navigate }: PagePro
                     <td>{formatDate(report.createdAt, locale, t("common.notAvailable"))}</td>
 	                    <td className="num">
 	                      {downloadUrl === null ? (
-	                        <Button disabled icon="download" size="sm" title={reportDownloadTitle(report)}>{actionLabel}</Button>
+	                        <Button disabled icon="download" size="sm" title={reportDownloadTitle(report, t)}>{actionLabel}</Button>
 	                      ) : (
-	                        <a className="btn default sm" download href={downloadUrl} title={reportDownloadTitle(report)}>
+	                        <a className="btn default sm" download href={downloadUrl} title={reportDownloadTitle(report, t)}>
                           <Icon name="download" size={13} />
                           {actionLabel}
                         </a>

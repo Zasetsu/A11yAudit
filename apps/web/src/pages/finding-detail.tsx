@@ -2,16 +2,21 @@ import { getArtifactDownloadUrl } from "../api/client";
 import { formatBytes, type Issue } from "../data";
 import { Button, Icon, PageHeader, Panel, SeverityBadge, StatusBadge, ViewportBadge } from "../design/ui";
 import { useT } from "../i18n/locale-context.js";
+import type { Messages } from "../i18n/messages.js";
 import type { PageProps } from "./page-props";
 
-function evidenceLabel(kind: string): string {
-  if (kind === "page_screenshot") return "Page screenshot";
-  if (kind === "html_snippet") return "HTML snippet";
+type Translate = <K extends keyof Messages>(key: K) => Messages[K];
+
+function evidenceLabel(kind: string, t: Translate): string {
+  if (kind === "page_screenshot") return t("finding.evidencePageScreenshot");
+  if (kind === "html_snippet") return t("finding.evidenceHtmlSnippet");
   return kind.replaceAll("_", " ");
 }
 
-function confidenceLabel(confidence: Issue["confidence"]): string {
-  return `${confidence[0].toUpperCase()}${confidence.slice(1)} confidence`;
+function confidenceLabel(confidence: Issue["confidence"], t: Translate): string {
+  if (confidence === "high") return t("finding.confidenceHigh");
+  if (confidence === "medium") return t("finding.confidenceMedium");
+  return t("finding.confidenceLow");
 }
 
 export function FindingDetailPage({ workspaceSlug, findings, issues, findingId, navigate }: PageProps & { findingId: string }) {
@@ -42,7 +47,7 @@ export function FindingDetailPage({ workspaceSlug, findings, issues, findingId, 
               <div className="kv"><span>{t("finding.likelyScope")}</span><strong>{issue.likelyScope}</strong></div>
               <div className="kv"><span>{t("finding.componentArea")}</span><strong>{issue.componentArea}</strong></div>
               <div className="kv"><span>{t("finding.cmsHint")}</span><strong>{issue.cmsHint}</strong></div>
-              <div className="kv"><span>{t("finding.confidence")}</span><strong>{confidenceLabel(issue.confidence)}</strong></div>
+              <div className="kv"><span>{t("finding.confidence")}</span><strong>{confidenceLabel(issue.confidence, t)}</strong></div>
               <div className="kv"><span>{t("finding.representativeUrl")}</span><strong className="mono break-text">{issue.representativeUrl}</strong></div>
               <div className="kv"><span>{t("finding.representativeSelector")}</span><strong className="mono break-text">{issue.representativeSelector ?? t("common.notCaptured")}</strong></div>
             </div>
@@ -125,7 +130,7 @@ export function FindingDetailPage({ workspaceSlug, findings, issues, findingId, 
                       <div className="evidence-file"><Icon name="file-text" size={18} /></div>
                     )}
                     <div>
-                      <strong>{evidenceLabel(artifact.kind)}</strong>
+                      <strong>{evidenceLabel(artifact.kind, t)}</strong>
                       <div className="table-sub mono break-text">{artifact.artifactKey}</div>
                       <div className="table-sub">{artifact.mimeType} · {formatBytes(artifact.sizeBytes, t("common.pending"))}</div>
                     </div>

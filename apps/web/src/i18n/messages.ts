@@ -161,6 +161,11 @@ export interface Messages {
   "finding.sampleUrlsEmpty": string;
   "finding.recommendation": string;
   "finding.htmlSnippet": string;
+  "finding.evidencePageScreenshot": string;
+  "finding.evidenceHtmlSnippet": string;
+  "finding.confidenceHigh": string;
+  "finding.confidenceMedium": string;
+  "finding.confidenceLow": string;
   "finding.notFound": string;
   "finding.evidence": string;
   "finding.pageUrl": string;
@@ -181,6 +186,8 @@ export interface Messages {
   "reports.artifacts": string;
   "reports.csvNote": string;
   "reports.reportName": (kind: string) => string;
+  "reports.downloadTitle": (kind: string) => string;
+  "reports.generatingTitle": (kind: string) => string;
   "reports.generating": string;
   // members
   "members.workspaceMembership": string;
@@ -439,6 +446,11 @@ export const MESSAGES: Record<Locale, Messages> = {
     "finding.sampleUrlsEmpty": "Bu gruplanmış sorun için örnek URL yakalanmadı.",
     "finding.recommendation": "Öneri",
     "finding.htmlSnippet": "HTML snippet",
+    "finding.evidencePageScreenshot": "Sayfa ekran görüntüsü",
+    "finding.evidenceHtmlSnippet": "HTML snippet",
+    "finding.confidenceHigh": "Yüksek güven",
+    "finding.confidenceMedium": "Orta güven",
+    "finding.confidenceLow": "Düşük güven",
     "finding.notFound": "Bulgu bulunamadı",
     "finding.evidence": "Bulgu kanıtı",
     "finding.pageUrl": "Sayfa URL'si",
@@ -458,6 +470,8 @@ export const MESSAGES: Record<Locale, Messages> = {
     "reports.artifacts": "Rapor çıktıları",
     "reports.csvNote": "CSV dışa aktarımı MVP'nin parçası değildir.",
     "reports.reportName": (kind) => `${kind.toUpperCase()} erişilebilirlik raporu`,
+    "reports.downloadTitle": (kind) => `${kind} raporunu indir`,
+    "reports.generatingTitle": (kind) => `${kind} raporu hâlâ üretiliyor`,
     "reports.generating": "Üretiliyor",
     "members.workspaceMembership": "Çalışma alanı üyeliği",
     "members.ownerRequired": "Sahip erişimi gerekli",
@@ -702,6 +716,11 @@ export const MESSAGES: Record<Locale, Messages> = {
     "finding.sampleUrlsEmpty": "No sample URLs were captured for this grouped issue.",
     "finding.recommendation": "Recommendation",
     "finding.htmlSnippet": "HTML snippet",
+    "finding.evidencePageScreenshot": "Page screenshot",
+    "finding.evidenceHtmlSnippet": "HTML snippet",
+    "finding.confidenceHigh": "High confidence",
+    "finding.confidenceMedium": "Medium confidence",
+    "finding.confidenceLow": "Low confidence",
     "finding.notFound": "Finding not found",
     "finding.evidence": "Finding evidence",
     "finding.pageUrl": "Page URL",
@@ -721,6 +740,8 @@ export const MESSAGES: Record<Locale, Messages> = {
     "reports.artifacts": "Report artifacts",
     "reports.csvNote": "CSV export is not part of the MVP.",
     "reports.reportName": (kind) => `${kind.toUpperCase()} accessibility report`,
+    "reports.downloadTitle": (kind) => `Download ${kind} report`,
+    "reports.generatingTitle": (kind) => `${kind} report is still generating`,
     "reports.generating": "Generating",
     "members.workspaceMembership": "Workspace membership",
     "members.ownerRequired": "Owner access required",

@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Report } from "../data";
+import { MESSAGES } from "../i18n/messages.js";
+
+const t = <K extends keyof typeof MESSAGES.en>(key: K) => MESSAGES.en[key];
 
 function report(overrides: Partial<Report>): Report {
   return {
@@ -31,7 +34,7 @@ describe("report presentation", () => {
 
     expect(reportActionLabel(html)).toBe("HTML");
     expect(reportDownloadUrl(html, "owner-workspace")).toBe("https://api.example.test/api/workspaces/owner-workspace/reports/report-html/download");
-    expect(reportDownloadTitle(html)).toBe("Download HTML report");
+    expect(reportDownloadTitle(html, t)).toBe("Download HTML report");
   });
 
   it("keeps generating reports disabled", async () => {
@@ -40,6 +43,6 @@ describe("report presentation", () => {
     const generating = report({ kind: "pdf", mimeType: "application/pdf", status: "generating" });
 
     expect(reportDownloadUrl(generating, "owner-workspace")).toBeNull();
-    expect(reportDownloadTitle(generating)).toBe("PDF report is still generating");
+    expect(reportDownloadTitle(generating, t)).toBe("PDF report is still generating");
   });
 });
