@@ -164,19 +164,36 @@ row ⇒ defaults.
   `<script src="https://<origin>/assist/<projectId>.js" defer></script>`.
 - Save → `PUT …/widget-config`; success toast noting "live within ~1 minute".
 - All copy localized via the existing typed catalog (`apps/web/src/i18n`), tr/en.
-- **Live preview is Phase 2** (mounting the real widget with the draft config);
-  Phase 1 ships the form + embed snippet only (YAGNI).
+- **Live preview (in scope):** a WYSIWYG preview of the real widget driven by the
+  **draft** (unsaved) form state, so the owner sees changes before saving.
+  - Implemented as an **`<iframe>`** whose `srcdoc` is a small sample page
+    (representative heading + paragraphs + a couple of links/buttons) plus
+    `<script>window.__AA_ASSIST_CONFIG__ = <draftConfig>;</script>` followed by
+    `<script src="<origin>/assist/a11yaudit-assist.js" defer></script>` (the shared
+    bundle, which reads the global). The draft config comes from the form, **not**
+    the per-project route (the config is unsaved).
+  - The iframe contains the widget's `position: fixed` to its own viewport, so the
+    launcher/panel stay inside the preview pane and never overlap the dashboard.
+  - On form change (debounced ~300 ms) the preview re-renders by rebuilding the
+    `srcdoc` (full reload — simplest and robust; no cross-frame messaging).
+  - The preview uses the same shared bundle the customer would load, so it is a
+    true reflection of behavior + brand + custom CSS.
 
-## Phasing
+## Implementation Sequence
 
-The spec is one feature; the implementation plan ships in two phases.
+One feature, built in this order (each step builds on the last; the plan breaks
+these into bite-sized tasks):
 
-- **Phase 1 (core):** `widget_configs` table + repo + defaults; public
-  `/assist/:projectId.js` route; owner-only write route + validation; loader reads
-  `__AA_ASSIST_CONFIG__` and applies behavior + brand + customCss; minimal
-  dashboard form + embed snippet. End-to-end: owner configures → customer site
-  reflects it.
-- **Phase 2 (polish):** live preview, launcher-icon UX niceties.
+1. **Storage:** `widget_configs` table + Drizzle schema + repository (get/upsert)
+   + typed defaults.
+2. **Public read route:** `GET /assist/:projectId.js` (config prelude + shared
+   bundle, headers, unknown → defaults).
+3. **Owner write route:** `PUT …/widget-config` + `GET …/widget-config` +
+   validation, owner-gated and workspace-scoped.
+4. **Widget loader:** read `__AA_ASSIST_CONFIG__`, apply behavior + brand +
+   customCss; data-attribute fallback.
+5. **Dashboard form:** owner-only settings panel + embed snippet + Save.
+6. **Live preview:** the iframe WYSIWYG preview driven by draft form state.
 
 ## Testing
 
@@ -190,7 +207,9 @@ The spec is one feature; the implementation plan ships in two phases.
   var, hides disabled features, applies position/language, injects customCss into
   the Shadow DOM; falls back to data-attrs when the global is absent.
 - **Web:** widget settings panel renders, is owner-gated, Save calls the PUT, embed
-  snippet shows the correct per-project URL.
+  snippet shows the correct per-project URL; the preview iframe's `srcdoc` embeds
+  the current **draft** config (changing a field updates the embedded
+  `__AA_ASSIST_CONFIG__`) and points at the shared bundle, not the per-project route.
 
 ## Edge Cases
 
