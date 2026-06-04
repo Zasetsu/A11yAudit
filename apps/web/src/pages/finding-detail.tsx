@@ -3,6 +3,7 @@ import { formatBytes, type Issue } from "../data";
 import { Button, Icon, PageHeader, Panel, SeverityBadge, StatusBadge, ViewportBadge } from "../design/ui";
 import { useT } from "../i18n/locale-context.js";
 import type { Messages } from "../i18n/messages.js";
+import { areaLabel, cmsLabel, scopeLabel } from "../i18n/inference-labels.js";
 import type { PageProps } from "./page-props";
 
 type Translate = <K extends keyof Messages>(key: K) => Messages[K];
@@ -20,7 +21,7 @@ function confidenceLabel(confidence: Issue["confidence"], t: Translate): string 
 }
 
 export function FindingDetailPage({ workspaceSlug, findings, issues, findingId, navigate }: PageProps & { findingId: string }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const issue = issues.find((candidate) => candidate.id === findingId);
   const finding = findings.find((candidate) => candidate.id === findingId) ?? findings[0];
 
@@ -44,9 +45,9 @@ export function FindingDetailPage({ workspaceSlug, findings, issues, findingId, 
               <div className="kv"><span>{t("finding.ruleId")}</span><strong className="mono">{issue.ruleId}</strong></div>
               <div className="kv"><span>{t("finding.affectedPages")}</span><strong className="tnum">{issue.affectedPages}</strong></div>
               <div className="kv"><span>{t("finding.occurrences")}</span><strong className="tnum">{issue.occurrences}</strong></div>
-              <div className="kv"><span>{t("finding.likelyScope")}</span><strong>{issue.likelyScope}</strong></div>
-              <div className="kv"><span>{t("finding.componentArea")}</span><strong>{issue.componentArea}</strong></div>
-              <div className="kv"><span>{t("finding.cmsHint")}</span><strong>{issue.cmsHint}</strong></div>
+              <div className="kv"><span>{t("finding.likelyScope")}</span><strong>{scopeLabel(issue.likelyScope, locale)}</strong></div>
+              <div className="kv"><span>{t("finding.componentArea")}</span><strong>{areaLabel(issue.componentArea, locale)}</strong></div>
+              <div className="kv"><span>{t("finding.cmsHint")}</span><strong>{cmsLabel(issue.cmsHint)}</strong></div>
               <div className="kv"><span>{t("finding.confidence")}</span><strong>{confidenceLabel(issue.confidence, t)}</strong></div>
               <div className="kv"><span>{t("finding.representativeUrl")}</span><strong className="mono break-text">{issue.representativeUrl}</strong></div>
               <div className="kv"><span>{t("finding.representativeSelector")}</span><strong className="mono break-text">{issue.representativeSelector ?? t("common.notCaptured")}</strong></div>

@@ -464,7 +464,7 @@ export function emptyProject(): Project {
     id: "no-project",
     name: "No project selected",
     url: "",
-    domain: "local instance",
+    domain: "",
     score: 0,
     createdAt: new Date(0).toISOString(),
     lastScan: null,
