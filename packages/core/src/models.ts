@@ -1,3 +1,5 @@
+import type { BaselineIssue } from "./diff.js";
+
 export type ViewportName = "desktop" | "mobile";
 export type FindingViewport = ViewportName | "both";
 export type Severity = "critical" | "serious" | "moderate" | "minor";
@@ -108,6 +110,7 @@ export interface CompletedScanResult {
   findings: ScanFinding[];
   reports: ScanReportArtifact[];
   reportWarnings?: string[];
+  resolvedIssues: BaselineIssue[];
   score: number;
   startedAt: string;
   finishedAt: string;

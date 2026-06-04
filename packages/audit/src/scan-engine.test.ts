@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DEFAULT_VIEWPORTS, type ScanRequest } from "@a11yaudit/core";
+import { DEFAULT_VIEWPORTS, type BaselineIssue, type ScanRequest } from "@a11yaudit/core";
 import { LocalStorageAdapter } from "@a11yaudit/storage";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { captureElementCropEvidence, collectScreenshotDataUris, runScan } from "./scan-engine.js";
@@ -155,6 +155,65 @@ describe("runScan", () => {
     expect(result.findings.length).toBeGreaterThan(0);
     expect(result.reports.map((report) => report.kind).sort()).toEqual(["html", "pdf"]);
     expect(result.score).toBeLessThan(100);
+  }, 60_000);
+
+  it("reports a non-matching baseline issue as resolved and stamps findings new/ongoing", async () => {
+    server = createServer((_request, response) => {
+      response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      response.end(`<!doctype html>
+        <html lang="en">
+          <head><title>Audit Fixture</title></head>
+          <body><main><h1>Audit Fixture</h1><img src="/missing.png"></main></body>
+        </html>`);
+    });
+    const url = await listen(server);
+    tempDir = await mkdtemp(join(tmpdir(), "a11yaudit-scan-"));
+    const storage = new LocalStorageAdapter({ rootDir: tempDir });
+    const request: ScanRequest = {
+      runId: "run-baseline",
+      projectId: "project-1",
+      targetUrl: url,
+      mode: "single_url",
+      viewports: [DEFAULT_VIEWPORTS[0]!],
+      maxPages: 1,
+      maxDepth: 0,
+      respectRobotsTxt: false
+    };
+
+    const nonMatchingKey = "nonexistent-key|9.9.9|signature|global|none";
+    const baselineIssue: BaselineIssue = {
+      issueKey: nonMatchingKey,
+      title: "Resolved baseline issue",
+      severity: "serious",
+      source: "axe",
+      certainty: "automatic_violation",
+      ruleId: "nonexistent-rule",
+      wcagCriteria: ["9.9.9"],
+      description: "",
+      recommendation: "",
+      likelyScope: "global",
+      urlScopeGroup: "global",
+      componentArea: "unknown",
+      cmsHint: "none",
+      confidence: "high",
+      affectedPages: 1,
+      occurrences: 1,
+      viewportSummary: "desktop",
+      representativeUrl: url,
+      representativeSelector: null,
+      representativeHtmlSnippet: null,
+      sampleUrls: [url]
+    };
+
+    const result = await runScan({
+      request,
+      storage,
+      baselineIssues: [baselineIssue]
+    });
+
+    expect(result.resolvedIssues.map((r) => r.issueKey)).toContain(nonMatchingKey);
+    expect(result.findings.length).toBeGreaterThan(0);
+    expect(result.findings.every((f) => f.status === "new" || f.status === "ongoing")).toBe(true);
   }, 60_000);
 
   it("returns completed audit data and HTML report when PDF rendering fails", async () => {
