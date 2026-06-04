@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { parseLoaderOptions } from "./loader.js";
+// @vitest-environment jsdom
+import { describe, afterEach, expect, it } from "vitest";
+import { parseLoaderOptions, resolveWidgetConfig } from "./loader.js";
+import { DEFAULT_WIDGET_CONFIG, WIDGET_CONFIG_GLOBAL } from "./widget-config.js";
 
 describe("parseLoaderOptions", () => {
   it("reads project, position, and language from script dataset", () => {
@@ -50,5 +52,31 @@ describe("parseLoaderOptions", () => {
     } as HTMLScriptElement;
 
     expect(parseLoaderOptions(script).enabledSections).toEqual(["content", "color"]);
+  });
+});
+
+describe("resolveWidgetConfig", () => {
+  afterEach(() => { delete (window as Record<string, unknown>)[WIDGET_CONFIG_GLOBAL]; });
+
+  it("prefers window.__AA_ASSIST_CONFIG__ when present (normalized)", () => {
+    (window as Record<string, unknown>)[WIDGET_CONFIG_GLOBAL] = { position: "top-left", brand: { accent: "#abcdef" } };
+    const config = resolveWidgetConfig(undefined);
+    expect(config.position).toBe("top-left");
+    expect(config.brand.accent).toBe("#abcdef");
+  });
+
+  it("falls back to data-* attributes when the global is absent", () => {
+    const script = document.createElement("script");
+    script.dataset.position = "bottom-left";
+    script.dataset.language = "en";
+    script.dataset.enabledSections = "content color";
+    const config = resolveWidgetConfig(script);
+    expect(config.position).toBe("bottom-left");
+    expect(config.language).toBe("en");
+    expect(config.enabledSections).toEqual(["content", "color"]);
+  });
+
+  it("returns defaults when neither is present", () => {
+    expect(resolveWidgetConfig(undefined)).toEqual(DEFAULT_WIDGET_CONFIG);
   });
 });

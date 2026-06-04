@@ -1,5 +1,6 @@
 import { mountAssistWidget, type AssistWidgetInstance, type AssistWidgetOptions } from "./widget.js";
 import { ASSIST_SECTIONS, DEFAULT_WIDGET_LOCALE, type AssistSection, type WidgetLocale } from "./config.js";
+import { DEFAULT_WIDGET_CONFIG, normalizeWidgetConfig, WIDGET_CONFIG_GLOBAL, type WidgetConfig } from "./widget-config.js";
 
 export type WidgetPosition = "bottom-right" | "bottom-left" | "top-right" | "top-left";
 
@@ -31,6 +32,15 @@ export function parseLoaderOptions(script: HTMLScriptElement): LoaderOptions {
   };
 }
 
+/** The effective config: the inlined per-project global wins; otherwise build one from the legacy data-* attributes; otherwise defaults. */
+export function resolveWidgetConfig(script: HTMLScriptElement | undefined): WidgetConfig {
+  const injected = typeof window !== "undefined" ? (window as unknown as Record<string, unknown>)[WIDGET_CONFIG_GLOBAL] : undefined;
+  if (injected !== undefined) return normalizeWidgetConfig(injected);
+  if (!script) return DEFAULT_WIDGET_CONFIG;
+  const opts = parseLoaderOptions(script);
+  return normalizeWidgetConfig({ enabledSections: opts.enabledSections, position: opts.position, language: opts.language });
+}
+
 function resolveLanguage(script: HTMLScriptElement): WidgetLocale {
   const explicit = script.dataset.language;
   if (explicit === "tr" || explicit === "en") return explicit;
@@ -44,11 +54,13 @@ export function initAssistWidget(options: Partial<LoaderOptions> & AssistWidgetO
   if (window.__A11Y_AUDIT_ASSIST__ && hasMountedAssistWidget()) return window.__A11Y_AUDIT_ASSIST__;
   if (window.__A11Y_AUDIT_ASSIST__) delete window.__A11Y_AUDIT_ASSIST__;
 
+  const config = options.config;
   const mountedInstance = mountAssistWidget({
     projectId: options.projectId,
-    position: options.position,
-    language: options.language ?? DEFAULT_WIDGET_LOCALE,
-    enabledSections: options.enabledSections
+    position: config?.position ?? options.position,
+    language: config?.language ?? options.language ?? DEFAULT_WIDGET_LOCALE,
+    enabledSections: config?.enabledSections ?? options.enabledSections,
+    config
   });
   const instance: AssistWidgetInstance = {
     clearPreferences: () => mountedInstance.clearPreferences(),
@@ -81,7 +93,8 @@ function hasMountedAssistWidget(): boolean {
 
 if (typeof document !== "undefined") {
   const currentScript = document.currentScript;
-  if (currentScript instanceof HTMLScriptElement) {
-    initAssistWidget(parseLoaderOptions(currentScript));
+  const script = currentScript instanceof HTMLScriptElement ? currentScript : undefined;
+  if (script) {
+    initAssistWidget({ ...parseLoaderOptions(script), config: resolveWidgetConfig(script) });
   }
 }

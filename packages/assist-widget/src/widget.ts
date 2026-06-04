@@ -1,4 +1,5 @@
 import { ASSIST_SECTIONS, DEFAULT_WIDGET_LOCALE, STORAGE_KEY, type AssistSection, type WidgetLocale } from "./config.js";
+import type { WidgetConfig } from "./widget-config.js";
 import { ClassManager } from "./effects/class-manager.js";
 import { COLOR_CLASSES, COLOR_CSS, colorClassForStep, type ColorStepFeature } from "./effects/color-preferences.js";
 import { FontPreferences } from "./effects/font-preferences.js";
@@ -41,6 +42,7 @@ export interface AssistWidgetOptions {
   position?: AssistWidgetPosition;
   language?: WidgetLocale;
   enabledSections?: readonly AssistSection[];
+  config?: WidgetConfig;
 }
 
 export interface AssistWidgetInstance {
