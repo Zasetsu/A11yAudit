@@ -37,6 +37,7 @@ import {
   type LucideIcon
 } from "lucide-react";
 import { severityMeta, type FindingStatus, type ScanStatus, type Severity, type Viewport } from "../data";
+import { useT } from "../i18n/locale-context.js";
 
 const iconMap = {
   activity: Activity,
@@ -143,10 +144,11 @@ export function PageHeader({ title, subtitle, breadcrumb, actions, icon }: { tit
 }
 
 export function SeverityBadge({ level }: { level: Severity }) {
+  const { t } = useT();
   return (
     <span className={`badge severity ${level}`}>
       <SeverityIcon level={level} />
-      {severityMeta[level].label}
+      {t(severityMeta[level].labelKey) as string}
     </span>
   );
 }
@@ -157,34 +159,37 @@ export function SeverityIcon({ level }: { level: Severity }) {
 }
 
 export function StatusBadge({ status }: { status: FindingStatus }) {
-  const label = status === "new" ? "New" : status === "resolved" ? "Resolved" : "Ongoing";
+  const { t } = useT();
+  const labelKey = status === "new" ? "status.new" : status === "resolved" ? "status.resolved" : "status.ongoing";
   const icon: IconName = status === "new" ? "circle-dot" : status === "resolved" ? "check-circle" : "clock";
   return (
     <span className={`badge status ${status}`}>
       <Icon name={icon} size={11} />
-      {label}
+      {t(labelKey)}
     </span>
   );
 }
 
 export function RunStatusBadge({ status }: { status: ScanStatus }) {
-  const label = status[0].toUpperCase() + status.slice(1);
+  const { t } = useT();
+  const labelKey = `status.${status}` as const;
   const icon: IconName = status === "completed" ? "check-circle" : status === "failed" ? "alert-octagon" : status === "queued" ? "clock" : "loader";
   return (
     <span className={`badge run ${status}`}>
       <Icon name={icon} size={11} className={icon === "loader" ? "spin" : undefined} />
-      {label}
+      {t(labelKey)}
     </span>
   );
 }
 
 export function ViewportBadge({ viewport }: { viewport: Viewport }) {
+  const { t } = useT();
   if (viewport === "both") {
     return (
       <span className="inline-meta">
         <Icon name="monitor" size={13} />
         <Icon name="smartphone" size={12} />
-        Both
+        {t("viewport.both")}
       </span>
     );
   }
@@ -192,7 +197,7 @@ export function ViewportBadge({ viewport }: { viewport: Viewport }) {
   return (
     <span className="inline-meta">
       <Icon name={viewport === "desktop" ? "monitor" : "smartphone"} size={13} />
-      {viewport === "desktop" ? "Desktop" : "Mobile"}
+      {t(viewport === "desktop" ? "viewport.desktop" : "viewport.mobile")}
     </span>
   );
 }

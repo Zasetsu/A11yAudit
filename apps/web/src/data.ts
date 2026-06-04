@@ -1,3 +1,5 @@
+import type { Locale, Messages } from "./i18n/messages.js";
+
 export type Severity = "critical" | "serious" | "moderate" | "minor";
 export type FindingSource = "axe" | "custom" | "crawler";
 export type FindingCertainty = "automatic_violation" | "needs_manual_verification" | "not_automatically_testable";
@@ -110,11 +112,11 @@ export interface Report {
   status: "ready" | "generating";
 }
 
-export const severityMeta: Record<Severity, { label: string; rank: number }> = {
-  critical: { label: "Critical", rank: 0 },
-  serious: { label: "Serious", rank: 1 },
-  moderate: { label: "Moderate", rank: 2 },
-  minor: { label: "Minor", rank: 3 }
+export const severityMeta: Record<Severity, { labelKey: keyof Messages; rank: number }> = {
+  critical: { labelKey: "severity.critical", rank: 0 },
+  serious: { labelKey: "severity.serious", rank: 1 },
+  moderate: { labelKey: "severity.moderate", rank: 2 },
+  minor: { labelKey: "severity.minor", rank: 3 }
 };
 
 export const demoProjects: Project[] = [
@@ -472,12 +474,12 @@ export function emptyProject(): Project {
   };
 }
 
-export function formatDate(value: string | null): string {
+export function formatDate(value: string | null, locale: Locale = "en", notAvailable = "Not available"): string {
   if (value === null) {
-    return "Not available";
+    return notAvailable;
   }
 
-  return new Intl.DateTimeFormat("en", {
+  return new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "en", {
     month: "short",
     day: "2-digit",
     hour: "2-digit",
@@ -485,9 +487,9 @@ export function formatDate(value: string | null): string {
   }).format(new Date(value));
 }
 
-export function formatBytes(value: number): string {
+export function formatBytes(value: number, pending = "Pending"): string {
   if (value <= 0) {
-    return "Pending";
+    return pending;
   }
 
   return `${(value / 1_000_000).toFixed(1)} MB`;

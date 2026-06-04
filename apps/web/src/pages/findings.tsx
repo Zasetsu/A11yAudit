@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { severityMeta, type Issue, type Severity } from "../data";
 import { Button, PageHeader, Panel, SeverityBadge } from "../design/ui";
+import { useT } from "../i18n/locale-context.js";
 import type { PageProps } from "./page-props";
 
 const severityOptions: Array<Severity | "all"> = ["all", "critical", "serious", "moderate", "minor"];
@@ -19,6 +20,7 @@ function confidenceLabel(confidence: Issue["confidence"]): string {
 }
 
 export function FindingsPage({ issues, project, navigate }: PageProps) {
+  const { t } = useT();
   const [severity, setSeverity] = useState<Severity | "all">("all");
   const projectIssues = useMemo(() => {
     return sortIssuesForTriage(
@@ -42,7 +44,7 @@ export function FindingsPage({ issues, project, navigate }: PageProps) {
       >
         <div className="filter-bar">
           <select className="input" onChange={(event) => setSeverity(event.target.value as Severity | "all")} value={severity}>
-            {severityOptions.map((value) => <option key={value} value={value}>{value === "all" ? "All severities" : severityMeta[value].label}</option>)}
+            {severityOptions.map((value) => <option key={value} value={value}>{value === "all" ? "All severities" : (t(severityMeta[value].labelKey) as string)}</option>)}
           </select>
         </div>
         <div className="table-wrap">
