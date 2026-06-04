@@ -26,6 +26,7 @@ export interface Messages {
   "nav.settings": string;
   "nav.docs": string;
   "nav.members": string;
+  "nav.widget": string;
   "nav.configure": string;
   // shell
   "shell.switchProject": string;
@@ -220,6 +221,27 @@ export interface Messages {
   "members.regenerate": string;
   "members.revoke": string;
   "members.emailPlaceholder": string;
+  // widget
+  "widget.title": string;
+  "widget.subtitle": string;
+  "widget.sections": string;
+  "widget.features": string;
+  "widget.position": string;
+  "widget.language": string;
+  "widget.accent": string;
+  "widget.theme": string;
+  "widget.themeLight": string;
+  "widget.themeDark": string;
+  "widget.themeAuto": string;
+  "widget.launcherLabel": string;
+  "widget.launcherIcon": string;
+  "widget.customCss": string;
+  "widget.embed": string;
+  "widget.embedCopy": string;
+  "widget.preview": string;
+  "widget.save": string;
+  "widget.saved": string;
+  "widget.ownerOnly": string;
   // settings
   "settings.subtitle": string;
   "settings.scanDefaults": string;
@@ -336,6 +358,7 @@ export const MESSAGES: Record<Locale, Messages> = {
     "nav.settings": "Ayarlar",
     "nav.docs": "Dokümantasyon",
     "nav.members": "Üyeler",
+    "nav.widget": "Widget",
     "nav.configure": "Yapılandırma",
     "shell.switchProject": "Proje değiştir",
     "shell.switchWorkspace": "Çalışma alanı değiştir",
@@ -519,6 +542,26 @@ export const MESSAGES: Record<Locale, Messages> = {
     "members.regenerate": "Bağlantıyı yenile",
     "members.revoke": "İptal et",
     "members.emailPlaceholder": "ekibarkadasi@example.com",
+    "widget.title": "Widget",
+    "widget.subtitle": "Sitenize gömülü erişilebilirlik widget'ını buradan yönetin.",
+    "widget.sections": "Bölümler",
+    "widget.features": "Özellikler",
+    "widget.position": "Konum",
+    "widget.language": "Dil",
+    "widget.accent": "Vurgu rengi",
+    "widget.theme": "Tema",
+    "widget.themeLight": "Açık",
+    "widget.themeDark": "Koyu",
+    "widget.themeAuto": "Otomatik",
+    "widget.launcherLabel": "Buton etiketi",
+    "widget.launcherIcon": "Buton ikonu (SVG)",
+    "widget.customCss": "Özel CSS",
+    "widget.embed": "Gömme kodu",
+    "widget.embedCopy": "Kopyala",
+    "widget.preview": "Canlı önizleme",
+    "widget.save": "Kaydet",
+    "widget.saved": "Kaydedildi: ~1 dk içinde canlı.",
+    "widget.ownerOnly": "Bu ayarları yalnızca workspace sahibi düzenleyebilir.",
     "settings.subtitle": "Audera ayarları ve kontrolleri.",
     "settings.scanDefaults": "Tarama varsayılanları",
     "settings.defaultUrl": "Varsayılan proje URL'si",
@@ -622,6 +665,7 @@ export const MESSAGES: Record<Locale, Messages> = {
     "nav.settings": "Settings",
     "nav.docs": "Documentation",
     "nav.members": "Members",
+    "nav.widget": "Widget",
     "nav.configure": "Configure",
     "shell.switchProject": "Switch project",
     "shell.switchWorkspace": "Switch workspace",
@@ -805,6 +849,26 @@ export const MESSAGES: Record<Locale, Messages> = {
     "members.regenerate": "Regenerate link",
     "members.revoke": "Revoke",
     "members.emailPlaceholder": "teammate@example.com",
+    "widget.title": "Widget",
+    "widget.subtitle": "Manage the accessibility widget embedded on your site.",
+    "widget.sections": "Sections",
+    "widget.features": "Features",
+    "widget.position": "Position",
+    "widget.language": "Language",
+    "widget.accent": "Accent color",
+    "widget.theme": "Theme",
+    "widget.themeLight": "Light",
+    "widget.themeDark": "Dark",
+    "widget.themeAuto": "Auto",
+    "widget.launcherLabel": "Launcher label",
+    "widget.launcherIcon": "Launcher icon (SVG)",
+    "widget.customCss": "Custom CSS",
+    "widget.embed": "Embed snippet",
+    "widget.embedCopy": "Copy",
+    "widget.preview": "Live preview",
+    "widget.save": "Save",
+    "widget.saved": "Saved: live within ~1 minute.",
+    "widget.ownerOnly": "Only the workspace owner can edit these settings.",
     "settings.subtitle": "Audera settings and controls.",
     "settings.scanDefaults": "Scan defaults",
     "settings.defaultUrl": "Default project URL",
