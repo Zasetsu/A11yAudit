@@ -236,14 +236,24 @@
     });
   }
 
-  /* ---------- scroll reveal ---------- */
+  /* ---------- scroll reveal (WOW-style: triggers on scroll, staggers a batch) ---------- */
   var revealEls = document.querySelectorAll(".reveal");
-  var io = new IntersectionObserver(function (entries) {
-    entries.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); } });
-  }, { threshold: 0.08, rootMargin: "0px 0px -30px 0px" });
-  revealEls.forEach(function (el) { io.observe(el); });
-  // fallback: ensure everything becomes visible even if IO never fires (e.g. offscreen render)
-  setTimeout(function () { revealEls.forEach(function (el) { el.classList.add("in"); }); }, 1400);
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      var shown = entries.filter(function (en) { return en.isIntersecting; });
+      // stagger items that cross the threshold together, top-to-bottom
+      shown.sort(function (a, b) { return a.boundingClientRect.top - b.boundingClientRect.top; });
+      shown.forEach(function (en, i) {
+        en.target.style.transitionDelay = Math.min(i, 6) * 90 + "ms";
+        en.target.classList.add("in");
+        io.unobserve(en.target);
+      });
+    }, { threshold: 0.12, rootMargin: "0px 0px -10% 0px" });
+    revealEls.forEach(function (el) { io.observe(el); });
+  } else {
+    // no IntersectionObserver: show everything
+    revealEls.forEach(function (el) { el.classList.add("in"); });
+  }
 
   /* ============================================================
      AUDERA ASSIST — live demo
