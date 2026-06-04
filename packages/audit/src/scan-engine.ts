@@ -13,7 +13,7 @@ import {
   type ScanFinding,
   type ScanRequest
 } from "@a11yaudit/core";
-import { buildAuditReportModel, renderPdfFromHtml, renderReportHtml } from "@a11yaudit/reporter";
+import { buildAuditReportModel, MAX_ELEMENTS_PER_CARD, renderPdfFromHtml, renderReportHtml } from "@a11yaudit/reporter";
 import { auditPage } from "@a11yaudit/rules";
 import { createArtifactKey, type StorageAdapter } from "@a11yaudit/storage";
 import { chromium, type Browser, type BrowserContext, type ElementHandle, type Page } from "playwright";
@@ -21,7 +21,11 @@ import { calculateScore } from "./score.js";
 
 const PDF_DETAILED_FINDING_LIMIT = 500;
 const PDF_EVIDENCE_ROW_LIMIT = 500;
-const MAX_ELEMENT_CROPS_PER_PAGE = 30;
+// Crop capture is aligned to what the report actually displays: each problem card
+// shows at most MAX_ELEMENTS_PER_CARD elements, so we capture a crop only for the
+// first MAX_ELEMENTS_PER_CARD findings of each rule on a page (the displayed ones),
+// bounded by a per-page ceiling so pathological pages with many rules stay fast.
+const MAX_ELEMENT_CROPS_PER_PAGE = 80;
 const CROP_CONTEXT_PADDING = 24;
 
 export async function collectScreenshotDataUris(
@@ -122,10 +126,15 @@ export async function runScan(input: RunScanInput): Promise<CompletedScanResult>
 
           let cropsThisPage = 0;
           let cropsSkippedByCap = 0;
+          const cropsByRule = new Map<string, number>();
           for (const finding of auditResult.findings) {
             let elementCrop: EvidenceArtifact | null = null;
-            if (finding.selector && cropsThisPage < MAX_ELEMENT_CROPS_PER_PAGE) {
-              const handle = await page.$(finding.selector).catch(() => null);
+            // Only capture a crop if this element will actually be displayed: within
+            // the first MAX_ELEMENTS_PER_CARD findings of its rule (the per-card limit).
+            const ruleCropCount = cropsByRule.get(finding.ruleId) ?? 0;
+            const willBeDisplayed = Boolean(finding.selector) && ruleCropCount < MAX_ELEMENTS_PER_CARD;
+            if (willBeDisplayed && cropsThisPage < MAX_ELEMENT_CROPS_PER_PAGE) {
+              const handle = await page.$(finding.selector!).catch(() => null);
               if (handle) {
                 elementCrop = await captureElementCropEvidence({
                   runId: input.request.runId,
@@ -135,9 +144,14 @@ export async function runScan(input: RunScanInput): Promise<CompletedScanResult>
                   storage: input.storage
                 });
                 await handle.dispose().catch(() => undefined);
-                if (elementCrop) cropsThisPage += 1;
+                if (elementCrop) {
+                  cropsThisPage += 1;
+                  cropsByRule.set(finding.ruleId, ruleCropCount + 1);
+                }
               }
-            } else if (finding.selector && cropsThisPage >= MAX_ELEMENT_CROPS_PER_PAGE) {
+            } else if (willBeDisplayed && cropsThisPage >= MAX_ELEMENT_CROPS_PER_PAGE) {
+              // A displayed element missed its crop only because the per-page ceiling
+              // was hit — this is the meaningful loss worth surfacing.
               cropsSkippedByCap += 1;
             }
             const snippet = await captureSnippetEvidence(input.request.runId, finding, input.storage);
@@ -149,7 +163,7 @@ export async function runScan(input: RunScanInput): Promise<CompletedScanResult>
             findings.push({ ...finding, evidence });
           }
           if (cropsSkippedByCap > 0) {
-            const warning = `Element screenshot cap reached on ${normalizedUrl} (${viewport.name}): ${MAX_ELEMENT_CROPS_PER_PAGE} crops captured, ${cropsSkippedByCap} additional flagged element(s) shown without a crop.`;
+            const warning = `Per-page element screenshot ceiling (${MAX_ELEMENT_CROPS_PER_PAGE}) reached on ${normalizedUrl} (${viewport.name}): ${cropsSkippedByCap} displayed element(s) shown without a crop.`;
             cropCapWarnings.push(warning);
             console.warn(`[scan-engine] ${warning}`);
           }

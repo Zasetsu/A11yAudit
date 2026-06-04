@@ -18,7 +18,7 @@ export interface RenderReportHtmlOptions {
 // Bound the element list (and therefore embedded crops) shown per problem card.
 // Without this, one rule failing on hundreds of elements embeds hundreds of crop
 // data URIs into a single card, re-bloating the HTML/PDF. Overflow is summarized.
-const MAX_ELEMENTS_PER_CARD = 12;
+export const MAX_ELEMENTS_PER_CARD = 12;
 
 export function renderReportHtml(report: AuditReportModel, options: RenderReportHtmlOptions = {}): string {
   const locale: ReportLocale = report.locale ?? "tr";
