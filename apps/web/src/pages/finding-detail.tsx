@@ -123,7 +123,7 @@ export function FindingDetailPage({ workspaceSlug, findings, issues, findingId, 
                 return (
                   <div className="evidence-card" key={artifact.artifactKey}>
                     {isImage && downloadUrl !== null ? (
-                      <a href={downloadUrl} rel="noreferrer" target="_blank" title="Open screenshot">
+                      <a href={downloadUrl} rel="noreferrer" target="_blank" title={t("finding.openScreenshot")}>
                         <img alt={t("finding.screenshotAlt")(finding.title)} className="evidence-thumb" src={downloadUrl} />
                       </a>
                     ) : (

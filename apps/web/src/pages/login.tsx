@@ -23,7 +23,7 @@ export function LoginPage({ onAuthenticated }: { onAuthenticated: (session: Auth
   }
 
   return (
-    <main aria-label="Main content" className="content auth-content">
+    <main aria-label={t("app.mainContent")} className="content auth-content">
       <div className="content-inner fadein">
         <PageHeader icon="shield-check" subtitle={t("auth.signInSubtitle")} title={t("auth.signIn")} />
         <Panel title={t("auth.account")}>

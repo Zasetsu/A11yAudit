@@ -24,7 +24,7 @@ export function InvitePage({ token, onAuthenticated }: { token: string; onAuthen
   }
 
   return (
-    <main aria-label="Main content" className="content auth-content">
+    <main aria-label={t("app.mainContent")} className="content auth-content">
       <div className="content-inner fadein">
         <PageHeader icon="shield-check" subtitle={t("auth.acceptSubtitle")} title={t("auth.acceptInvite")} />
         <Panel title={t("auth.accountDetails")}>

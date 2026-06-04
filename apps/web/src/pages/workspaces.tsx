@@ -11,7 +11,7 @@ export function WorkspacesPage({
 }) {
   const { t } = useT();
   return (
-    <main aria-label="Main content" className="content auth-content">
+    <main aria-label={t("app.mainContent")} className="content auth-content">
       <div className="content-inner fadein">
         <PageHeader icon="folder" subtitle={t("workspaces.subtitle")} title={t("workspaces.title")} />
         <Panel title={t("workspaces.your")}>

@@ -25,7 +25,7 @@ export function SignupPage({ onAuthenticated }: { onAuthenticated: (session: Aut
   }
 
   return (
-    <main aria-label="Main content" className="content auth-content">
+    <main aria-label={t("app.mainContent")} className="content auth-content">
       <div className="content-inner fadein">
         <PageHeader icon="shield-check" subtitle={t("auth.createSubtitle")} title={t("auth.createAccount")} />
         <Panel title={t("auth.accountDetails")}>

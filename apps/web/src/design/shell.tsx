@@ -21,8 +21,7 @@ const navItems: Array<{ id: TopLevelPage; labelKey: StringMessageKey; icon: Icon
 ];
 
 const configItems: Array<{ id: TopLevelPage; labelKey: StringMessageKey; icon: IconName }> = [
-  { id: "settings", labelKey: "nav.settings", icon: "settings" },
-  { id: "docs", labelKey: "nav.docs", icon: "book-open" }
+  { id: "settings", labelKey: "nav.settings", icon: "settings" }
 ];
 
 function isActive(route: Route, id: Route["page"]): boolean {
@@ -43,7 +42,7 @@ function NavButton({ item, route, navigate }: { item: { id: TopLevelPage; labelK
 export function Sidebar({ route, navigate, workspaceRole }: { route: Route; navigate: Navigate; workspaceRole: WorkspaceRole }) {
   const { t } = useT();
   return (
-    <nav aria-label="Primary" className="sidebar">
+    <nav aria-label={t("shell.primaryNav")} className="sidebar">
       <div className="brand">
         <div className="logo"><Icon name="shield-check" size={16} /></div>
         <div className="name">A11yAudit<small>{t("shell.brandSub")}</small></div>
