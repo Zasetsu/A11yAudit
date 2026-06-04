@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createProject, createScan } from "../api/client";
 import { Button, Field, Icon, PageHeader, Panel, SelectInput, TextInput, Toggle } from "../design/ui";
+import { useT } from "../i18n/locale-context.js";
 import type { Project } from "../data";
 import type { PageProps } from "./page-props";
 
@@ -17,6 +18,7 @@ function defaultProjectId(project: Project, projects: Project[]): string {
 }
 
 export function NewScanPage({ workspaceSlug, workspaceRole, project, projects, navigate, onSelectProject }: PageProps & { onSelectProject: (project: Project) => void }) {
+  const { t } = useT();
   const canCreateProject = workspaceRole === "owner";
   const [projectMode, setProjectMode] = useState<ProjectMode>(() => defaultProjectMode(projects, canCreateProject));
   const [projectId, setProjectId] = useState(() => defaultProjectId(project, projects));
@@ -87,11 +89,11 @@ export function NewScanPage({ workspaceSlug, workspaceRole, project, projects, n
     <div className="content-inner fadein">
       <PageHeader
         icon="scan-search"
-        subtitle="Create a public website project and run the same scan profile available in the CLI."
-        title="New Scan"
+        subtitle={t("scan.subtitle")}
+        title={t("common.newScan")}
       />
       <div className="split-grid score">
-        <Panel title="Scan target">
+        <Panel title={t("scan.target")}>
           <form
             className="form-grid"
             onSubmit={(event) => {
@@ -99,17 +101,17 @@ export function NewScanPage({ workspaceSlug, workspaceRole, project, projects, n
               mutation.mutate();
             }}
           >
-            <Field label="Project action" hint="Use an existing project or create one from this target.">
+            <Field label={t("scan.projectAction")} hint={t("scan.projectActionHint")}>
               <SelectInput
                 onChange={(event) => setProjectMode(event.target.value as ProjectMode)}
                 value={projectMode}
               >
-                <option value="existing" disabled={projects.length === 0}>Use existing project</option>
-                {canCreateProject ? <option value="new">Create new project</option> : null}
+                <option value="existing" disabled={projects.length === 0}>{t("scan.useExisting")}</option>
+                {canCreateProject ? <option value="new">{t("scan.createNew")}</option> : null}
               </SelectInput>
             </Field>
             {projectMode === "existing" ? (
-              <Field label="Project" hint="Projects are local records for public websites.">
+              <Field label={t("scan.project")} hint={t("scan.projectHint")}>
                 <SelectInput
                   onChange={(event) => {
                     const next = projects.find((candidate) => candidate.id === event.target.value);
@@ -126,54 +128,54 @@ export function NewScanPage({ workspaceSlug, workspaceRole, project, projects, n
                 </SelectInput>
               </Field>
             ) : (
-              <Field label="Project name" hint="Optional; defaults to the target hostname.">
-                <TextInput onChange={(event) => setProjectName(event.target.value)} placeholder="Municipal portal" value={projectName} />
+              <Field label={t("scan.projectName")} hint={t("scan.projectNameHint")}>
+                <TextInput onChange={(event) => setProjectName(event.target.value)} placeholder={t("scan.projectNamePlaceholder")} value={projectName} />
               </Field>
             )}
-            <Field label="Public URL" hint="Authenticated pages, private networks, and local file URLs are blocked.">
+            <Field label={t("scan.publicUrl")} hint={t("scan.publicUrlHint")}>
               <TextInput className="input mono" onChange={(event) => setUrl(event.target.value)} placeholder="https://example.gov" required type="url" value={url} />
             </Field>
-            <Field label="Mode" hint="Single URL matches CLI single-url. Full site follows same-origin links with crawl limits.">
+            <Field label={t("scan.mode")} hint={t("scan.modeHint")}>
               <SelectInput
                 onChange={(event) => setScanMode(event.target.value as ScanMode)}
                 value={scanMode}
               >
-                <option value="single_url">Single URL</option>
-                <option value="same_domain_crawl">Full site same-domain crawl</option>
+                <option value="single_url">{t("scan.singleUrl")}</option>
+                <option value="same_domain_crawl">{t("scan.fullSite")}</option>
               </SelectInput>
             </Field>
             {scanMode === "same_domain_crawl" ? (
               <div className="form-row">
-                <Field label="Max pages" hint="CLI --max-pages">
+                <Field label={t("scan.maxPages")} hint={t("scan.maxPagesHint")}>
                   <TextInput min={1} max={250} onChange={(event) => setMaxPages(Number(event.target.value))} required type="number" value={maxPages} />
                 </Field>
-                <Field label="Max depth" hint="CLI --max-depth">
+                <Field label={t("scan.maxDepth")} hint={t("scan.maxDepthHint")}>
                   <TextInput min={0} max={5} onChange={(event) => setMaxDepth(Number(event.target.value))} required type="number" value={maxDepth} />
                 </Field>
               </div>
             ) : null}
-            <Toggle checked={desktop} label="Desktop viewport" onChange={setDesktop} description="CLI default viewport; can be disabled like --no-desktop." />
-            <Toggle checked={mobile} label="Mobile viewport" onChange={setMobile} description="CLI default viewport; can be disabled like --no-mobile." />
+            <Toggle checked={desktop} label={t("scan.desktopViewport")} onChange={setDesktop} description={t("scan.desktopViewportHint")} />
+            <Toggle checked={mobile} label={t("scan.mobileViewport")} onChange={setMobile} description={t("scan.mobileViewportHint")} />
             {selectedViewports.length === 0 ? (
-              <div className="note"><Icon name="info" size={14} /> Select at least one viewport before starting a scan.</div>
+              <div className="note"><Icon name="info" size={14} /> {t("scan.selectViewport")}</div>
             ) : null}
             {mutation.data === null ? (
-              <div className="note"><Icon name="info" size={14} /> The API did not accept the scan request. Check that the server is running and the URL is allowed.</div>
+              <div className="note"><Icon name="info" size={14} /> {t("scan.apiError")}</div>
             ) : null}
             <div className="form-actions">
-              <Button onClick={() => navigate({ page: "overview" })}>Cancel</Button>
-              <Button disabled={mutation.isPending} icon="play" type="submit" variant="primary">{mutation.isPending ? "Starting..." : "Start Scan"}</Button>
+              <Button onClick={() => navigate({ page: "overview" })}>{t("common.cancel")}</Button>
+              <Button disabled={mutation.isPending} icon="play" type="submit" variant="primary">{mutation.isPending ? t("common.starting") : t("common.startScan")}</Button>
             </div>
           </form>
         </Panel>
-        <Panel title="Run profile">
-          <div className="kv"><span>Scope</span><strong>{scanMode === "same_domain_crawl" ? "Same-domain crawl" : "Single public URL"}</strong></div>
-          <div className="kv"><span>Limits</span><strong>{scanMode === "same_domain_crawl" ? `${maxPages} pages / depth ${maxDepth}` : "1 page"}</strong></div>
-          <div className="kv"><span>Viewports</span><strong>{selectedViewports.join(" + ") || "None selected"}</strong></div>
-          <div className="kv"><span>Authentication</span><strong>Not supported</strong></div>
-          <div className="kv"><span>Evidence</span><strong>Screenshot + HTML snippet</strong></div>
-          <div className="kv"><span>Reports</span><strong>HTML and PDF artifacts</strong></div>
-          <div className="note" style={{ marginTop: 14 }}><Icon name="info" size={14} /> Full site scans obey same-origin safety, crawl limits, and robots.txt.</div>
+        <Panel title={t("scan.runProfile")}>
+          <div className="kv"><span>{t("scan.scope")}</span><strong>{scanMode === "same_domain_crawl" ? t("scan.scopeCrawl") : t("scan.scopeSingle")}</strong></div>
+          <div className="kv"><span>{t("scan.limits")}</span><strong>{scanMode === "same_domain_crawl" ? t("scan.limitsValue")(maxPages, maxDepth) : t("scan.onePage")}</strong></div>
+          <div className="kv"><span>{t("scan.viewports")}</span><strong>{selectedViewports.join(" + ") || t("common.none")}</strong></div>
+          <div className="kv"><span>{t("scan.authentication")}</span><strong>{t("scan.authNotSupported")}</strong></div>
+          <div className="kv"><span>{t("scan.evidence")}</span><strong>{t("scan.evidenceValue")}</strong></div>
+          <div className="kv"><span>{t("scan.reports")}</span><strong>{t("scan.reportsValue")}</strong></div>
+          <div className="note" style={{ marginTop: 14 }}><Icon name="info" size={14} /> {t("scan.safetyNote")}</div>
         </Panel>
       </div>
     </div>

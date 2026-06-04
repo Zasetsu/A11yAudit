@@ -1,5 +1,6 @@
 import { formatDate, severityMeta, type Issue, type Severity } from "../data";
 import { Button, Icon, PageHeader, Panel, Progress, RunStatusBadge, ScoreRing, SeverityBadge } from "../design/ui";
+import { useT } from "../i18n/locale-context.js";
 import type { PageProps } from "./page-props";
 
 export function issueOverviewMetrics(issues: Issue[]) {
@@ -36,6 +37,7 @@ function Stat({ icon, label, value, sub }: { icon: Parameters<typeof Icon>[0]["n
 }
 
 export function OverviewPage({ project, scans, issues, navigate }: PageProps) {
+  const { t, locale } = useT();
   const projectScans = scans.filter((scan) => scan.projectId === project.id);
   const projectIssues = issues.filter((issue) => issue.projectId === project.id);
   const issueMetrics = issueOverviewMetrics(projectIssues);
@@ -59,12 +61,12 @@ export function OverviewPage({ project, scans, issues, navigate }: PageProps) {
       <PageHeader
         actions={
           <>
-            <Button icon="download" onClick={() => navigate({ page: "reports" })}>Latest PDF</Button>
-            <Button icon="scan-search" onClick={() => navigate({ page: "new-scan" })} variant="primary">Start Scan</Button>
+            <Button icon="download" onClick={() => navigate({ page: "reports" })}>{t("overview.latestPdf")}</Button>
+            <Button icon="scan-search" onClick={() => navigate({ page: "new-scan" })} variant="primary">{t("common.startScan")}</Button>
           </>
         }
         breadcrumb={<><Icon name="globe" size={13} /><span className="mono">{project.domain}</span></>}
-        subtitle={activeRun ? `Manual scan in progress: ${activeRun.id}` : `Last scan ${formatDate(project.lastScan)}`}
+        subtitle={activeRun ? `Manual scan in progress: ${activeRun.id}` : `${t("projects.lastScan")}${formatDate(project.lastScan, locale, t("common.notAvailable"))}`}
         title={project.name}
       />
 
@@ -73,23 +75,23 @@ export function OverviewPage({ project, scans, issues, navigate }: PageProps) {
           <div className="score-panel">
             <ScoreRing score={project.score} size={96} />
             <div>
-              <div className="stat-label">Accessibility score</div>
-              <p className="panel-copy">Weighted score across audited public URLs, desktop checks, and mobile checks.</p>
-              <div className="note" style={{ marginTop: 10 }}><Icon name="info" size={14} /> Automated checks do not certify legal compliance.</div>
+              <div className="stat-label">{t("overview.accessibilityScore")}</div>
+              <p className="panel-copy">{t("overview.scoreHint")}</p>
+              <div className="note" style={{ marginTop: 10 }}><Icon name="info" size={14} /> {t("overview.scoreDisclaimer")}</div>
             </div>
           </div>
         </Panel>
         <div className="stat-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
-          <Stat icon="list" label="Unique issues" sub="grouped problems" value={issueMetrics.uniqueIssues} />
-          <Stat icon="file-text" label="Affected pages" sub="sampled from issues" value={issueMetrics.affectedPages} />
-          <Stat icon="circle-dot" label="Occurrences" sub="raw detections" value={issueMetrics.totalOccurrences} />
-          <Stat icon="alert-octagon" label="Critical issues" sub="highest severity" value={issueMetrics.criticalIssues} />
+          <Stat icon="list" label={t("overview.uniqueIssues")} sub={t("overview.groupedProblems")} value={issueMetrics.uniqueIssues} />
+          <Stat icon="file-text" label={t("overview.affectedPages")} sub={t("overview.sampledFromIssues")} value={issueMetrics.affectedPages} />
+          <Stat icon="circle-dot" label={t("overview.occurrences")} sub={t("overview.rawDetections")} value={issueMetrics.totalOccurrences} />
+          <Stat icon="alert-octagon" label={t("overview.criticalIssues")} sub={t("overview.highestSeverity")} value={issueMetrics.criticalIssues} />
         </div>
       </div>
 
       <div className="split-grid three" style={{ marginBottom: 16 }}>
-        <Panel action={<Button iconRight="arrow-right" onClick={() => navigate({ page: "findings" })} size="sm" variant="ghost">Triage</Button>} title="Issues by severity">
-          <div className="severity-meter" aria-label="Severity distribution">
+        <Panel action={<Button iconRight="arrow-right" onClick={() => navigate({ page: "findings" })} size="sm" variant="ghost">{t("overview.triage")}</Button>} title={t("overview.issuesBySeverity")}>
+          <div className="severity-meter" aria-label={t("overview.severityDistribution")}>
             {(["critical", "serious", "moderate", "minor"] as const).map((level) => (
               <i className={level} key={level} style={{ width: `${(severityCounts[level] / total) * 100}%` }} />
             ))}
@@ -104,28 +106,28 @@ export function OverviewPage({ project, scans, issues, navigate }: PageProps) {
             ))}
           </div>
         </Panel>
-        <Panel title="Viewport split">
+        <Panel title={t("overview.viewportSplit")}>
           <div className="metric-list">
-            <div className="metric-row"><span className="inline-meta"><Icon name="monitor" size={14} />Desktop</span><Progress value={46} /><strong>46%</strong></div>
-            <div className="metric-row"><span className="inline-meta"><Icon name="smartphone" size={14} />Mobile</span><Progress color="var(--serious)" value={54} /><strong>54%</strong></div>
+            <div className="metric-row"><span className="inline-meta"><Icon name="monitor" size={14} />{t("viewport.desktop")}</span><Progress value={46} /><strong>46%</strong></div>
+            <div className="metric-row"><span className="inline-meta"><Icon name="smartphone" size={14} />{t("viewport.mobile")}</span><Progress color="var(--serious)" value={54} /><strong>54%</strong></div>
           </div>
-          <div className="note" style={{ marginTop: 14 }}><Icon name="smartphone" size={14} /> Mobile checks expose more target size and reflow issues.</div>
+          <div className="note" style={{ marginTop: 14 }}><Icon name="smartphone" size={14} /> {t("overview.viewportHint")}</div>
         </Panel>
-        <Panel title="Current run">
+        <Panel title={t("overview.currentRun")}>
           {activeRun ? (
             <div className="metric-list">
-              <div className="kv"><span>Status</span><RunStatusBadge status={activeRun.status} /></div>
-              <div className="kv"><span>Pages</span><strong>{activeRun.pagesScanned}/{activeRun.pagesQueued}</strong></div>
+              <div className="kv"><span>{t("table.status")}</span><RunStatusBadge status={activeRun.status} /></div>
+              <div className="kv"><span>{t("table.pages")}</span><strong>{activeRun.pagesScanned}/{activeRun.pagesQueued}</strong></div>
               <Progress tall value={(activeRun.pagesScanned / Math.max(activeRun.pagesQueued, 1)) * 100} />
             </div>
           ) : (
-            <div className="note"><Icon name="check-circle" size={14} /> No scan is currently running for this project.</div>
+            <div className="note"><Icon name="check-circle" size={14} /> {t("overview.noRunning")}</div>
           )}
         </Panel>
       </div>
 
       <div className="split-grid two">
-        <Panel title="Top recurring issues">
+        <Panel title={t("overview.topRecurring")}>
           <div className="stack-list">
             {topIssues.map((issue) => (
               <button className="list-row" key={issue.id} onClick={() => navigate({ page: "finding-detail", findingId: issue.id })} type="button">
@@ -137,16 +139,16 @@ export function OverviewPage({ project, scans, issues, navigate }: PageProps) {
             ))}
           </div>
         </Panel>
-        <Panel action={<Button iconRight="arrow-right" onClick={() => navigate({ page: "scan-runs" })} size="sm" variant="ghost">All runs</Button>} title="Recent scan runs">
+        <Panel action={<Button iconRight="arrow-right" onClick={() => navigate({ page: "scan-runs" })} size="sm" variant="ghost">{t("overview.allRuns")}</Button>} title={t("overview.recentRuns")}>
           <div className="table-wrap">
             <table className="table">
-              <thead><tr><th>Run</th><th>Status</th><th>Started</th><th className="num">Occurrences</th></tr></thead>
+              <thead><tr><th>{t("table.run")}</th><th>{t("table.status")}</th><th>{t("table.started")}</th><th className="num">{t("table.occurrences")}</th></tr></thead>
               <tbody>
                 {projectScans.slice(0, 4).map((scan) => (
                   <tr key={scan.id}>
                     <td className="mono">{scan.id}</td>
                     <td><RunStatusBadge status={scan.status} /></td>
-                    <td>{formatDate(scan.createdAt)}</td>
+                    <td>{formatDate(scan.createdAt, locale, t("common.notAvailable"))}</td>
                     <td className="num tnum">{scan.findingsTotal}</td>
                   </tr>
                 ))}

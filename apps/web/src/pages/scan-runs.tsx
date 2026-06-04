@@ -1,5 +1,6 @@
 import { formatDate } from "../data";
 import { Button, PageHeader, Panel, Progress, RunStatusBadge } from "../design/ui";
+import { useT } from "../i18n/locale-context.js";
 import type { PageProps } from "./page-props";
 import type { ScanRun } from "../data";
 
@@ -25,27 +26,28 @@ export function scanRunMessageClass(scan: ScanRun): string {
 }
 
 export function ScanRunsPage({ scans, navigate }: PageProps) {
+  const { t, locale } = useT();
   return (
     <div className="content-inner fadein">
       <PageHeader
-        actions={<Button icon="scan-search" onClick={() => navigate({ page: "new-scan" })} variant="primary">New Scan</Button>}
+        actions={<Button icon="scan-search" onClick={() => navigate({ page: "new-scan" })} variant="primary">{t("common.newScan")}</Button>}
         icon="activity"
-        subtitle="Manual public URL scan runs from the local instance."
-        title="Scan Runs"
+        subtitle={t("runs.subtitle")}
+        title={t("nav.scanRuns")}
       />
-      <Panel title="Runs">
+      <Panel title={t("runs.runs")}>
         <div className="table-wrap">
           <table className="table">
             <thead>
               <tr>
-                <th>Run</th>
-                <th>Project</th>
-                <th>Status</th>
-                <th>Profile</th>
-                <th>Target</th>
-                <th>Progress</th>
-                <th className="num">Occurrences</th>
-                <th>Started</th>
+                <th>{t("table.run")}</th>
+                <th>{t("table.project")}</th>
+                <th>{t("table.status")}</th>
+                <th>{t("table.profile")}</th>
+                <th>{t("table.target")}</th>
+                <th>{t("table.progress")}</th>
+                <th className="num">{t("table.occurrences")}</th>
+                <th>{t("table.started")}</th>
               </tr>
             </thead>
             <tbody>
@@ -60,8 +62,8 @@ export function ScanRunsPage({ scans, navigate }: PageProps) {
 	                    ) : null}
 	                  </td>
                   <td>
-                    <strong>{scan.mode === "same_domain_crawl" ? "Full site" : "Single URL"}</strong>
-                    <div className="table-sub">{scan.viewports} · {scan.maxPages} pages · depth {scan.maxDepth}</div>
+                    <strong>{scan.mode === "same_domain_crawl" ? t("runs.fullSite") : t("runs.singleUrl")}</strong>
+                    <div className="table-sub">{t("runs.profileMeta")(scan.viewports, scan.maxPages, scan.maxDepth)}</div>
                   </td>
                   <td className="url-cell">{scan.url}</td>
                   <td style={{ minWidth: 150 }}>
@@ -69,7 +71,7 @@ export function ScanRunsPage({ scans, navigate }: PageProps) {
                     <div className={`table-sub ${scan.status === "failed" ? "error-text" : ""}`}>{scanProgressLabel(scan)}</div>
                   </td>
                   <td className="num tnum">{scan.findingsTotal}</td>
-                  <td>{formatDate(scan.createdAt)}</td>
+                  <td>{formatDate(scan.createdAt, locale, t("common.notAvailable"))}</td>
                 </tr>
               ))}
             </tbody>
