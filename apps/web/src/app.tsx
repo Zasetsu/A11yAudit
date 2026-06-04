@@ -416,7 +416,7 @@ export function App() {
 
   if (!sessionLoaded) {
     return (
-      <main aria-label="Main content" className="content auth-content">
+      <main aria-label={t("app.mainContent")} className="content auth-content">
         <div className="content-inner fadein">
           <Panel title={t("common.loading")}>{t("app.preparingSession")}</Panel>
         </div>
