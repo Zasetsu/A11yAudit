@@ -421,11 +421,11 @@ export function App() {
   }
 
   if (appRoute.page === "login") {
-    return <LoginPage onAuthenticated={routeAfterAuth} />;
+    return <LoginPage onAuthenticated={routeAfterAuth} onSignup={() => setBrowserRoute({ page: "signup" })} />;
   }
 
   if (appRoute.page === "signup") {
-    return <SignupPage onAuthenticated={routeAfterAuth} />;
+    return <SignupPage onAuthenticated={routeAfterAuth} onLogin={() => setBrowserRoute({ page: "login" })} />;
   }
 
   if (appRoute.page === "invite") {

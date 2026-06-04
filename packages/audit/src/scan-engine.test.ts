@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { DEFAULT_VIEWPORTS, type ScanRequest } from "@a11yaudit/core";
 import { LocalStorageAdapter } from "@a11yaudit/storage";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { runScan } from "./scan-engine.js";
+import { captureElementCropEvidence, collectScreenshotDataUris, runScan } from "./scan-engine.js";
 
 const crawlerSafety = vi.hoisted(() => ({
   assertSafeResolvedUrl: vi.fn(),
@@ -360,4 +360,63 @@ describe("runScan", () => {
     );
     expect(new Set(screenshotKeys)).toHaveLength(1);
   }, 60_000);
+
+  it("collects screenshot artifacts as data uris", async () => {
+    const storage = {
+      get: async (key: string) => Buffer.from(`bytes-${key}`),
+      put: async () => ({ key: "", mimeType: "", sizeBytes: 0 }),
+      delete: async () => undefined
+    };
+    const findings = [{
+      evidence: [
+        { kind: "element_screenshot", artifactKey: "crop1", mimeType: "image/png", sizeBytes: 1 },
+        { kind: "page_screenshot", artifactKey: "k1", mimeType: "image/png", sizeBytes: 1 }
+      ]
+    }] as any;
+    const map = await collectScreenshotDataUris(findings, storage as any);
+    expect(map.get("crop1")).toBe(`data:image/png;base64,${Buffer.from("bytes-crop1").toString("base64")}`);
+    // page screenshots are NOT collected for inlining (avoids hundreds-of-MB reports)
+    expect(map.has("k1")).toBe(false);
+  });
+
+  it("captures an element crop with a temporary highlight", async () => {
+    const calls: string[] = [];
+    const el = {
+      evaluate: async (_fn: unknown) => { calls.push("style"); },
+      boundingBox: async () => ({ x: 10, y: 20, width: 100, height: 30 })
+    };
+    const page = {
+      screenshot: async (_opts: unknown) => Buffer.from("png"),
+      viewportSize: () => ({ width: 1440, height: 900 })
+    };
+    const storage = {
+      put: async (k: string) => ({ key: k, mimeType: "image/png", sizeBytes: 3 }),
+      get: async () => Buffer.from(""),
+      delete: async () => undefined
+    };
+
+    const artifact = await captureElementCropEvidence({
+      runId: "r1", page: page as any, element: el as any, fingerprint: "fp", storage: storage as any
+    });
+    expect(artifact?.kind).toBe("element_screenshot");
+    expect(calls.filter((c) => c === "style").length).toBeGreaterThanOrEqual(2); // outline set + cleared
+  });
+
+  it("keeps the element crop clip within the viewport for edge elements", async () => {
+    let captured: any = null;
+    const el = {
+      evaluate: async () => undefined,
+      boundingBox: async () => ({ x: 1420, y: 880, width: 30, height: 30 })
+    };
+    const page = {
+      screenshot: async (opts: any) => { captured = opts.clip; return Buffer.from("png"); },
+      viewportSize: () => ({ width: 1440, height: 900 })
+    };
+    const storage = { put: async (k: string) => ({ key: k, mimeType: "image/png", sizeBytes: 3 }), get: async () => Buffer.from(""), delete: async () => undefined };
+
+    await captureElementCropEvidence({ runId: "r", page: page as any, element: el as any, fingerprint: "fp", storage: storage as any });
+    expect(captured).not.toBeNull();
+    expect(captured.x + captured.width).toBeLessThanOrEqual(1440);
+    expect(captured.y + captured.height).toBeLessThanOrEqual(900);
+  });
 });

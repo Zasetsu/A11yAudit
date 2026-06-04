@@ -148,5 +148,5 @@ Also `docs/deployment.md` (env + bootstrap), `docs/wcag-22-coverage-guide.md` (r
 
 ## Product principles (enforce in copy)
 
-- **English-only** product surface (UI, CLI, PDF, rule text, comments). Planning chat with the owner may be Turkish; shipped copy is not.
+- **English-only** code surface (web UI, CLI, rule identifiers, comments). The **downloaded audit report is localized** (Turkish default, English available) because the customer base is Turkish — it is the one deliverable exempt from English-only. Report criterion copy (user impact / how-to-fix per WCAG criterion) lives in `packages/core/src/wcag-content.ts`, keyed by criterion + locale, sourced from W3C WCAG 2.2. Planning chat with the owner may be Turkish.
 - **Technical verification only** — never certify legal/WCAG conformance or imply it. Does not replace manual screen-reader/keyboard testing. Interaction-rule copy describes a technical check ("Clickable control is not reachable by keyboard"), not a verdict ("Site is not WCAG compliant"). Custom rules stay conservative to avoid false positives.
