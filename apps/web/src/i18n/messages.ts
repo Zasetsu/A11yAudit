@@ -75,6 +75,7 @@ export interface Messages {
   "overview.topRecurring": string;
   "overview.allRuns": string;
   "overview.recentRuns": string;
+  "overview.manualScanInProgress": (runId: string) => string;
   // projects
   "projects.newProject": string;
   "projects.subtitle": string;
@@ -365,6 +366,7 @@ export const MESSAGES: Record<Locale, Messages> = {
     "overview.topRecurring": "En sık tekrarlayan sorunlar",
     "overview.allRuns": "Tüm taramalar",
     "overview.recentRuns": "Son taramalar",
+    "overview.manualScanInProgress": (runId) => `Manuel tarama sürüyor: ${runId}`,
     "projects.newProject": "Yeni Proje",
     "projects.subtitle": "Yerel A11yAudit taramaları için yapılandırılmış herkese açık siteler.",
     "projects.uniqueIssues": "benzersiz sorun",
@@ -635,6 +637,7 @@ export const MESSAGES: Record<Locale, Messages> = {
     "overview.topRecurring": "Top recurring issues",
     "overview.allRuns": "All runs",
     "overview.recentRuns": "Recent scan runs",
+    "overview.manualScanInProgress": (runId) => `Manual scan in progress: ${runId}`,
     "projects.newProject": "New Project",
     "projects.subtitle": "Public websites configured for local A11yAudit scans.",
     "projects.uniqueIssues": "unique issues",

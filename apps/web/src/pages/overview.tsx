@@ -66,7 +66,7 @@ export function OverviewPage({ project, scans, issues, navigate }: PageProps) {
           </>
         }
         breadcrumb={<><Icon name="globe" size={13} /><span className="mono">{project.domain}</span></>}
-        subtitle={activeRun ? `Manual scan in progress: ${activeRun.id}` : `${t("projects.lastScan")}${formatDate(project.lastScan, locale, t("common.notAvailable"))}`}
+        subtitle={activeRun ? t("overview.manualScanInProgress")(activeRun.id) : `${t("projects.lastScan")}${formatDate(project.lastScan, locale, t("common.notAvailable"))}`}
         title={project.name}
       />
 
