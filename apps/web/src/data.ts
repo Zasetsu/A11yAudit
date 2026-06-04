@@ -73,6 +73,7 @@ export interface Issue {
   severity: Severity;
   source: FindingSource;
   certainty: FindingCertainty;
+  status: FindingStatus;
   ruleId: string;
   wcagCriteria: string;
   description: string;
@@ -394,6 +395,7 @@ export const demoIssues: Issue[] = [
     severity: "critical",
     source: "axe",
     certainty: "automatic_violation",
+    status: "new",
     ruleId: "button-name",
     wcagCriteria: "4.1.2",
     description: "The control exposes a button role but does not provide an accessible name.",

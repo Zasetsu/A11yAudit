@@ -13,6 +13,7 @@ function issue(overrides: Partial<Issue>): Issue {
     severity: "moderate",
     source: "axe",
     certainty: "automatic_violation",
+    status: "ongoing",
     ruleId: "rule",
     wcagCriteria: "1.1.1",
     description: "Description",
