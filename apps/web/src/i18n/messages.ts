@@ -144,6 +144,11 @@ export interface Messages {
   "run.relatedReports": string;
   "run.noIssues": string;
   "run.noReports": string;
+  "run.sinceLastScan": string;
+  "run.statusNew": string;
+  "run.statusOngoing": string;
+  "run.statusResolved": string;
+  "run.resolvedGroup": string;
   "run.viewDetail": (runId: string) => string;
   // findings
   "findings.subtitle": string;
@@ -442,6 +447,11 @@ export const MESSAGES: Record<Locale, Messages> = {
     "run.relatedReports": "Bu taramanın raporları",
     "run.noIssues": "Bu tarama için gruplanmış sorun yok.",
     "run.noReports": "Bu tarama için rapor yok.",
+    "run.sinceLastScan": "Geçen taramadan beri",
+    "run.statusNew": "yeni",
+    "run.statusOngoing": "devam eden",
+    "run.statusResolved": "çözüldü",
+    "run.resolvedGroup": "Çözülen sorunlar",
     "run.viewDetail": (runId) => `${runId} taramasının detayını gör`,
     "findings.subtitle": "WCAG referansları ve kanıt işaretçileriyle gruplanmış erişilebilirlik sorunları.",
     "findings.markResolved": "Çözüldü İşaretle",
@@ -723,6 +733,11 @@ export const MESSAGES: Record<Locale, Messages> = {
     "run.relatedReports": "Reports from this scan",
     "run.noIssues": "No grouped issues for this scan.",
     "run.noReports": "No reports for this scan.",
+    "run.sinceLastScan": "Since last scan",
+    "run.statusNew": "new",
+    "run.statusOngoing": "ongoing",
+    "run.statusResolved": "resolved",
+    "run.resolvedGroup": "Resolved issues",
     "run.viewDetail": (runId) => `View detail for scan ${runId}`,
     "findings.subtitle": "Grouped accessibility issues with WCAG references and evidence pointers.",
     "findings.markResolved": "Mark Resolved",

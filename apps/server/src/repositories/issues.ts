@@ -1,4 +1,6 @@
-import { and, desc, eq, type SQL } from "drizzle-orm";
+import { and, desc, eq, ne, type SQL } from "drizzle-orm";
+
+import type { BaselineIssue } from "@a11yaudit/core";
 
 import type { SqliteDatabase } from "../db/client.js";
 import { issues, projects, scanRuns } from "../db/schema.js";
@@ -84,4 +86,78 @@ export async function getIssueForWorkspace(
     .get();
 
   return row ? mapIssueRow(row.issue) : null;
+}
+
+function toBaselineIssue(row: IssueRow): BaselineIssue {
+  return {
+    issueKey: row.issueKey,
+    title: row.title,
+    severity: row.severity as BaselineIssue["severity"],
+    source: row.source as BaselineIssue["source"],
+    certainty: row.certainty as BaselineIssue["certainty"],
+    ruleId: row.ruleId,
+    wcagCriteria: row.wcagCriteria.split(",").map((c) => c.trim()).filter(Boolean),
+    description: row.description,
+    recommendation: row.recommendation,
+    likelyScope: row.likelyScope,
+    urlScopeGroup: row.urlScopeGroup,
+    componentArea: row.componentArea,
+    cmsHint: row.cmsHint,
+    confidence: row.confidence as BaselineIssue["confidence"],
+    affectedPages: row.affectedPages,
+    occurrences: row.occurrences,
+    viewportSummary: row.viewportSummary,
+    representativeUrl: row.representativeUrl,
+    representativeSelector: row.representativeSelector,
+    representativeHtmlSnippet: row.representativeHtmlSnippet,
+    sampleUrls: parseSampleUrls(row.sampleUrls)
+  };
+}
+
+export interface BaselineContext {
+  // A prior completed scan exists — distinct from whether it had any issues. A clean
+  // prior scan (0 issues) still means "not the first audit", so the report must not
+  // fall back to its first-audit copy just because `issues` is empty.
+  hasBaselineRun: boolean;
+  issues: BaselineIssue[];
+}
+
+export function getBaselineContext(
+  db: SqliteDatabase,
+  params: { projectId: string; excludeScanRunId: string }
+): BaselineContext {
+  const priorRun = db
+    .select({ id: scanRuns.id })
+    .from(scanRuns)
+    .where(and(
+      eq(scanRuns.projectId, params.projectId),
+      eq(scanRuns.status, "completed"),
+      ne(scanRuns.id, params.excludeScanRunId)
+    ))
+    .orderBy(desc(scanRuns.finishedAt))
+    .limit(1)
+    .get();
+
+  if (!priorRun) {
+    return { hasBaselineRun: false, issues: [] };
+  }
+
+  // Exclude resolved carry-over rows from the baseline. They are not "live" issues:
+  // including them would re-resolve an already-fixed issue on every subsequent scan
+  // (sticky resolved) and would mislabel a regressed issue as "ongoing" instead of "new".
+  const baselineIssues = db
+    .select({ issue: issues })
+    .from(issues)
+    .where(and(eq(issues.scanRunId, priorRun.id), ne(issues.status, "resolved")))
+    .all()
+    .map((row) => toBaselineIssue(row.issue));
+
+  return { hasBaselineRun: true, issues: baselineIssues };
+}
+
+export function getBaselineIssues(
+  db: SqliteDatabase,
+  params: { projectId: string; excludeScanRunId: string }
+): BaselineIssue[] {
+  return getBaselineContext(db, params).issues;
 }

@@ -59,6 +59,7 @@ export interface AuditReportModel {
   severitySummary?: SeveritySummary;
   locale: ReportLocale;
   problems: ReportProblem[];
+  diffSummary?: { counts: { new: number; ongoing: number; resolved: number }; resolvedTitles: string[]; hasBaseline: boolean };
 }
 
 function preferredScreenshotKey(finding: ScanFinding): string | null {
@@ -126,6 +127,7 @@ export function buildAuditReportModel(input: {
   generatedAt: string;
   locale?: ReportLocale;
   screenshotDataUris?: Map<string, string>;
+  diffSummary?: { counts: { new: number; ongoing: number; resolved: number }; resolvedTitles: string[]; hasBaseline: boolean };
 }): AuditReportModel {
   const url = new URL(input.request.targetUrl);
   const issues = aggregateScanIssues(input.findings, { auditedPages: input.pages });
@@ -149,7 +151,8 @@ export function buildAuditReportModel(input: {
     pages: input.pages,
     severitySummary: summarizeSeverity(issues),
     locale,
-    problems
+    problems,
+    diffSummary: input.diffSummary
   };
 }
 

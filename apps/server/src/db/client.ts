@@ -122,6 +122,7 @@ export function initializeDb(sqlite: Database.Database): void {
       project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       scan_run_id TEXT NOT NULL REFERENCES scan_runs(id) ON DELETE CASCADE,
       issue_key TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'new',
       title TEXT NOT NULL,
       severity TEXT NOT NULL,
       source TEXT NOT NULL,
@@ -202,4 +203,13 @@ export function initializeDb(sqlite: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_reports_scan_created ON reports(scan_run_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_evidence_artifacts_key ON evidence_artifacts(artifact_key);
   `);
+
+  // Backfill additive columns on pre-existing databases (CREATE TABLE IF NOT EXISTS
+  // does not alter an existing table). Each ALTER is idempotent: it throws if the
+  // column already exists, which we swallow.
+  try {
+    sqlite.exec("ALTER TABLE issues ADD COLUMN status TEXT NOT NULL DEFAULT 'new'");
+  } catch {
+    // column already exists — fresh DBs already have it from CREATE TABLE
+  }
 }

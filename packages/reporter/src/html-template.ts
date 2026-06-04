@@ -130,6 +130,9 @@ export function renderReportHtml(report: AuditReportModel, options: RenderReport
     </tbody>
   </table>
 
+  <!-- CHANGES SINCE LAST SCAN -->
+  ${renderChanges(report, strings)}
+
   <!-- FIX THESE FIRST -->
   <h2>${escapeHtml(strings.fixFirst)}</h2>
   ${fixFirstList}
@@ -150,6 +153,22 @@ export function renderReportHtml(report: AuditReportModel, options: RenderReport
 
 </body>
 </html>`;
+}
+
+function renderChanges(report: AuditReportModel, strings: ReportStrings): string {
+  const d = report.diffSummary;
+  if (!d) return "";
+  if (!d.hasBaseline) {
+    return `<h2>${escapeHtml(strings.changesTitle)}</h2><p>${escapeHtml(strings.changesFirstAudit)}</p>`;
+  }
+  const resolvedList = d.resolvedTitles.length > 0
+    ? `<div class="block"><b>${escapeHtml(strings.changesResolvedList)} (${d.counts.resolved})</b><ul>${
+        d.resolvedTitles.map((t) => `<li>${escapeHtml(t)}</li>`).join("")
+      }</ul></div>`
+    : "";
+  return `<h2>${escapeHtml(strings.changesTitle)}</h2>
+    <p>${d.counts.new} ${escapeHtml(strings.changesNew)} · ${d.counts.ongoing} ${escapeHtml(strings.changesOngoing)} · ${d.counts.resolved} ${escapeHtml(strings.changesResolved)}</p>
+    ${resolvedList}`;
 }
 
 function renderProblemCard(problem: ReportProblem, strings: ReportStrings, locale: ReportLocale): string {

@@ -6,8 +6,11 @@ import {
   shouldSkipUrl
 } from "@a11yaudit/crawler";
 import {
+  aggregateScanIssues,
+  diffScanIssues,
   DEFAULT_SCAN_LIMITS,
   type AuditedPage,
+  type BaselineIssue,
   type CompletedScanResult,
   type EvidenceArtifact,
   type ScanFinding,
@@ -67,6 +70,11 @@ export interface RunScanInput {
   request: ScanRequest;
   storage: StorageAdapter;
   onProgress?: (event: ScanProgressEvent) => Promise<void> | void;
+  baselineIssues?: BaselineIssue[];
+  // Whether a prior completed scan exists. Distinct from baselineIssues.length: a clean
+  // prior scan has 0 baseline issues but still means "not the first audit". Defaults to
+  // baselineIssues.length > 0 when omitted (callers that have a baseline run pass true).
+  hasBaseline?: boolean;
 }
 
 export async function runScan(input: RunScanInput): Promise<CompletedScanResult> {
@@ -185,12 +193,31 @@ export async function runScan(input: RunScanInput): Promise<CompletedScanResult>
     throw new Error("No pages were audited successfully");
   }
 
-  const score = calculateScore(findings);
-  await emitProgress(input, "reporting", pagesQueued, pages.length, findings.length);
+  const currentIssues = aggregateScanIssues(findings, { auditedPages: pages });
+  const diff = diffScanIssues(currentIssues, input.baselineIssues ?? []);
+
+  const statusByFingerprint = new Map<string, "new" | "ongoing">();
+  for (const issue of diff.issues) {
+    for (const fp of issue.occurrenceFingerprints) {
+      if (fp) statusByFingerprint.set(fp, issue.status);
+    }
+  }
+  const diffedFindings: ScanFinding[] = findings.map((f) => ({
+    ...f,
+    status: statusByFingerprint.get(f.fingerprint) ?? "new"
+  }));
+
+  const score = calculateScore(diffedFindings);
+  await emitProgress(input, "reporting", pagesQueued, pages.length, diffedFindings.length);
   const { reports, reportWarnings } = await storeReports(input, {
     score,
     pages,
-    findings
+    findings: diffedFindings,
+    diffSummary: {
+      counts: diff.counts,
+      resolvedTitles: diff.resolved.map((r) => r.title),
+      hasBaseline: input.hasBaseline ?? (input.baselineIssues ?? []).length > 0
+    }
   });
 
   return {
@@ -199,9 +226,10 @@ export async function runScan(input: RunScanInput): Promise<CompletedScanResult>
     targetUrl: input.request.targetUrl,
     mode: input.request.mode,
     pages,
-    findings,
+    findings: diffedFindings,
     reports,
     reportWarnings: [...cropCapWarnings, ...reportWarnings],
+    resolvedIssues: diff.resolved,
     score,
     startedAt,
     finishedAt: new Date().toISOString()
@@ -421,7 +449,12 @@ async function validateSafeAuditUrl(url: string): Promise<void> {
 
 async function storeReports(
   input: RunScanInput,
-  reportInput: { score: number; pages: AuditedPage[]; findings: ScanFinding[] }
+  reportInput: {
+    score: number;
+    pages: AuditedPage[];
+    findings: ScanFinding[];
+    diffSummary: { counts: { new: number; ongoing: number; resolved: number }; resolvedTitles: string[]; hasBaseline: boolean };
+  }
 ): Promise<{ reports: CompletedScanResult["reports"]; reportWarnings: string[] }> {
   const generatedAt = new Date().toISOString();
   const screenshotDataUris = await collectScreenshotDataUris(reportInput.findings, input.storage);
@@ -432,7 +465,8 @@ async function storeReports(
     score: reportInput.score,
     generatedAt,
     locale: "tr",
-    screenshotDataUris
+    screenshotDataUris,
+    diffSummary: reportInput.diffSummary
   });
   const html = renderReportHtml(report);
   const htmlArtifact = await input.storage.put(

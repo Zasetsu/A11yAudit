@@ -1,6 +1,6 @@
 import { getReportDownloadUrl } from "../api/client";
 import { formatDate, severityMeta } from "../data";
-import { Button, Icon, PageHeader, Panel, Progress, RunStatusBadge, SeverityBadge } from "../design/ui";
+import { Button, Icon, PageHeader, Panel, Progress, RunStatusBadge, SeverityBadge, StatusBadge } from "../design/ui";
 import { useT } from "../i18n/locale-context.js";
 import type { PageProps } from "./page-props";
 
@@ -20,6 +20,14 @@ export function ScanRunDetailPage({ workspaceSlug, scans, issues, reports, scanR
   const scanIssues = [...issues.filter((issue) => issue.scanRunId === scan.id)].sort(
     (a, b) => severityMeta[a.severity].rank - severityMeta[b.severity].rank || b.occurrences - a.occurrences
   );
+  const counts = { new: 0, ongoing: 0, resolved: 0 };
+  for (const i of scanIssues) {
+    if (i.status === "new") counts.new += 1;
+    else if (i.status === "ongoing") counts.ongoing += 1;
+    else if (i.status === "resolved") counts.resolved += 1;
+  }
+  const openIssues = scanIssues.filter((i) => i.status !== "resolved");
+  const resolvedIssues = scanIssues.filter((i) => i.status === "resolved");
   const scanReports = reports.filter((report) => report.scanRunId === scan.id);
   const progress = (scan.pagesScanned / Math.max(scan.pagesQueued, 1)) * 100;
 
@@ -43,6 +51,7 @@ export function ScanRunDetailPage({ workspaceSlug, scans, issues, reports, scanR
             <div className="kv"><span>{t("table.progress")}</span><strong className="tnum">{scan.pagesScanned}/{scan.pagesQueued} {t("runs.pagesWord")}</strong></div>
             <Progress color={scan.status === "failed" ? "var(--critical)" : "var(--accent)"} value={progress} />
             <div className="kv"><span>{t("table.occurrences")}</span><strong className="tnum">{scan.findingsTotal}</strong></div>
+            <div className="kv"><span>{t("run.sinceLastScan")}</span><strong>{counts.new} {t("run.statusNew")} · {counts.ongoing} {t("run.statusOngoing")} · {counts.resolved} {t("run.statusResolved")}</strong></div>
             {scan.score !== null ? <div className="kv"><span>{t("run.score")}</span><strong className="tnum">{scan.score}</strong></div> : null}
             <div className="kv"><span>{t("table.started")}</span><strong>{formatDate(scan.createdAt, locale, t("common.notAvailable"))}</strong></div>
             {scan.errorMessage !== null ? (
@@ -52,13 +61,14 @@ export function ScanRunDetailPage({ workspaceSlug, scans, issues, reports, scanR
         </Panel>
 
         <Panel title={t("run.relatedIssues")}>
-          {scanIssues.length === 0 ? (
+          {openIssues.length === 0 ? (
             <div className="note"><Icon name="info" size={14} /> {t("run.noIssues")}</div>
           ) : (
             <div className="stack-list">
-              {scanIssues.map((issue) => (
+              {openIssues.map((issue) => (
                 <button className="list-row" key={issue.id} onClick={() => navigate({ page: "finding-detail", findingId: issue.id })} type="button">
                   <SeverityBadge level={issue.severity} />
+                  <StatusBadge status={issue.status} />
                   <span className="truncate">{issue.title}</span>
                   <span className="wcag">{issue.wcagCriteria}</span>
                   <strong className="tnum">{issue.occurrences}</strong>
@@ -67,6 +77,20 @@ export function ScanRunDetailPage({ workspaceSlug, scans, issues, reports, scanR
             </div>
           )}
         </Panel>
+
+        {resolvedIssues.length > 0 ? (
+          <Panel title={t("run.resolvedGroup")}>
+            <div className="stack-list static">
+              {resolvedIssues.map((issue) => (
+                <div className="list-row" key={issue.id}>
+                  <StatusBadge status={issue.status} />
+                  <span className="truncate">{issue.title}</span>
+                  <span className="wcag">{issue.wcagCriteria}</span>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        ) : null}
 
         <Panel title={t("run.relatedReports")}>
           {scanReports.length === 0 ? (

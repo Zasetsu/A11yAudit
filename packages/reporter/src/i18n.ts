@@ -24,6 +24,12 @@ export interface ReportStrings {
   selector: string;
   page: string;
   viewport: string;
+  changesTitle: string;
+  changesNew: string;
+  changesOngoing: string;
+  changesResolved: string;
+  changesResolvedList: string;
+  changesFirstAudit: string;
 }
 
 const STRINGS: Record<ReportLocale, ReportStrings> = {
@@ -50,7 +56,13 @@ const STRINGS: Record<ReportLocale, ReportStrings> = {
     pagesAudited: "denetlenen sayfa",
     selector: "seçici",
     page: "sayfa",
-    viewport: "görünüm"
+    viewport: "görünüm",
+    changesTitle: "Geçen taramadan beri değişiklikler",
+    changesNew: "yeni",
+    changesOngoing: "devam eden",
+    changesResolved: "çözüldü",
+    changesResolvedList: "Çözülen sorunlar",
+    changesFirstAudit: "İlk denetim — karşılaştırılacak önceki tarama yok."
   },
   en: {
     reportTitle: "Accessibility Audit Report",
@@ -75,7 +87,13 @@ const STRINGS: Record<ReportLocale, ReportStrings> = {
     pagesAudited: "pages audited",
     selector: "selector",
     page: "page",
-    viewport: "viewport"
+    viewport: "viewport",
+    changesTitle: "Changes since last scan",
+    changesNew: "new",
+    changesOngoing: "ongoing",
+    changesResolved: "resolved",
+    changesResolvedList: "Resolved issues",
+    changesFirstAudit: "First audit — no prior scan to compare."
   }
 };
 

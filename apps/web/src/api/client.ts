@@ -139,6 +139,7 @@ type ServerIssue = Partial<Omit<Issue, "severity" | "source" | "certainty" | "co
   severity: Issue["severity"];
   source: Issue["source"];
   certainty: Issue["certainty"];
+  status: Issue["status"];
   ruleId: string;
   wcagCriteria: string;
   description: string;
@@ -373,6 +374,10 @@ function issueSampleUrls(sampleUrls: unknown): string[] {
   return Array.isArray(sampleUrls) ? sampleUrls.filter((url): url is string => typeof url === "string") : [];
 }
 
+function issueStatus(status: unknown): Issue["status"] {
+  return status === "new" || status === "resolved" ? status : "ongoing";
+}
+
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim() !== "";
 }
@@ -433,6 +438,7 @@ function mapIssue(row: ServerIssue): Issue {
     severity: row.severity,
     source: row.source,
     certainty: row.certainty,
+    status: issueStatus(row.status),
     ruleId: row.ruleId,
     wcagCriteria: row.wcagCriteria,
     description: row.description,
