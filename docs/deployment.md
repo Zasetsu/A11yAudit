@@ -2,6 +2,21 @@
 
 A11yAudit is an open-source, self-hosted WCAG 2.2 technical accessibility audit platform. These notes describe the current server and web deployment behavior without claiming hosted SaaS production readiness.
 
+## Public site & routing
+
+The Fastify server serves four trees on one origin:
+
+```text
+GET /            → apps/landing      (public marketing site — visiting the root lands here, not the app)
+GET /app, /app/* → apps/web/dist     (dashboard SPA, built with Vite base "/app/"; behind login)
+GET /assist/...  → assist-widget bundle
+GET /api/*       → API (auth + data)
+```
+
+- The **landing** (`apps/landing`) is static (`index.html` + `landing/` + `assets/` + `demo/`), served via `@fastify/static` at `/`. It embeds the real accessibility widget (dogfood) and its live demo loads the widget inside an `<iframe>` pointed at `/demo/ornek-site.html`. The contact form is `mailto:`-only (no backend yet).
+- The **dashboard** (`apps/web`) must be built with `base: "/app/"` (already configured); the server serves `apps/web/dist` at `/app/*` with a client-route fallback (extensionless `/app/...` → the SPA shell). API calls remain origin-relative `/api/*`. If `apps/web/dist` is absent, `/app` returns 404 (run `pnpm build`).
+- Route order: API / assist / health / `/app` are registered before the `/` landing static (which uses `wildcard:false`), so the landing never shadows them.
+
 ## Fresh Database Assumption
 
 The current SaaS auth and workspace schema is intended for a fresh SQLite database. Existing local single-tenant databases are not backfilled by these deployment notes.
