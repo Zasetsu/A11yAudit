@@ -90,6 +90,7 @@ export const issues = sqliteTable("issues", {
     .notNull()
     .references(() => scanRuns.id, { onDelete: "cascade" }),
   issueKey: text("issue_key").notNull(),
+  status: text("status").notNull().default("new"),
   title: text("title").notNull(),
   severity: text("severity").notNull(),
   source: text("source").notNull(),

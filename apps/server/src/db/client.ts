@@ -122,6 +122,7 @@ export function initializeDb(sqlite: Database.Database): void {
       project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       scan_run_id TEXT NOT NULL REFERENCES scan_runs(id) ON DELETE CASCADE,
       issue_key TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'new',
       title TEXT NOT NULL,
       severity TEXT NOT NULL,
       source TEXT NOT NULL,
