@@ -1481,7 +1481,7 @@ git commit -m "feat(web): localize overview, projects, new-scan, scan-runs pages
 
 - [ ] **Step 2: finding-detail.tsx**
 
-`const { t, locale } = useT();`. Map every inventory line to its `finding.*` key. For `"Not captured"` (two sites) use `t("common.notCaptured")`. The screenshot alt `${finding.title} screenshot evidence` → `t("finding.screenshotAlt")(finding.title)`. `"Download"` → `t("common.download")`. Back links → `t("finding.back")`. WCAG criterion name display (if shown): resolve via `getCriterionContent(criterionId, locale)?.name ?? criterionId` (import `getCriterionContent` from `@a11yaudit/core`); if the page only shows the criterion id string, leave the id as-is. Update any `formatDate`/`formatBytes` calls to pass `locale`/labels.
+`const { t, locale } = useT();`. Map every inventory line to its `finding.*` key. For `"Not captured"` (two sites) use `t("common.notCaptured")`. The screenshot alt `${finding.title} screenshot evidence` → `t("finding.screenshotAlt")(finding.title)`. `"Download"` → `t("common.download")`. Back links → `t("finding.back")`. Update any `formatDate`/`formatBytes` calls to pass `locale`/labels. **Do NOT import `getCriterionContent` from `@a11yaudit/core`** — that helper does not exist in core's `src` on this branch (it ships on the report-redesign branch, PR #6). Leave WCAG criterion ids displayed as-is; localizing criterion names is a follow-up after PR #6 merges.
 
 - [ ] **Step 3: reports.tsx**
 
