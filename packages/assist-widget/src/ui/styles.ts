@@ -82,6 +82,33 @@ export const WIDGET_CSS = `
 .aa-assist-structure-list { display:grid;gap:4px; }
 .aa-assist-structure-item { min-height:32px;border:1px solid #e6e7eb;border-radius:8px;background:#fff;color:#111827;cursor:pointer;font:inherit;font-size:12px;padding:6px 8px;text-align:left; }
 @media (prefers-reduced-motion: reduce) { .aa-assist-launcher,.aa-assist-control,.aa-assist-close { transition:none !important; } }
+
+/* Mobile: the panel takes the whole viewport and scrolls internally.
+   A bottom-anchored panel can never fit a tall control grid on a phone,
+   so on narrow screens it becomes a full-screen scrollable sheet. */
+@media (max-width: 560px) {
+  .aa-assist-panel {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    max-width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100vh;
+    max-height: 100dvh;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .aa-assist-header {
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 1;
+  }
+}
 `;
 
 export const PAGE_EFFECT_CSS = `
