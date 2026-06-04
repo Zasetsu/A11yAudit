@@ -473,6 +473,12 @@ textarea.input { height: auto; line-height: 1.5; min-height: 86px; padding: 8px 
   width: 26px;
 }
 
+.brand-mark {
+  border-radius: 7px;
+  display: block;
+  flex: none;
+}
+
 .brand .name {
   font-size: 14px;
   font-weight: 700;

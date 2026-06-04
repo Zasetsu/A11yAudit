@@ -46,8 +46,8 @@ export function Sidebar({ route, navigate, workspaceRole }: { route: Route; navi
   return (
     <nav aria-label={t("shell.primaryNav")} className="sidebar">
       <div className="brand">
-        <div className="logo"><Icon name="shield-check" size={16} /></div>
-        <div className="name">A11yAudit<small>{t("shell.brandSub")}</small></div>
+        <img alt="" className="brand-mark" height={28} src="/favicon.svg" width={28} />
+        <div className="name">Audera<small>{t("shell.brandSub")}</small></div>
       </div>
       <div className="nav-list">
         {navItems.map((item) => <NavButton item={item} key={item.id} navigate={navigate} route={route} />)}
