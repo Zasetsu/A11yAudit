@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="tr" class="theme-light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Audera — Web Erişilebilirlik Denetimi ve Sürekli İyileştirme Platformu</title>
+<meta name="description" content="Audera; web sitenizi WCAG 2.2'ye göre masaüstü ve mobilde tarar, bulguları kanıtlarıyla raporlar ve Audera Assist ile ziyaretçilere canlı erişilebilirlik desteği sunar." />
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+<script>(function(){try{var t=localStorage.getItem("audera-theme");if(t==="dark")document.documentElement.classList.remove("theme-light");else if(t==="light")document.documentElement.classList.add("theme-light");}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="landing/landing.css" />
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<header class="nav" id="nav">
+  <div class="container">
+    <a class="brand" href="#top" aria-label="Audera ana sayfa">
+      <svg width="30" height="30" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+        <rect width="64" height="64" rx="16" fill="#232020"/>
+        <path d="M16 41 L32 19 L48 41" fill="none" stroke="#FAF8F5" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M22.5 45.5 L32 32 L41.5 45.5" fill="none" stroke="#6F9BF0" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="name">Audera</span>
+    </a>
+    <nav class="nav-links" aria-label="Birincil">
+      <a href="#urun">Ürün</a>
+      <a href="#ozellikler">Özellikler</a>
+      <a href="#assist">Audera Assist</a>
+      <a href="#nasil">Nasıl çalışır</a>
+      <a href="#sss">SSS</a>
+    </nav>
+    <div class="nav-right">
+      <button class="theme-btn" id="themeBtn" aria-label="Temayı değiştir" title="Açık / koyu tema">
+        <svg class="sun" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+        <svg class="moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      </button>
+      <a class="btn btn-primary btn-sm" href="#iletisim">İletişime geçin</a>
+      <button class="nav-toggle" id="navToggle" aria-label="Menüyü aç" aria-expanded="false">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+<div class="mobile-menu" id="mobileMenu">
+  <a href="#urun">Ürün</a>
+  <a href="#ozellikler">Özellikler</a>
+  <a href="#assist">Audera Assist</a>
+  <a href="#nasil">Nasıl çalışır</a>
+  <a href="#sss">SSS</a>
+  <a class="btn btn-primary" href="#iletisim">İletişime geçin</a>
+</div>
+
+<main id="top">
+
+<!-- ============ HERO ============ -->
+<section class="hero" id="hero">
+  <div class="grid-bg"></div>
+  <div class="glow g1"></div>
+  <div class="container" style="position:relative;z-index:1">
+
+    <div class="hero-main hero-A">
+      <span class="hero-pill"><span class="tag">WCAG 2.2</span> Erişilebilirlik denetim platformu</span>
+      <h1>Erişilebilirliği denetleyin,<br><span class="em">kanıtlayın</span> ve sürekli iyileştirin.</h1>
+      <p class="sub">Audera web sitenizi masaüstü ve mobilde tarar, bulguları kanıtlarıyla gruplar, tekrar taramalarda karşılaştırır ve yöneticiden geliştiriciye herkesin okuyabileceği PDF raporlar üretir.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary btn-lg" href="#iletisim">İletişime geçin</a>
+        <a class="btn btn-ghost btn-lg" href="#urun">Ürünü inceleyin →</a>
+      </div>
+      <p class="hero-trust"><span class="dot"></span> Kamu kurumları, bankalar, e-ticaret ve kurumsal ekipler için.</p>
+    </div>
+
+    <div class="hero-mock reveal">
+      <div class="hero-mock-glow"></div>
+      <div class="window">
+        <div class="window-bar"><div class="dots"><i></i><i></i><i></i></div><div class="url"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>audera.app/projeler/ornek-belediye/genel-bakis</div></div>
+        <div class="console" data-full="true"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PRODUCT EXPLAINER ============ -->
+<section class="section" id="urun">
+  <div class="container">
+    <div class="section-head center reveal">
+      <span class="eyebrow center">Denetim konsolu</span>
+      <h2 class="title">Tek ekranda erişilebilirlik sağlığınız</h2>
+      <p class="lead">Skor, önem dağılımı, en çok etkilenen sayfalar ve tekrar eden sorunlar — yöneticiler için özet, teknik ekipler için kanıt. Hepsi aynı konsolda.</p>
+    </div>
+
+    <div class="product-points reveal" style="margin-top:44px">
+      <div class="ppoint">
+        <span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg></span>
+        <div><h4>Anlık genel bakış</h4><p>Skor, toplam bulgu ve önem kırılımı ilk bakışta.</p></div>
+      </div>
+      <div class="ppoint">
+        <span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></span>
+        <div><h4>Önceliklendirilmiş triyaj</h4><p>Önem, WCAG kriteri, görünüm ve kaynağa göre filtreleyin.</p></div>
+      </div>
+      <div class="ppoint">
+        <span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg></span>
+        <div><h4>Paylaşılabilir rapor</h4><p>Tek tıkla kanıt ekli PDF; paydaşlarla paylaşın.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FEATURES ============ -->
+<section class="section section-tight" id="ozellikler" style="background:var(--bg-2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+  <div class="container">
+    <div class="section-head reveal">
+      <span class="eyebrow">Özellikler</span>
+      <h2 class="title">Denetimden kanıta, rapordan karşılaştırmaya</h2>
+      <p class="lead">Audera teknik bir denetim motoru üzerine kurulu: gerçek tarayıcılarla tarar, kanıt toplar, sonuçları kök nedene göre düzenler.</p>
+    </div>
+
+    <div class="feature-grid">
+      <article class="fcard reveal">
+        <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/><path d="m16 16-1.9-1.9"/></svg></span>
+        <h3>Akıllı tarama</h3>
+        <p>Gerçek tarayıcı motoru, axe-core ve özel kurallar bir arada. Tek URL, URL listesi ya da aynı-domain tarama; her sayfa hem masaüstü hem mobil görünümde denetlenir.</p>
+        <div class="meta"><span class="tagchip">Tek URL</span><span class="tagchip">URL listesi</span><span class="tagchip">Aynı-domain</span></div>
+      </article>
+
+      <article class="fcard reveal">
+        <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12.8 2.2-9.2 4a1 1 0 0 0 0 1.8l8.6 3.9a2 2 0 0 0 1.6 0l8.6-3.9a1 1 0 0 0 0-1.8Z"/><path d="m22 12.5-9.2 4.2a2 2 0 0 1-1.6 0L2 12.5"/></svg></span>
+        <h3>Kanıt-temelli bulgular</h3>
+        <p>Her bulgu için ekran görüntüsü, eleman kırpması, CSS seçici ve HTML parçası. Tekrar eden sorunlar kök nedene göre gruplanır; bileşen, şablon, içerik veya üçüncü-taraf olarak etiketlenir.</p>
+        <div class="meta"><span class="tagchip">Ekran görüntüsü</span><span class="tagchip">CSS seçici</span><span class="tagchip">HTML parçası</span></div>
+      </article>
+
+      <article class="fcard reveal">
+        <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 13H8M16 17H8M10 9H8"/></svg></span>
+        <h3>Kanıt ekli PDF raporlar</h3>
+        <p>Yönetici özeti ve teknik bölümler bir arada: erişilebilirlik skoru, önem dağılımı, WCAG 2.2 dökümü, en çok etkilenen sayfalar, kanıt eki ve manuel inceleme listesi.</p>
+        <div class="meta"><span class="tagchip">Yönetici özeti</span><span class="tagchip">WCAG dökümü</span><span class="tagchip">Kanıt eki</span></div>
+      </article>
+
+      <article class="fcard reveal">
+        <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg></span>
+        <h3>Tekrar taramada karşılaştırma</h3>
+        <p>Taramalar arasında yeni, devam eden ve çözülen bulguları izleyin. İyileştirmenin etkisini sayılarla görün; gerilemeleri erkenden yakalayın.</p>
+        <div class="meta"><span class="tagchip">Yeni</span><span class="tagchip">Devam eden</span><span class="tagchip">Çözülen</span></div>
+      </article>
+    </div>
+
+    <div class="feature-mini">
+      <div class="fmini reveal">
+        <span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z"/><path d="M12 8v4M12 16h.01"/></svg></span>
+        <div><h4>Önem seviyeleri</h4><p>Kritik, ciddi, orta ve küçük — renk, etiket ve simgeyle birlikte.</p></div>
+      </div>
+      <div class="fmini reveal">
+        <span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span>
+        <div><h4>Güvenli tarama</h4><p>Özel ağları, localhost ve metadata IP'lerini engelleyen koruma katmanı.</p></div>
+      </div>
+      <div class="fmini reveal">
+        <span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></span>
+        <div><h4>Manuel inceleme etiketleri</h4><p>Otomatik testin yakalayamadığı kriterler için net işaretleme.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ HOW IT WORKS ============ -->
+<section class="section" id="nasil">
+  <div class="container">
+    <div class="section-head reveal">
+      <span class="eyebrow">Nasıl çalışır</span>
+      <h2 class="title">Dört adımda denetimden iyileştirmeye</h2>
+    </div>
+    <div class="steps">
+      <div class="step lit reveal">
+        <span class="num">01</span>
+        <h3>Hedefi tanımlayın</h3>
+        <p>Domain veya URL listesi girin; tarama modunu, sayfa limitlerini ve görünümleri (masaüstü/mobil) seçin.</p>
+      </div>
+      <div class="step lit reveal">
+        <span class="num">02</span>
+        <h3>Tarama çalışır</h3>
+        <p>Audera sayfaları gezer, her birini masaüstü ve mobilde denetler, ekran görüntüsü ve HTML kanıtı toplar.</p>
+      </div>
+      <div class="step lit reveal">
+        <span class="num">03</span>
+        <h3>Bulguları triyaj edin</h3>
+        <p>Önem, WCAG kriteri, görünüm ve kaynağa göre filtreleyin. Sorunlar kök nedene göre gruplanır.</p>
+      </div>
+      <div class="step lit reveal">
+        <span class="num">04</span>
+        <h3>Raporlayın ve iyileştirin</h3>
+        <p>Kanıt ekli PDF üretin, ekibe atayın ve Audera Assist ile ziyaretçilere anlık destek sunun.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ AUDERA ASSIST ============ -->
+<section class="section assist" id="assist">
+  <div class="container">
+    <div class="section-head center reveal">
+      <span class="assist-badge">
+        <svg width="20" height="20" viewBox="0 0 64 64" fill="none" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#5b8cff"/><path d="M16 41 L32 19 L48 41" fill="none" stroke="#0a0a0c" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M22.5 45.5 L32 32 L41.5 45.5" fill="none" stroke="#0a0a0c" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/></svg>
+        Audera Assist
+      </span>
+      <h2 class="title" style="margin-top:18px">Sitenize eklenen canlı erişilebilirlik destek katmanı</h2>
+      <p class="lead">Erişilebilirlik yalnızca otomatik testlerden geçmek değildir. Gerçek kullanıcılar siteleri farklı görme, okuma, odaklanma, hareket ve bilişsel ihtiyaçlarla deneyimler. Audera Assist, ziyaretçilerin site deneyimini kendi ihtiyaçlarına göre uyarlamasını sağlayan, kullanıcı kontrollü bir destek katmanıdır.</p>
+    </div>
+
+    <!-- interactive demo -->
+    <div class="assist-demo reveal">
+      <div class="demo-stage">
+        <div class="demo-toolbar"><div class="dots"><i></i><i></i><i></i></div><div class="u">örnek-site.com</div></div>
+        <div class="reading-mask" id="maskTop" style="top:42px;height:0"></div>
+        <div class="reading-mask" id="maskBottom" style="bottom:0;height:0"></div>
+        <div class="reading-guide" id="readGuide"></div>
+        <article id="assistSample">
+          <div class="kicker">Belediye Hizmetleri</div>
+          <h3 id="sampleHeading">Su ve atık yönetimi başvuruları artık çevrim içi</h3>
+          <p>Vatandaşlarımız, su aboneliği ve atık toplama hizmetlerine ilişkin başvurularını artık tek bir formdan tamamlayabiliyor. Başvuru sırasında gerekli belgeleri yükleyebilir, durumunuzu gerçek zamanlı olarak takip edebilirsiniz.</p>
+          <p>Daha fazla bilgi için <a href="#assist">hizmet rehberini inceleyin</a> veya çağrı merkezimizle iletişime geçin. Bu sayfadaki ayarları sağdaki Audera Assist panelinden değiştirerek deneyiminizi kendinize göre uyarlayabilirsiniz.</p>
+          <div class="media" data-media="true">görsel / kampanya banner'ı</div>
+          <div class="btnrow">
+            <span class="sbtn">Başvuru oluştur</span>
+            <span class="sbtn sec">Hizmet rehberi</span>
+          </div>
+        </article>
+      </div>
+
+      <!-- control panel -->
+      <aside class="assist-panel" aria-label="Audera Assist tercih paneli">
+        <div class="ap-head">
+          <span class="ai"><svg width="18" height="18" viewBox="0 0 64 64" fill="none" aria-hidden="true"><path d="M16 41 L32 19 L48 41" fill="none" stroke="#0a0a0c" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><path d="M22.5 45.5 L32 32 L41.5 45.5" fill="none" stroke="#0a0a0c" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/></svg></span>
+          <span class="t">Erişilebilirlik tercihleri<small>Canlı demo — deneyin</small></span>
+          <button class="reset" id="assistReset">Sıfırla</button>
+        </div>
+        <div class="ap-body">
+          <div class="ap-group">
+            <div class="gh">Okuma konforu</div>
+            <div class="ap-row"><span class="lbl">Metin boyutu</span><div class="step-ctrl" data-step="fontSize"><button data-dir="-1" aria-label="Metni küçült">−</button><span class="val">100%</span><button data-dir="1" aria-label="Metni büyüt">+</button></div></div>
+            <div class="ap-row"><span class="lbl">Satır yüksekliği</span><div class="step-ctrl" data-step="lineHeight"><button data-dir="-1" aria-label="Azalt">−</button><span class="val">1.7</span><button data-dir="1" aria-label="Artır">+</button></div></div>
+            <div class="ap-row"><span class="lbl">Harf aralığı</span><div class="step-ctrl" data-step="letterSpacing"><button data-dir="-1" aria-label="Azalt">−</button><span class="val">0</span><button data-dir="1" aria-label="Artır">+</button></div></div>
+            <div class="ap-row"><span class="lbl">Disleksi dostu font</span><button class="tgl" role="switch" aria-checked="false" data-toggle="dyslexia"><i></i></button></div>
+            <div class="ap-row"><span class="lbl">Bionic okuma</span><button class="tgl" role="switch" aria-checked="false" data-toggle="bionic"><i></i></button></div>
+          </div>
+          <div class="ap-group">
+            <div class="gh">Görsel algı ve kontrast</div>
+            <div class="ap-row"><span class="lbl">Yüksek kontrast</span><button class="tgl" role="switch" aria-checked="false" data-toggle="contrast"><i></i></button></div>
+            <div class="ap-row"><span class="lbl">Gri tonlama</span><button class="tgl" role="switch" aria-checked="false" data-toggle="grayscale"><i></i></button></div>
+            <div class="ap-row"><span class="lbl">Doygunluğu azalt</span><button class="tgl" role="switch" aria-checked="false" data-toggle="lowsat"><i></i></button></div>
+          </div>
+          <div class="ap-group">
+            <div class="gh">Gezinme ve odak</div>
+            <div class="ap-row"><span class="lbl">Linkleri belirginleştir</span><button class="tgl" role="switch" aria-checked="false" data-toggle="links"><i></i></button></div>
+            <div class="ap-row"><span class="lbl">Büyük imleç</span><button class="tgl" role="switch" aria-checked="false" data-toggle="cursor"><i></i></button></div>
+          </div>
+          <div class="ap-group">
+            <div class="gh">Okuma ve dikkat</div>
+            <div class="ap-row"><span class="lbl">Okuma maskesi</span><button class="tgl" role="switch" aria-checked="false" data-toggle="mask"><i></i></button></div>
+            <div class="ap-row"><span class="lbl">Okuma kılavuzu</span><button class="tgl" role="switch" aria-checked="false" data-toggle="guide"><i></i></button></div>
+          </div>
+          <div class="ap-group">
+            <div class="gh">Hareket ve medya</div>
+            <div class="ap-row"><span class="lbl">Animasyonları durdur</span><button class="tgl" role="switch" aria-checked="false" data-toggle="stopmotion"><i></i></button></div>
+            <div class="ap-row"><span class="lbl">Görselleri gizle</span><button class="tgl" role="switch" aria-checked="false" data-toggle="hideimg"><i></i></button></div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- category cards -->
+    <div class="assist-cats">
+      <div class="catcard reveal">
+        <span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></span>
+        <h4>Okuma konforu</h4>
+        <ul><li>Metin boyutu ve satır yüksekliği</li><li>Harf/metin aralığı ve hizalama</li><li>Okunabilir &amp; disleksi dostu font</li><li>Bionic reading tarzı okuma</li></ul>
+      </div>
+      <div class="catcard reveal">
+        <span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/></svg></span>
+        <h4>Görsel algı ve kontrast</h4>
+        <ul><li>Kontrast artırma ve akıllı kontrast</li><li>Parlaklık ve doygunluk ayarları</li><li>Monokrom / gri tonlama modu</li><li>Görsel yorgunluğunu azaltma</li></ul>
+      </div>
+      <div class="catcard reveal">
+        <span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 0 0-2 2M19 3a2 2 0 0 1 2 2M5 21a2 2 0 0 1-2-2M19 21a2 2 0 0 0 2-2M9 3h2M9 21h2"/><path d="m13 13 6 3-2.5 1L15 21z"/></svg></span>
+        <h4>Gezinme ve odak</h4>
+        <ul><li>Linkleri belirginleştirme</li><li>Daha görünür klavye odağı</li><li>Büyük imleç desteği</li><li>Sayfa yapısını gösterme</li></ul>
+      </div>
+      <div class="catcard reveal">
+        <span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6h20M2 12h20M2 18h12"/></svg></span>
+        <h4>Okuma ve dikkat</h4>
+        <ul><li>Okuma kılavuzu ve maskesi</li><li>Tıkla-okut / sayfa okuyucu</li><li>Dikkat dağıtıcıları azaltan okuma modu</li><li>Daha sakin bir sayfa düzeni</li></ul>
+      </div>
+      <div class="catcard reveal">
+        <span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></span>
+        <h4>Hareket ve medya kontrolü</h4>
+        <ul><li>Animasyonları durdurma</li><li>Sesleri susturma</li><li>Görselleri gizleme</li><li>Rahatsız edici içeriği azaltma</li></ul>
+      </div>
+      <div class="catcard reveal">
+        <span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></span>
+        <h4>Yardımcı ipuçları</h4>
+        <ul><li>alt, title ve aria açıklamalarını görünür kılma</li><li>Görsel ve kontroller için ek bağlam</li><li>Açıklayıcı bilgileri kullanıcıya sunma</li></ul>
+      </div>
+    </div>
+
+    <div class="note reveal" style="max-width:880px;margin-left:auto;margin-right:auto">
+      <span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></span>
+      <span>Audera Assist; WCAG 2.2 denetimleri, manuel testler ve teknik iyileştirme süreçlerinin yerini almaz, onları <b>tamamlar</b>. Teknik çalışmalar sürerken kullanıcılara anlık destek sağlayarak kurumların erişilebilirlikte daha proaktif ve şeffaf olmasına yardımcı olur.</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ WCAG SCOPE ============ -->
+<section class="section section-tight" id="kapsam">
+  <div class="container">
+    <div class="scope-grid">
+      <div class="reveal">
+        <span class="eyebrow">Kapsam ve şeffaflık</span>
+        <h2 class="title">WCAG 2.2'yi temel alır, sınırlarını açıkça söyler</h2>
+        <p class="lead">Audera, denetimlerini WCAG 2.2 başarı kriterlerine göre yapılandırır ve her bulguyu ilgili kritere bağlar. Otomatik testlerle yakalanamayan kriterler, manuel inceleme için işaretlenir.</p>
+        <div class="note">
+          <span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4M12 16h.01"/></svg></span>
+          <span>Audera <b>teknik erişilebilirlik denetimi</b> yapar. Otomatik testler WCAG 2.2 başarı kriterlerinin bir bölümünü kapsar ve <b>yasal uyumluluk sertifikası vermez</b>. Audera, denetim ve iyileştirme sürecinizi hızlandırır.</span>
+        </div>
+      </div>
+      <div class="reveal">
+        <div class="window" style="padding:22px;background:var(--panel)">
+          <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-3);margin-bottom:16px">WCAG 2.2 kriter dağılımı · örnek</div>
+          <div class="wcag-vis">
+            <div class="wcag-bar"><span class="id">1.4.3</span><span class="nm">Kontrast (Minimum)</span><span class="track"><i style="width:100%"></i></span></div>
+            <div class="wcag-bar"><span class="id">4.1.2</span><span class="nm">İsim, Rol, Değer</span><span class="track"><i style="width:75%"></i></span></div>
+            <div class="wcag-bar"><span class="id">1.1.1</span><span class="nm">Metin Olmayan İçerik</span><span class="track"><i style="width:58%"></i></span></div>
+            <div class="wcag-bar"><span class="id">2.4.4</span><span class="nm">Bağlantı Amacı</span><span class="track"><i style="width:40%"></i></span></div>
+            <div class="wcag-bar"><span class="id">2.5.8</span><span class="nm">Hedef Boyutu (Min.)</span><span class="track"><i style="width:31%"></i></span></div>
+            <div class="wcag-bar"><span class="id">2.4.7</span><span class="nm">Odak Görünürlüğü</span><span class="track"><i style="width:22%"></i></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ WHO FOR ============ -->
+<section class="section" id="kimler" style="background:var(--bg-2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+  <div class="container">
+    <div class="section-head center reveal">
+      <span class="eyebrow center">Kimler için</span>
+      <h2 class="title">Erişilebilirliği iş haline getiren ekipler</h2>
+    </div>
+    <div class="who-grid">
+      <div class="whocard reveal">
+        <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></span>
+        <h3>Geliştiriciler &amp; QA</h3>
+        <p>Kanıt-temelli, kök nedene göre gruplanmış bulgular. Seçici, HTML parçası ve tekrar taramada karşılaştırma ile hızlı düzeltme.</p>
+      </div>
+      <div class="whocard reveal">
+        <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4a2 2 0 0 0 .7 2.7l.2.1a2 2 0 0 1 1 1.7v.5a2 2 0 0 1-1 1.7l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.7v-.5a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></span>
+        <h3>Dijital ajanslar</h3>
+        <p>Birden çok müşteri ve siteyi tek yerden denetleyin. Marka ekli, paylaşılabilir PDF raporlarla değerinizi gösterin.</p>
+      </div>
+      <div class="whocard reveal">
+        <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/><path d="M9 9v.01M9 12v.01M9 15v.01M9 18v.01"/></svg></span>
+        <h3>Kamu &amp; kurumsal</h3>
+        <p>Uyumluluk sorumluları için şeffaf, tekrarlanabilir denetim ve raporlama. Audera Assist ile kullanıcılara proaktif destek.</p>
+      </div>
+    </div>
+    <div class="sectors reveal">
+      <span class="sector"><span class="d"></span>Kamu kurumları</span>
+      <span class="sector"><span class="d"></span>Belediyeler</span>
+      <span class="sector"><span class="d"></span>Bankalar</span>
+      <span class="sector"><span class="d"></span>E-ticaret</span>
+      <span class="sector"><span class="d"></span>Sağlık portalları</span>
+      <span class="sector"><span class="d"></span>Kurumsal web siteleri</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section class="section" id="sss">
+  <div class="container">
+    <div class="section-head center reveal">
+      <span class="eyebrow center">Sık sorulan sorular</span>
+      <h2 class="title">Merak edilenler</h2>
+    </div>
+    <div class="faq">
+      <div class="faq-item">
+        <button class="faq-q">Audera nasıl kullanılır?<span class="pm"></span></button>
+        <div class="faq-a"><div class="inner">Audera, yönetilen bir SaaS platformudur. Kullanmaya başlamak için aşağıdaki iletişim formunu doldurun; ekibimiz sizinle iletişime geçerek ihtiyacınıza uygun kurulum ve demoyu planlasın.</div></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q">Otomatik test her şeyi yakalar mı?<span class="pm"></span></button>
+        <div class="faq-a"><div class="inner">Hayır. Otomatik testler WCAG 2.2 başarı kriterlerinin yalnızca bir bölümünü kapsar. Audera, otomatik olarak test edilemeyen kriterleri "manuel inceleme gerekli" olarak işaretler; böylece denetiminiz hem hızlı hem de dürüst olur.</div></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q">Hangi sayfalar taranabilir?<span class="pm"></span></button>
+        <div class="faq-a"><div class="inner">Genel erişime açık sayfalar taranır. Tek bir URL, belirli bir URL listesi veya aynı-domain üzerinde sınırlı bir gezinme ile tarama yapabilirsiniz. Sayfa ve derinlik limitleri sizin kontrolünüzdedir.</div></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q">Audera Assist yasal uyumluluk sağlar mı?<span class="pm"></span></button>
+        <div class="faq-a"><div class="inner">Audera Assist, kullanıcıların site deneyimini kendi ihtiyaçlarına göre uyarlamasına yardımcı olan bir destek katmanıdır. Teknik denetim ve iyileştirmenin yerini almaz; onu tamamlar ve kullanıcılara anlık fayda sağlar.</div></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q">Raporları paydaşlarla paylaşabilir miyim?<span class="pm"></span></button>
+        <div class="faq-a"><div class="inner">Evet. Audera; yönetici özeti, önem dağılımı, WCAG 2.2 dökümü ve kanıt eki içeren PDF raporlar üretir. Bu raporlar teknik olmayan paydaşların da anlayabileceği şekilde tasarlanmıştır.</div></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q">Nasıl başlarız?<span class="pm"></span></button>
+        <div class="faq-a"><div class="inner">İletişim formunu doldurmanız yeterli. Sitenizi ve önceliklerinizi anlatın; ekibimiz size en uygun kurulumu, kapsamı ve demoyu planlasın.</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CONTACT ============ -->
+<section class="section contact" id="iletisim">
+  <div class="glow"></div>
+  <div class="container">
+    <div class="section-head center reveal">
+      <span class="eyebrow center">İletişim</span>
+      <h2 class="title">Audera'yı kullanmaya başlayın</h2>
+      <p class="lead">Ekibimize sitenizi ve önceliklerinizi anlatın; size en uygun kurulumu ve demoyu birlikte planlayalım.</p>
+    </div>
+
+    <div class="contact-grid">
+      <div class="contact-info reveal">
+        <h3>Birlikte planlayalım</h3>
+        <p>Denetlemek istediğiniz site, ekibinizin büyüklüğü ve hedeflerinizi paylaşın. Genellikle bir iş günü içinde dönüş yaparız.</p>
+        <div class="contact-list">
+          <div class="cl-item">
+            <span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg></span>
+            <div><div class="k">E-posta</div><div class="v">merhaba@audera.app</div></div>
+          </div>
+          <div class="cl-item">
+            <span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+            <div><div class="k">Konum</div><div class="v">İstanbul, Türkiye</div></div>
+          </div>
+          <div class="cl-item">
+            <span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span>
+            <div><div class="k">Yanıt süresi</div><div class="v">Genellikle 1 iş günü</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="reveal">
+        <form class="form" id="contactForm" novalidate>
+          <div class="form-fields" id="formFields">
+            <div class="form-row">
+              <div class="field"><label for="f-name">Ad Soyad <span class="req">*</span></label><input id="f-name" name="name" placeholder="Adınız ve soyadınız" required /></div>
+              <div class="field"><label for="f-email">İş e-postası <span class="req">*</span></label><input id="f-email" name="email" type="email" placeholder="ad@sirket.com" required /></div>
+            </div>
+            <div class="form-row">
+              <div class="field"><label for="f-company">Şirket <span class="req">*</span></label><input id="f-company" name="company" placeholder="Şirket / kurum adı" required /></div>
+              <div class="field"><label for="f-site">Web sitesi / denetlenecek domain <span class="req">*</span></label><input id="f-site" name="site" placeholder="https://site.com" required /></div>
+            </div>
+            <div class="field"><label for="f-msg">Mesaj / ihtiyaç</label><textarea id="f-msg" name="message" rows="4" placeholder="Hangi siteyi denetlemek istiyorsunuz? Öncelikleriniz neler?"></textarea></div>
+            <button type="submit" class="btn btn-primary btn-lg" style="width:100%">İletişime geçin</button>
+            <p class="consent">Bu formu göndererek Audera ekibinin sizinle bu talep hakkında iletişime geçmesine izin vermiş olursunuz.</p>
+          </div>
+          <div class="form-success" id="formSuccess">
+            <span class="badge"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+            <h3>Teşekkürler! Talebiniz alındı.</h3>
+            <p>Ekibimiz en kısa sürede, genellikle bir iş günü içinde sizinle iletişime geçecek. Bu arada ürünü incelemeye devam edebilirsiniz.</p>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ============ FOOTER ============ -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <a class="brand" href="#top" aria-label="Audera">
+          <svg width="28" height="28" viewBox="0 0 64 64" fill="none" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#232020"/><path d="M16 41 L32 19 L48 41" fill="none" stroke="#FAF8F5" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M22.5 45.5 L32 32 L41.5 45.5" fill="none" stroke="#6F9BF0" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="name">Audera</span>
+        </a>
+        <p class="fdesc">Web erişilebilirlik denetimi, kanıt-temelli raporlama ve canlı kullanıcı desteği — tek platformda.</p>
+      </div>
+      <div class="fcol">
+        <h5>Ürün</h5>
+        <a href="#urun">Denetim konsolu</a>
+        <a href="#ozellikler">Özellikler</a>
+        <a href="#assist">Audera Assist</a>
+        <a href="#nasil">Nasıl çalışır</a>
+      </div>
+      <div class="fcol">
+        <h5>Kaynaklar</h5>
+        <a href="#kapsam">WCAG 2.2 kapsamı</a>
+        <a href="#kimler">Kimler için</a>
+        <a href="#sss">SSS</a>
+      </div>
+      <div class="fcol">
+        <h5>İletişim</h5>
+        <a href="#iletisim">İletişime geçin</a>
+        <a href="mailto:merhaba@audera.app">merhaba@audera.app</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Audera. Tüm hakları saklıdır.</span>
+      <span class="disc">Audera teknik erişilebilirlik denetimi yapar ve yasal uyumluluk sertifikası vermez.</span>
+    </div>
+  </div>
+</footer>
+
+<script src="landing/landing.js"></script>
+</body>
+</html>

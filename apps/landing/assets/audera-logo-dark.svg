@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="212" height="48" viewBox="0 0 212 48" role="img" aria-label="Audera">
+  <g transform="translate(0,2) scale(0.6875)">
+    <rect width="64" height="64" rx="16" fill="#232020"></rect>
+    <path d="M16 41 L32 19 L48 41" fill="none" stroke="#FAF8F5" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"></path>
+    <path d="M22.5 45.5 L32 32 L41.5 45.5" fill="none" stroke="#6F9BF0" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"></path>
+  </g>
+  <text x="56" y="33" fill="#ECE7DF" font-family="Geist, system-ui, sans-serif" font-weight="600" font-size="30" letter-spacing="-1.05">Audera</text>
+</svg>

@@ -40,6 +40,8 @@ importers:
         specifier: ^4.11.0
         version: 4.22.4
 
+  apps/landing: {}
+
   apps/server:
     dependencies:
       '@a11yaudit/audit':
