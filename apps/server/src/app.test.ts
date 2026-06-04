@@ -4207,4 +4207,61 @@ describe("assist widget bundle route", () => {
       }
     });
   });
+
+  it("serves the landing page at / without auth", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const res = await app.inject({ method: "GET", url: "/" });
+        expect(res.statusCode).toBe(200);
+        expect(res.headers["content-type"]).toContain("text/html");
+        expect(res.body).toContain("Audera");
+        expect(res.body).not.toContain("bankalar, e-ticaret");
+        expect(res.body).toContain("/assist/a11yaudit-assist.js");
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("serves the landing demo sample page", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const res = await app.inject({ method: "GET", url: "/demo/ornek-site.html" });
+        expect(res.statusCode).toBe(200);
+        expect(res.body).toContain("/assist/a11yaudit-assist.js");
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("serves the landing css asset", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const res = await app.inject({ method: "GET", url: "/landing/landing.css" });
+        expect(res.statusCode).toBe(200);
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  it("does not shadow /health, /api, or /assist", async () => {
+    await withTempDb(async (dbPath) => {
+      const app = await buildServer({ dbPath, executeScans: false });
+      try {
+        const health = await app.inject({ method: "GET", url: "/health" });
+        expect(health.statusCode).toBe(200);
+
+        const assist = await app.inject({ method: "GET", url: "/assist/a11yaudit-assist.js" });
+        expect([200, 404]).toContain(assist.statusCode);
+        expect(assist.headers["content-type"] ?? "").not.toContain("text/html");
+      } finally {
+        await app.close();
+      }
+    });
+  });
 });

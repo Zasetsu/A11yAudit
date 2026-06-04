@@ -18,6 +18,7 @@
     "@a11yaudit/reporter": "workspace:*",
     "@a11yaudit/storage": "workspace:*",
     "@fastify/rate-limit": "^9.1.0",
+    "@fastify/static": "^7",
     "better-sqlite3": "^12.10.0",
     "drizzle-orm": "^0.30.10",
     "fastify": "^4.27.0",
