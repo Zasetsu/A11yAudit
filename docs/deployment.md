@@ -109,9 +109,12 @@ The server serves the built accessibility widget bundle at:
 ```text
 GET /assist/a11yaudit-assist.js
 GET /assist/a11yaudit-assist.js.map
+GET /assist/<projectId>.js
 ```
 
-These are **public, unauthenticated, CSRF-exempt** GETs with `Access-Control-Allow-Origin: *` (and `Access-Control-Allow-Credentials: false`, spec-valid for `*`) and a `public, max-age=3600` cache. The route requires the widget package to be built (`pnpm build` produces `packages/assist-widget/dist/a11yaudit-assist.js`); if the bundle is missing the route returns `404`.
+The first two are **public, unauthenticated, CSRF-exempt** GETs with `Access-Control-Allow-Origin: *` (and `Access-Control-Allow-Credentials: false`, spec-valid for `*`) and a `public, max-age=3600` cache. The route requires the widget package to be built (`pnpm build` produces `packages/assist-widget/dist/a11yaudit-assist.js`); if the bundle is missing the route returns `404`.
+
+`GET /assist/<projectId>.js` serves a **per-project bundle**: it inlines `window.__AA_ASSIST_CONFIG__ = {…}` (the owner-managed widget config from the dashboard) before the shared bundle bytes, so the embedded widget renders with the configured behavior, brand, and custom CSS. Public, CORS `*`, `Cache-Control: public, max-age=60` (an owner's save goes live within ~1 minute). An unknown `projectId` is served with **default config** (a typo never breaks the customer page); only a missing bundle file returns `404`. Owners edit this config at `PUT /api/workspaces/:slug/projects/:projectId/widget-config` (owner-only). Embed: `<script src="https://<A11YAUDIT_SERVER_URL>/assist/<projectId>.js" defer></script>` — no `data-*` attributes needed.
 
 Customers embed the widget with one script tag pointing at the Audera server origin:
 
