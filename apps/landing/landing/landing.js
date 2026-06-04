@@ -18,10 +18,10 @@
     return '<div class="c-ring" style="width:' + size + 'px;height:' + size + 'px">' +
       '<svg width="' + size + '" height="' + size + '" style="transform:rotate(-90deg)">' +
       '<circle cx="' + size/2 + '" cy="' + size/2 + '" r="' + r + '" fill="none" stroke="#efebe4" stroke-width="9"/>' +
-      '<circle cx="' + size/2 + '" cy="' + size/2 + '" r="' + r + '" fill="none" stroke="' + color + '" stroke-width="9" stroke-linecap="round" stroke-dasharray="' + c + '" stroke-dashoffset="' + off + '"/>' +
+      '<circle class="c-ring-arc" cx="' + size/2 + '" cy="' + size/2 + '" r="' + r + '" fill="none" stroke="' + color + '" stroke-width="9" stroke-linecap="round" stroke-dasharray="' + c + '" stroke-dashoffset="' + off + '"/>' +
       '</svg>' +
       '<div class="c-ring-c">' +
-      '<span class="c-ring-n" style="font-size:' + (size*0.3) + 'px">' + score + '</span>' +
+      '<span class="c-ring-n" style="font-size:' + (size*0.3) + 'px" data-count="' + score + '">' + score + '</span>' +
       '<span class="c-ring-max">/100</span></div></div>';
   }
 
@@ -68,7 +68,7 @@
       '<div class="c-search">Bulgu, URL veya WCAG kriteri ara…</div></div>';
 
     var stats = statCards.map(function (s) {
-      return '<div class="c-st"><div class="l">' + s.l + '</div><div class="v' + (s.crit ? " crit" : "") + '">' + s.v + '</div></div>';
+      return '<div class="c-st"><div class="l">' + s.l + '</div><div class="v' + (s.crit ? " crit" : "") + '" data-count="' + s.v + '">' + s.v + '</div></div>';
     }).join("");
 
     var scoreCard =
@@ -90,7 +90,7 @@
       '</div>' +
       '<div class="c-sevrows">' +
       severityRows.map(function (r) {
-        return '<span class="c-sev-pill"><span class="dot" style="background:' + SEV[r.k] + '"></span>' + r.l + ' <b>' + r.n + '</b></span>';
+        return '<span class="c-sev-pill"><span class="dot" style="background:' + SEV[r.k] + '"></span>' + r.l + ' <b data-count="' + r.n + '">' + r.n + '</b></span>';
       }).join("") +
       '</div></div>';
 
@@ -124,6 +124,61 @@
   document.querySelectorAll(".console").forEach(function (el) {
     buildConsole(el, el.dataset.full === "true");
   });
+
+  /* ---------- console replica: animate ring, severity meter, counters ---------- */
+  var prefersReduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function countUp(el, to, dur) {
+    var start = null;
+    function tick(ts) {
+      if (start === null) start = ts;
+      var p = Math.min((ts - start) / dur, 1);
+      var eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(to * eased);
+      if (p < 1) requestAnimationFrame(tick);
+      else el.textContent = to;
+    }
+    requestAnimationFrame(tick);
+  }
+
+  function animateConsole(root) {
+    if (prefersReduced) return; // leave the final rendered state untouched
+
+    // score ring: sweep the arc from empty to its target offset
+    var arc = root.querySelector(".c-ring-arc");
+    if (arc) {
+      var target = arc.getAttribute("stroke-dashoffset");
+      var dash = arc.getAttribute("stroke-dasharray");
+      arc.style.transition = "none";
+      arc.setAttribute("stroke-dashoffset", dash);
+      void arc.getBoundingClientRect();
+      arc.style.transition = "stroke-dashoffset 1.1s cubic-bezier(.22,1,.36,1)";
+      requestAnimationFrame(function () { arc.setAttribute("stroke-dashoffset", target); });
+    }
+
+    // severity meter: grow each bar from 0 to its width, staggered
+    root.querySelectorAll(".c-meter i").forEach(function (bar, i) {
+      var w = bar.style.width;
+      bar.style.transition = "none";
+      bar.style.width = "0%";
+      void bar.getBoundingClientRect();
+      bar.style.transition = "width .9s cubic-bezier(.22,1,.36,1)";
+      bar.style.transitionDelay = (i * 0.08) + "s";
+      requestAnimationFrame(function () { bar.style.width = w; });
+    });
+
+    // counters: tick up from 0 to the data-count target
+    root.querySelectorAll("[data-count]").forEach(function (el) {
+      countUp(el, parseInt(el.getAttribute("data-count"), 10), 1100);
+    });
+  }
+
+  var consoleIO = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      if (en.isIntersecting) { animateConsole(en.target); consoleIO.unobserve(en.target); }
+    });
+  }, { threshold: 0.25 });
+  document.querySelectorAll(".console").forEach(function (el) { consoleIO.observe(el); });
 
   /* ---------- theme toggle ---------- */
   var themeBtn = document.getElementById("themeBtn");
