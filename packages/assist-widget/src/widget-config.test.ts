@@ -45,4 +45,30 @@ describe("normalizeWidgetConfig", () => {
     expect(normalizeWidgetConfig({ brand: { launcherIcon: "alert('x')" } }).brand.launcherIcon).toBe("default");
     expect(normalizeWidgetConfig({ brand: { launcherIcon: "<svg></svg>" } }).brand.launcherIcon).toBe("<svg></svg>");
   });
+
+  it("rejects an svg launcher icon with a script or event handler", () => {
+    expect(normalizeWidgetConfig({ brand: { launcherIcon: "<svg><script>1</script></svg>" } }).brand.launcherIcon).toBe("default");
+    expect(normalizeWidgetConfig({ brand: { launcherIcon: "<svg onload=\"x()\"></svg>" } }).brand.launcherIcon).toBe("default");
+    expect(normalizeWidgetConfig({ brand: { launcherIcon: "<svg><a href=\"javascript:x\"></a></svg>" } }).brand.launcherIcon).toBe("default");
+    expect(normalizeWidgetConfig({ brand: { launcherIcon: "<svg><path d=\"M0 0\"/></svg>" } }).brand.launcherIcon).toBe("<svg><path d=\"M0 0\"/></svg>");
+  });
+
+  it("rejects an oversized svg launcher icon", () => {
+    const huge = "<svg>" + "x".repeat(20001) + "</svg>";
+    expect(normalizeWidgetConfig({ brand: { launcherIcon: huge } }).brand.launcherIcon).toBe("default");
+  });
+
+  it("strips @import without eating the following rule", () => {
+    const css = "@import url(evil)\n.keep{color:red}";
+    const out = normalizeWidgetConfig({ customCss: css }).customCss;
+    expect(out).not.toMatch(/@import/i);
+    expect(out).toContain(".keep{color:red}");
+  });
+
+  it("caps customCss by UTF-8 bytes, not characters", () => {
+    // each "学" is 3 UTF-8 bytes; 20000 chars = 60000 bytes > 50000 cap
+    const big = "学".repeat(20000);
+    const out = normalizeWidgetConfig({ customCss: big }).customCss;
+    expect(new TextEncoder().encode(out).length).toBeLessThanOrEqual(WIDGET_CONFIG_CSS_MAX_BYTES);
+  });
 });
