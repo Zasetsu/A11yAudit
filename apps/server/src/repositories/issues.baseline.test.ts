@@ -153,6 +153,22 @@ describe("getBaselineIssues", () => {
     ).toEqual([]);
   });
 
+  it("excludes resolved carry-over rows from the baseline", () => {
+    // S2 (newest completed for P) also carries a resolved row from a prior fix.
+    // It must NOT seed the baseline — otherwise a fixed issue would re-resolve every
+    // scan, and a regressed issue would be mislabeled "ongoing" instead of "new".
+    client.db.insert(issues).values(issueFixture({
+      id: "issue-s2-resolved",
+      scanRunId: "S2",
+      issueKey: "k-resolved",
+      status: "resolved"
+    })).run();
+
+    const keys = getBaselineIssues(client.db, { projectId: "P", excludeScanRunId: "S_new" }).map((b) => b.issueKey);
+    expect(keys).toContain("k2");
+    expect(keys).not.toContain("k-resolved");
+  });
+
   it("maps wcagCriteria and sampleUrls onto the BaselineIssue shape", () => {
     const [baseline] = getBaselineIssues(client.db, { projectId: "P", excludeScanRunId: "S2" });
     expect(baseline.wcagCriteria).toEqual(["1.1.1"]);

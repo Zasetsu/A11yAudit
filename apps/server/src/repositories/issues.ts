@@ -134,10 +134,13 @@ export function getBaselineIssues(
     return [];
   }
 
+  // Exclude resolved carry-over rows from the baseline. They are not "live" issues:
+  // including them would re-resolve an already-fixed issue on every subsequent scan
+  // (sticky resolved) and would mislabel a regressed issue as "ongoing" instead of "new".
   return db
     .select({ issue: issues })
     .from(issues)
-    .where(eq(issues.scanRunId, priorRun.id))
+    .where(and(eq(issues.scanRunId, priorRun.id), ne(issues.status, "resolved")))
     .all()
     .map((row) => toBaselineIssue(row.issue));
 }
