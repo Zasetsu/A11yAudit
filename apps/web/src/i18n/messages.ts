@@ -242,6 +242,14 @@ export interface Messages {
   "widget.save": string;
   "widget.saved": string;
   "widget.ownerOnly": string;
+  "widget.sectionsHint": string;
+  "widget.appearance": string;
+  "widget.advanced": string;
+  "widget.launcherLabelHint": string;
+  "widget.launcherLabelPlaceholder": string;
+  "widget.launcherIconHint": string;
+  "widget.customCssHint": string;
+  "widget.embedCopied": string;
   // settings
   "settings.subtitle": string;
   "settings.scanDefaults": string;
@@ -562,6 +570,14 @@ export const MESSAGES: Record<Locale, Messages> = {
     "widget.save": "Kaydet",
     "widget.saved": "Kaydedildi: ~1 dk içinde canlı.",
     "widget.ownerOnly": "Bu ayarları yalnızca workspace sahibi düzenleyebilir.",
+    "widget.sectionsHint": "Hangi bölümler ve özellikler ziyaretçilere sunulsun.",
+    "widget.appearance": "Görünüm",
+    "widget.advanced": "Gelişmiş",
+    "widget.launcherLabelHint": "Açılış butonunun erişilebilir etiketi.",
+    "widget.launcherLabelPlaceholder": "Erişilebilirlik",
+    "widget.launcherIconHint": "İsteğe bağlı. Tek bir <svg> öğesi; boş bırakırsanız varsayılan ikon kullanılır.",
+    "widget.customCssHint": "Widget'a özel stil; izole shadow DOM içine uygulanır.",
+    "widget.embedCopied": "Kopyalandı",
     "settings.subtitle": "Audera ayarları ve kontrolleri.",
     "settings.scanDefaults": "Tarama varsayılanları",
     "settings.defaultUrl": "Varsayılan proje URL'si",
@@ -869,6 +885,14 @@ export const MESSAGES: Record<Locale, Messages> = {
     "widget.save": "Save",
     "widget.saved": "Saved: live within ~1 minute.",
     "widget.ownerOnly": "Only the workspace owner can edit these settings.",
+    "widget.sectionsHint": "Which sections and features visitors can use.",
+    "widget.appearance": "Appearance",
+    "widget.advanced": "Advanced",
+    "widget.launcherLabelHint": "Accessible label for the launcher button.",
+    "widget.launcherLabelPlaceholder": "Accessibility",
+    "widget.launcherIconHint": "Optional. A single <svg> element; leave empty for the default icon.",
+    "widget.customCssHint": "Custom styles applied inside the widget's isolated shadow DOM.",
+    "widget.embedCopied": "Copied",
     "settings.subtitle": "Audera settings and controls.",
     "settings.scanDefaults": "Scan defaults",
     "settings.defaultUrl": "Default project URL",

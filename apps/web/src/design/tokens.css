@@ -1179,3 +1179,117 @@ textarea.input { height: auto; line-height: 1.5; min-height: 86px; padding: 8px 
     text-align: left;
   }
 }
+
+/* ============ Widget settings page ============ */
+.wcfg {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.wcfg-main { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: 16px; }
+.wcfg-aside { position: sticky; top: 16px; display: grid; gap: 16px; }
+
+.wcfg-sections { display: grid; gap: 12px; }
+.wcfg-section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--panel-2);
+  padding: 12px 14px;
+  transition: opacity 150ms;
+}
+.wcfg-section.is-off { opacity: 0.62; }
+.wcfg-section-h { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.wcfg-section-name { font-size: 13px; font-weight: 600; color: var(--ink); }
+.wcfg-section-meta { font-size: 11px; color: var(--ink-3); margin-top: 1px; }
+.wcfg-feats { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+
+.feat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 11px 0 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms, color 120ms, border-color 120ms;
+}
+.feat .feat-mark {
+  width: 13px; height: 13px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  color: #fff;
+}
+.feat.on { background: var(--accent-bg); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.feat.on .feat-mark { background: var(--accent); border-color: var(--accent); }
+.feat:disabled { cursor: not-allowed; opacity: 0.55; }
+.feat:not(:disabled):hover { border-color: var(--accent); }
+.feat:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.seg { display: inline-flex; width: 100%; border: 1px solid var(--border-strong); border-radius: var(--radius-md); overflow: hidden; }
+.seg button {
+  flex: 1;
+  height: 34px;
+  background: var(--panel);
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  border-right: 1px solid var(--border);
+}
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: var(--accent); color: #fff; font-weight: 600; }
+.seg button:disabled { cursor: not-allowed; }
+
+.accent-row { display: flex; align-items: center; gap: 10px; }
+.accent-swatch { width: 44px; height: 34px; padding: 2px; border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--panel); cursor: pointer; }
+.accent-hex { font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-2); letter-spacing: 0.02em; }
+
+.mono-area { height: auto; min-height: 80px; padding: 9px 10px; font-family: var(--font-mono); font-size: 12px; line-height: 1.55; resize: vertical; }
+
+.wcfg-adv { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--panel); overflow: hidden; }
+.wcfg-adv > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 12px 14px; font-size: 13px; font-weight: 600; color: var(--ink); }
+.wcfg-adv > summary::-webkit-details-marker { display: none; }
+.wcfg-adv-chev { transition: transform 150ms; color: var(--ink-3); }
+.wcfg-adv[open] .wcfg-adv-chev { transform: rotate(90deg); }
+.wcfg-adv-b { padding: 0 14px 14px; display: grid; gap: 14px; border-top: 1px solid var(--border); padding-top: 14px; }
+
+.embed-code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  margin: 0 0 10px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--ink);
+}
+
+.wcfg-savebar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.wcfg-saved { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 500; color: var(--resolved); }
+
+@media (max-width: 960px) {
+  .wcfg { grid-template-columns: 1fr; }
+  .wcfg-aside { position: static; }
+}
